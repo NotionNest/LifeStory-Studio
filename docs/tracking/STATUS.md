@@ -1,6 +1,6 @@
 # 项目跟进
 
-更新：2026-10-15。当前阶段：开发环境与代码骨架已建立，macOS 本机验证完成；正式功能及 Windows 实机验证待推进。
+更新：2026-10-15。当前阶段：开发环境、代码骨架与 Git 流程已建立，macOS 本机验证及双平台 CI 通过；正式功能及 Windows 实机验证待推进。
 
 ## 当前任务
 
@@ -11,14 +11,14 @@
 | TASK-03 | 协作流程与项目规则 | DEC-05 | 已建立 | WORKFLOW.md、AGENTS.md、模板与人类使用手册 |
 | TASK-04 | 核心产品决策 | DEC-06—11 | 主要范围已确认；剩余事项待决定 | 双平台、两类 AI、本地资料、文字/对话/图片、生活回顾与导出已确认；系统/CPU、加密及具体服务名单待定 |
 | TASK-05 | 体验、架构及技术选型 | 全部核心需求 | 已确认 | architecture 下四份方案，官方文档研究及本机 CLI/schema 检查 |
-| TASK-06 | 可运行开发环境与代码骨架 | 技术方案 | 本机已验证；Windows 待验证 | [开发环境说明](../development/ENVIRONMENT.md)；真实应用包与 IPC、SQLite、编辑器检查通过 |
+| TASK-06 | 可运行开发环境与代码骨架 | 技术方案 | 本机及双平台 CI 已验证；Windows 实机待验收 | [开发环境说明](../development/ENVIRONMENT.md)；真实应用包与 IPC、SQLite、编辑器检查通过 |
 | TASK-07 | 功能规格与开发任务拆解 | REQ-01—15 | 待开始 | 产品范围和技术方案 |
 
 任务表是本地进度记录，没有建立定时自动跟进或外部任务同步。
 
 ## 本次交接
 
-2026-10-15 Git 初始化：GitHub 登录 NotionNest 已核实，用户授权将项目放入远程，并确认账号。已创建私有仓库 https://github.com/NotionNest/LifeStory-Studio 并绑定 origin。新增 Git 流程、PR 模板、LF 约定及双平台 Checks 工作流。首次提交/推送与 CI 结果在完成后更新；不把工作流文件存在当作检查通过。
+2026-10-15 Git 初始化：GitHub 登录 NotionNest 已核实，用户授权将项目放入远程，并确认账号。已创建私有仓库 https://github.com/NotionNest/LifeStory-Studio 并绑定 origin。新增 Git 流程、PR 模板、LF 约定及双平台 Checks 工作流。已完成首次提交 `0417fa0` 与推送。首次 CI 暴露锁文件空版本条目和测试临时目录时间戳碰撞，分别以 `a15001d`、`6949702` 修复，未改变既有依赖版本或降低检查要求。代码提交 `6949702` 的 [双平台 Checks](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38671215710) 已通过 macOS/Windows 的严格依赖安装、类型/格式、3 个存储集成用例、Clippy 与桌面编译。本机另验证干净目录 npm ci、存储测试及类型/格式。此次没有发布安装包、开启服务器分支保护或完成 Windows 实机验收；后续从 main 建任务分支，经 PR 审阅与 squash 合并。
 
 2026-10-15 前端技术追加：用户指定 Tailwind CSS + shadcn/ui，记录 DEC-16。已接入 Tailwind Vite 插件、主题变量、@ 别名、components.json 和官方 Radix Button/Badge。当前页面采用 Tailwind 布局与源码控件，去除全局按钮样式冲突。类型检查和 macOS 调试包构建通过，真实窗口刷新 IPC 与编辑器加载检查通过；此次未更改 Rust 逻辑，未重复存储测试或新增样式用例。最低平台范围需考虑 Tailwind 的 WebView 基线，Windows 仍未实机验证。
 
