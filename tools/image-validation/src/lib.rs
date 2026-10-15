@@ -72,5 +72,6 @@ mod tests {
         }
         assert!(validate(&vec![0; MAX_BYTES + 1]).is_err());
         assert!(validate(include_bytes!("../fixtures/oversize.png")).is_err());
+        assert!(validate(include_bytes!("../fixtures/overpixels.png")).is_err());
     }
 }

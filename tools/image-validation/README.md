@@ -4,6 +4,6 @@
 
 运行：`cargo test --locked --manifest-path tools/image-validation/Cargo.toml`。
 
-`fixtures` 为 Pillow 12.3.0 生成的合成图片，无用户资料：静态 8×6 RGB PNG/JPEG/WebP、两帧 APNG/动画 WebP，以及 17000×1 PNG。静态样本依据文件签名解码，动画明确拒绝，截断/未知输入和尺寸/字节超限必须失败。样本不代表所有色彩空间、EXIF 方向或跨平台 UI 都已验证。
+`fixtures` 为 Pillow 12.3.0 生成的合成图片，无用户资料：静态 8×6 RGB PNG/JPEG/WebP、两帧 APNG/动画 WebP，以及 17000×1 单边超限、7000×6000 总像素超限 PNG。静态样本依据文件签名解码，动画明确拒绝，截断/未知输入和尺寸/字节超限必须失败。样本不代表所有色彩空间、EXIF 方向或跨平台 UI 都已验证。
 
 格式与能力结果见 [图片支持矩阵](../../docs/features/IMAGE_CAPABILITIES.md)。
