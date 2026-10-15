@@ -2,7 +2,8 @@ use rusqlite::Connection;
 
 fn database() -> Connection {
     let db = Connection::open_in_memory().unwrap();
-    db.execute_batch(include_str!("../../docs/features/contracts/library.sql"))
+    db.pragma_update(None, "foreign_keys", "ON").unwrap();
+    db.execute_batch(include_str!("../migrations/002_records.sql"))
         .unwrap();
     db
 }

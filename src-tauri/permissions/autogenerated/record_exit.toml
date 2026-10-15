@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-record-exit"
+description = "Enables the record_exit command without any pre-configured scope."
+commands.allow = ["record_exit"]
+
+[[permission]]
+identifier = "deny-record-exit"
+description = "Denies the record_exit command without any pre-configured scope."
+commands.deny = ["record_exit"]

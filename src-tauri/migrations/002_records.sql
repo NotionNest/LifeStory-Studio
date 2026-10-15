@@ -1,6 +1,5 @@
--- LIB-01 target schema, reviewed before activation by LIB-02.
+-- Migration 002: library records.
 -- All time instants are UTC Unix milliseconds; record_date is a validated YYYY-MM-DD.
-PRAGMA foreign_keys = ON;
 CREATE TABLE records (
     id TEXT PRIMARY KEY NOT NULL,
     kind TEXT NOT NULL CHECK (kind IN ('text', 'conversation', 'draft')),
@@ -114,3 +113,11 @@ CREATE TABLE record_relations (
 );
 -- Literal search policy is implemented by the query layer; no user MATCH syntax.
 CREATE VIRTUAL TABLE record_search USING fts5(record_id UNINDEXED, content, tokenize='trigram');
+-- Save receipts preserve exact retry results; historical pruning removes their payload too.
+CREATE TABLE record_save_receipts (
+    request_id TEXT PRIMARY KEY NOT NULL,
+    record_id TEXT NOT NULL REFERENCES records(id) ON DELETE CASCADE,
+    revision_id TEXT NOT NULL REFERENCES record_revisions(id) ON DELETE CASCADE,
+    request_json TEXT NOT NULL,
+    response_json TEXT NOT NULL
+);

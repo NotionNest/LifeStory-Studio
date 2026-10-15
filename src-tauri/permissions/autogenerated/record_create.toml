@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-record-create"
+description = "Enables the record_create command without any pre-configured scope."
+commands.allow = ["record_create"]
+
+[[permission]]
+identifier = "deny-record-create"
+description = "Denies the record_create command without any pre-configured scope."
+commands.deny = ["record_create"]

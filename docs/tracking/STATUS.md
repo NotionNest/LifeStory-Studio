@@ -1,6 +1,6 @@
 # 项目跟进
 
-更新：2026-10-15。当前阶段：开发环境、代码骨架与 Git 流程已建立，macOS 本机验证及双平台 CI 通过；正式功能及 Windows 实机验证待推进。
+更新：2026-10-15。当前阶段：LIB-02 文字记录与持久化已实现，本机验证通过；本次双平台 CI 待确认，Windows 实机验收待完成。
 
 ## 当前任务
 
@@ -12,11 +12,13 @@
 | TASK-04 | 核心产品决策 | DEC-06—11 | 主要范围已确认；剩余事项待决定 | 双平台、两类 AI、本地资料、文字/对话/图片、生活回顾与导出已确认；系统/CPU、加密及具体服务名单待定 |
 | TASK-05 | 体验、架构及技术选型 | 全部核心需求 | 已确认 | architecture 下四份方案，官方文档研究及本机 CLI/schema 检查 |
 | TASK-06 | 可运行开发环境与代码骨架 | 技术方案 | 本机及双平台 CI 已验证；Windows 实机待验收 | [开发环境说明](../development/ENVIRONMENT.md)；真实应用包与 IPC、SQLite、编辑器检查通过 |
-| TASK-07 | 功能规格与开发任务拆解 | REQ-01—15 | 进行中 | [资料库与日常记录](../features/LIBRARY_AND_RECORDING.md)：功能规格、页面流程及任务已获用户确认；LIB-01 契约及图片验证完成，LIB-02 待开始 |
+| TASK-07 | 功能规格与开发任务拆解 | REQ-01—15 | 资料库规格已确认，实施进行中 | [资料库与日常记录](../features/LIBRARY_AND_RECORDING.md)：功能规格、页面流程及任务已获用户确认；LIB-01 契约及图片验证完成，LIB-02 待开始 |
 
 任务表是本地进度记录，没有建立定时自动跟进或外部任务同步。
 
 ## 本次交接
+
+2026-10-15 LIB-02：schema 2 快照迁移、文字记录创建/保存/读取/分页列表、标题/日期/标签及有限 IPC 已实现。保存幂等、版本冲突及事务保护已接入，界面采用用户选择的专业紧凑写作工具方向，设计背景存于 .impeccable.md。9 项 Rust 集成和 3 项前端关键交互、类型/格式/Clippy、macOS 调试包及原生窗口保存重开/菜单退出/主动另存验证通过，详见 [交付记录](../development/LIB02_VERIFICATION.md)。当前手动保存，LIB-03 自动保存与异常恢复未实现。本次远程 CI 待运行，未合并或发布。
 
 2026-10-15 LIB-01 交付：目标 SQL 与前后端类型契约已定稿；真实 bundled SQLite 的 3 项契约保护通过，应用及契约类型、格式检查通过。独立图片验证在本机和 [macOS/Windows CI](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38703938848) 通过测试及 Clippy。支持静态 PNG/JPEG/WebP，25 MiB、4000 万像素、单边 16384 限制，其他/动画格式明确拒绝；结果见 [支持矩阵](../features/IMAGE_CAPABILITIES.md)。提交位于 docs/library-recording-spec，未合并 main。未启用新 schema、未实现导入/编辑 UI，未重复完整桌面构建；下一步 LIB-02 编号迁移、记录服务与真实保存重开。
 
