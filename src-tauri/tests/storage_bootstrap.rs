@@ -1,7 +1,7 @@
 use std::{
     fs,
     path::PathBuf,
-    time::{SystemTime, UNIX_EPOCH},
+    sync::atomic::{AtomicU64, Ordering},
 };
 
 use lifestory_studio_lib::storage::DatabaseWorker;
@@ -9,12 +9,11 @@ use rusqlite::Connection;
 
 struct Workspace(PathBuf);
 
+static NEXT_WORKSPACE_ID: AtomicU64 = AtomicU64::new(0);
+
 impl Workspace {
     fn new() -> Self {
-        let id = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let id = NEXT_WORKSPACE_ID.fetch_add(1, Ordering::Relaxed);
         let path = std::env::temp_dir().join(format!("lifestory-test-{}-{id}", std::process::id()));
         fs::create_dir(&path).unwrap();
         Self(path)
