@@ -12,7 +12,7 @@
     "desktop:build": "tauri build",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
     "check:rust": "cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings",
-    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --test storage_bootstrap",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --tests",
     "check": "npm run typecheck && cargo fmt --manifest-path src-tauri/Cargo.toml --check",
     "test:ui": "vitest run",
     "codex:check": "node scripts/check-codex.mjs"

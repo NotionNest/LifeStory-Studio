@@ -25,6 +25,10 @@ npm run desktop:dev
 4. [待决策事项](docs/product/DECISIONS.md)：已确认的方向与需要进一步确定的内容。
 5. [原始对话整理](docs/产品需求与对话整理.md)：需求来源。
 
+## 当前功能评审
+
+[资料库与日常记录规格](docs/features/LIBRARY_AND_RECORDING.md)记录已确认行为；[页面流程与开发评审稿](docs/features/LIBRARY_REVIEW.md)包含页面结构、完整流程、剩余建议与依赖任务。
+
 ## 架构方案入口
 
 - [架构与数据流](docs/architecture/ARCHITECTURE.md)
