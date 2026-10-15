@@ -12,7 +12,7 @@
 
 ## 验证证据
 
-独立验证程序： [tools/image-validation](../../tools/image-validation/README.md)，有单独锁文件及合成样本。macOS 本机 2 项用例与 Clippy 通过；Windows 与 macOS CI 结果待执行后更新。
+独立验证程序： [tools/image-validation](../../tools/image-validation/README.md)，有单独锁文件及合成样本。macOS 本机 2 项用例与 Clippy 通过；[双平台 CI](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38703938848) 已在 macOS（44 秒）和 Windows（1 分钟）通过同一组用例与 Clippy，验证提交为 `0303216`。
 
 覆盖：三种静态格式的签名识别/完整解码、截断输入、未知数据、APNG/动画 WebP 拒绝、字节上限与尺寸上限拒绝。像素乘积使用 u64 防溢出。该验证是格式与规则验证，不等于系统粘贴/拖入或正式附件保存链路已验证。
 
