@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "inspect-runtime"
+description = "Read application and local database health from the main window."
+commands.allow = ["runtime_info"]

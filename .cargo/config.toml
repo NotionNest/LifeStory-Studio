@@ -1,0 +1,3 @@
+[build]
+# Keep routine compilation from using every available CPU core.
+jobs = 2

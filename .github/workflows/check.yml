@@ -1,0 +1,65 @@
+name: Checks
+
+on:
+  push:
+    branches: [main]
+    paths: &code-paths
+      - 'src/**'
+      - 'src-tauri/**'
+      - 'scripts/**'
+      - '.cargo/**'
+      - '.github/workflows/check.yml'
+      - 'package*.json'
+      - 'tsconfig*.json'
+      - 'vite.config.ts'
+      - 'components.json'
+      - 'index.html'
+      - '.node-version'
+      - '.npmrc'
+      - 'rust-toolchain.toml'
+  pull_request:
+    branches: [main]
+    paths: *code-paths
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    name: Desktop (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: '.node-version'
+          cache: npm
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            src-tauri/target
+          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src-tauri/Cargo.lock', 'rust-toolchain.toml') }}
+      - name: Install locked frontend dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Type and Rust format checks
+        run: npm run check
+      - name: Storage integration tests
+        run: npm run test:rust
+      - name: Rust static checks
+        run: npm run check:rust
+      - name: Desktop compile with production frontend resources
+        run: npm run desktop:build -- --debug --no-bundle
