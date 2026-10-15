@@ -1,6 +1,6 @@
 # 项目跟进
 
-更新：2026-10-15。当前阶段：LIB-02 文字记录与持久化已实现，本机验证通过；本次双平台 CI 待确认，Windows 实机验收待完成。
+更新：2026-10-15。当前阶段：LIB-02 文字记录与持久化已实现，本机验证通过；本次 macOS/Windows 测试、静态检查与编译通过，Windows CI 缓存收尾中；Windows 实机验收待完成。
 
 ## 当前任务
 
@@ -18,7 +18,7 @@
 
 ## 本次交接
 
-2026-10-15 LIB-02：schema 2 快照迁移、文字记录创建/保存/读取/分页列表、标题/日期/标签及有限 IPC 已实现。保存幂等、版本冲突及事务保护已接入，界面采用用户选择的专业紧凑写作工具方向，设计背景存于 .impeccable.md。9 项 Rust 集成和 3 项前端关键交互、类型/格式/Clippy、macOS 调试包及原生窗口保存重开/菜单退出/主动另存验证通过，详见 [交付记录](../development/LIB02_VERIFICATION.md)。当前手动保存，LIB-03 自动保存与异常恢复未实现。本次远程 CI 待运行，未合并或发布。
+2026-10-15 LIB-02：schema 2 快照迁移、文字记录创建/保存/读取/分页列表、标题/日期/标签及有限 IPC 已实现。保存幂等、版本冲突及事务保护已接入，界面采用用户选择的专业紧凑写作工具方向，设计背景存于 .impeccable.md。9 项 Rust 集成和 3 项前端关键交互、类型/格式/Clippy、macOS 调试包及原生窗口保存重开/菜单退出/主动另存验证通过，详见 [交付记录](../development/LIB02_VERIFICATION.md)。当前手动保存，LIB-03 自动保存与异常恢复未实现。[本次双平台 CI](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38707797826) 已通过前端/存储测试、静态检查及桌面编译，交付 [PR #1](https://github.com/NotionNest/LifeStory-Studio/pull/1)，未合并或发布。下一步 LIB-03 自动保存与恢复草稿。
 
 2026-10-15 LIB-01 交付：目标 SQL 与前后端类型契约已定稿；真实 bundled SQLite 的 3 项契约保护通过，应用及契约类型、格式检查通过。独立图片验证在本机和 [macOS/Windows CI](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38703938848) 通过测试及 Clippy。支持静态 PNG/JPEG/WebP，25 MiB、4000 万像素、单边 16384 限制，其他/动画格式明确拒绝；结果见 [支持矩阵](../features/IMAGE_CAPABILITIES.md)。提交位于 docs/library-recording-spec，未合并 main。未启用新 schema、未实现导入/编辑 UI，未重复完整桌面构建；下一步 LIB-02 编号迁移、记录服务与真实保存重开。
 
