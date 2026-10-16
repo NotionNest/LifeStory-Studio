@@ -4,7 +4,7 @@
 
 前端技术：React + TypeScript + Vite + Tailwind CSS + shadcn/ui；长文编辑使用 Tiptap。
 
-当前阶段：LIB-03 已调整为单一自动持久化，macOS 桌面验收通过；本次修改保留本地，暂不推进 PR/提交合并流程。Windows 实机验收待完成。
+当前阶段：LIB-03 单一自动持久化已合入 develop，macOS 桌面验收和双平台 CI 通过；CI 审查修正见项目跟进。Windows 实机验收待完成。
 
 ## 启动开发
 
