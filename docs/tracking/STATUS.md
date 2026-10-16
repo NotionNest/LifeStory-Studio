@@ -1,6 +1,6 @@
 # 项目跟进
 
-更新：2026-10-16。当前阶段：LIB-03 保存与历史进入规则已按最新要求修正并在本机验证，改动保留本地，暂不推进 PR/提交合并流程；LIB-04 未开始。Windows 实机验收待完成。
+更新：2026-10-16。当前阶段：LIB-03 最新保存与历史进入规则已随 PR #3 合入 develop；Git 流程已随 #4 进入 main，正在同步到 develop。LIB-04 未开始，Windows 实机验收待完成。
 
 ## 当前任务
 
@@ -8,7 +8,7 @@
 |---|---|---|---|---|
 | TASK-01 | 历史对话整理 | 需求来源 | 已交付 | 用户已阅读 docs/产品需求与对话整理.md |
 | TASK-02 | 正式 PRD | REQ-01—15 | 方向已认可，详细验收持续细化 | docs/product/PRD.md，已同步五项范围决定 |
-| TASK-03 | 协作流程与项目规则 | DEC-05 | 已建立 | WORKFLOW.md、AGENTS.md、模板与人类使用手册 |
+| TASK-03 | 协作流程与项目规则 | DEC-05 | 已建立，Git 分层迁移验证中 | WORKFLOW.md、AGENTS.md、Git 流程、模板与人类使用手册 |
 | TASK-04 | 核心产品决策 | DEC-06—11 | 主要范围已确认；剩余事项待决定 | 双平台、两类 AI、本地资料、文字/对话/图片、生活回顾与导出已确认；系统/CPU、加密及具体服务名单待定 |
 | TASK-05 | 体验、架构及技术选型 | 全部核心需求 | 已确认 | architecture 下四份方案，官方文档研究及本机 CLI/schema 检查 |
 | TASK-06 | 可运行开发环境与代码骨架 | 技术方案 | 本机及双平台 CI 已验证；Windows 实机待验收 | [开发环境说明](../development/ENVIRONMENT.md)；真实应用包与 IPC、SQLite、编辑器检查通过 |
@@ -91,3 +91,14 @@ AI 决定：用户自配模型服务/API Key 与本机 Codex 等工具连接同�
 验证（2026-10-14）：使用 Python 检查 9 份 Markdown 的本地链接，以及 12 个需求编号、7 个任务编号的唯一性与数量，结果通过。应用测试不适用，尚无应用代码。
 
 2026-10-15 确认同步：DEC-12～DEC-15 已确认，已更新架构、选型、数据契约、协作规则、README 和人类手册。此次仅同步文档，未执行应用构建或测试。
+
+
+## 2026-10-16 Git 流程迁移
+
+- 用户已确认 develop / release / main 分层方案，保持私有并接受强制保护未启用（GitHub 403 套餐限制）。
+- 本地功能提交 5f165c8 已推送保护分支；#2 关闭，#3 整理后由用户于 2026-10-16 合入 develop（72cc959）；[功能双平台 CI](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38856209731) 通过。
+- 已创建远程 develop。基础设施分支 hotfix/git-workflow 实现按范围检查、稳定 CI Gate、合并来源核对、隔离预发布产物；合并与同步按迁移顺序执行。
+- 本地 CI 策略测试 4 项通过，包括失败/取消/意外跳过的拒绝；差异空白检查通过。真实预发布安装、签名及发布未运行，未确定版本不创建 release 分支。
+- workflow 权限已补齐；[PR #4](https://github.com/NotionNest/LifeStory-Studio/pull/4) 的[新门禁完整双平台检查](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38857441214)通过，已合入 main（9af5214），[main 合并来源核对](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38858338301)通过。Node 流程测试独立运行，避免被 Vitest 重复收集。
+- #3 先行合入 develop，导致直接 main→develop 的 #5 出现文档冲突；改用 chore/sync-main-workflow 从最新 develop 合入 main，保留全部应用代码，仅协调文档冲突，再通过 PR 以 merge commit 集成。#5 由该同步取代。
+- 同步 PR 完成后，develop 同时包含已验证保存功能和新流程；最终集成检查及合并来源核对以该 PR 与 Actions 实际结果为准。保护分支保留，不创建 release 版本或产品发布。

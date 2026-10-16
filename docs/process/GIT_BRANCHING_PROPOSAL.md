@@ -1,6 +1,6 @@
 # develop 与预发布分支方案
 
-2026-10-16。用户提出增加 develop 和预发布分支、希望更完整流程。本文件是可审阅提案，尚未创建分支、修改 Actions 或仓库设置，也未提交/推送/修改 PR；现行配置仍见 GIT_WORKFLOW.md 与 .github/workflows/。最新本地保存功能修改完整保留。
+2026-10-16。以下保留方案提出时的问题与设计依据。用户已确认方案，流程已实施于 [Git 流程](GIT_WORKFLOW.md)，实际迁移与验证见 [项目跟进](../tracking/STATUS.md)。仓库保持私有，强制保护受套餐限制未启用；未确定版本，不创建 release 分支。
 
 ## 当前问题
 
@@ -66,4 +66,4 @@ main/develop/release 通过 PR 和稳定门禁更新，限制强推/删除及绕
 - https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/trigger-a-workflow
 - https://docs.github.com/en/actions/how-tos/manage-workflow-runs/skip-workflow-runs
 
-分支职责、检查分层与合并策略是本项目提案，并非 GitHub 强制的唯一流程。本轮仅文档提案，不运行应用测试。
+分支职责、检查分层与合并策略是本项目提案，并非 GitHub 强制的唯一流程。本文件为方案阶段记录；实施与检查结果以项目跟进和实际 Actions 为准。
