@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-record-begin-edit"
+description = "Enables the record_begin_edit command without any pre-configured scope."
+commands.allow = ["record_begin_edit"]
+
+[[permission]]
+identifier = "deny-record-begin-edit"
+description = "Denies the record_begin_edit command without any pre-configured scope."
+commands.deny = ["record_begin_edit"]

@@ -35,12 +35,19 @@ fn create(db: &DatabaseWorker) -> Record {
     })
     .unwrap()
 }
-fn save(record: &Record) -> SaveRecord {
+fn save(db: &DatabaseWorker, record: &Record) -> SaveRecord {
+    let session = db
+        .begin_edit(lifestory_studio_lib::recovery::BeginEdit {
+            record_id: record.id.clone(),
+            expected_revision_id: record.revision_id.clone(),
+            recovery: None,
+        })
+        .unwrap();
     SaveRecord {
         record_id: record.id.clone(),
         base_revision_id: Some(record.revision_id.clone()),
         request_id: "save-one".into(),
-        session_id: "session".into(),
+        session_id: session.session_id,
         edit_sequence: 1,
         title: Some("补写旅行".into()),
         record_date: "2024-02-29".into(),
@@ -56,7 +63,7 @@ fn save_retry_reopen_tags_and_conflict_preserve_content() {
     let entry = create(&db);
     let tag = db.create_tag(" e\u{301} ".into()).unwrap();
     assert_eq!(tag.id, db.create_tag("é".into()).unwrap().id);
-    let mut input = save(&entry);
+    let mut input = save(&db, &entry);
     input.tag_ids = vec![tag.id.clone()];
     let result = db.save_record(input.clone()).unwrap();
     assert_eq!(
@@ -86,6 +93,14 @@ fn save_retry_reopen_tags_and_conflict_preserve_content() {
     assert_eq!(reopened.tags[0].id, tag.id);
     let mut same = input.clone();
     same.request_id = "unchanged".into();
+    same.session_id = db
+        .begin_edit(lifestory_studio_lib::recovery::BeginEdit {
+            record_id: reopened.id.clone(),
+            expected_revision_id: reopened.revision_id.clone(),
+            recovery: None,
+        })
+        .unwrap()
+        .session_id;
     same.base_revision_id = Some(reopened.revision_id.clone());
     assert_eq!(
         db.save_record(same).unwrap().revision_id,
@@ -98,17 +113,17 @@ fn validation_and_transaction_failure_never_change_current_record() {
     let root = Workspace::new();
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
     let entry = create(&db);
-    let mut bad = save(&entry);
+    let mut bad = save(&db, &entry);
     bad.record_date = "2025-02-29".into();
     assert!(db.save_record(bad).is_err());
-    let mut bad = save(&entry);
+    let mut bad = save(&db, &entry);
     bad.document =
         json!({"type":"doc","content":[{"type":"image","attrs":{"src":"file:///private"}}]});
     assert!(db.save_record(bad).is_err());
     let external = Connection::open(root.0.join("lifestory.db")).unwrap();
     external.execute_batch("CREATE TRIGGER reject_save BEFORE INSERT ON record_tags BEGIN SELECT RAISE(ABORT,'synthetic failure'); END;").unwrap();
     let tag = db.create_tag("测试".into()).unwrap();
-    let mut input = save(&entry);
+    let mut input = save(&db, &entry);
     input.tag_ids = vec![tag.id];
     assert!(db.save_record(input).is_err());
     let unchanged = db.read_record(entry.id).unwrap();

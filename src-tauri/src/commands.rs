@@ -140,3 +140,40 @@ pub(crate) fn record_exit(app: tauri::AppHandle, gate: State<'_, crate::ExitGate
     gate.0.store(true, std::sync::atomic::Ordering::SeqCst);
     app.exit(0);
 }
+
+use crate::recovery::{BeginEdit, EditingSession, RecoveryDraft, RecoverySummary};
+#[tauri::command]
+pub async fn recovery_list(
+    database: State<'_, DatabaseWorker>,
+) -> Result<Vec<RecoverySummary>, RecordError> {
+    record_task(&database, |db| db.recovery_list()).await
+}
+#[tauri::command]
+pub async fn recovery_read(
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+) -> Result<Option<RecoveryDraft>, RecordError> {
+    record_task(&database, move |db| db.recovery_read(record_id)).await
+}
+#[tauri::command]
+pub async fn record_begin_edit(
+    database: State<'_, DatabaseWorker>,
+    input: BeginEdit,
+) -> Result<EditingSession, RecordError> {
+    record_task(&database, move |db| db.begin_edit(input)).await
+}
+#[tauri::command]
+pub async fn recovery_write(
+    database: State<'_, DatabaseWorker>,
+    input: SaveRecord,
+) -> Result<bool, RecordError> {
+    record_task(&database, move |db| db.recovery_write(input)).await
+}
+#[tauri::command]
+pub async fn record_end_edit(
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+    session_id: String,
+) -> Result<(), RecordError> {
+    record_task(&database, move |db| db.end_edit(record_id, session_id)).await
+}

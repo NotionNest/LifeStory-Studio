@@ -83,3 +83,5 @@ DDL 通过真实 bundled SQLite 的 3 个契约用例：跨记录版本拒绝、
 2026-10-15 验证：真实 bundled SQLite 契约用例 3 项、应用类型检查、契约独立严格类型检查、格式及差异检查通过。图片测试 2 项和 Clippy 在本机及双平台 CI 通过；未重复运行完整桌面构建。
 
 LIB-02 已完成文字记录迁移及手动保存链路，详情见 [验证记录](../development/LIB02_VERIFICATION.md)；自动保存与恢复草稿仍为后续 LIB-03。
+
+2026-10-15 LIB-03：自动保存、schema 3 会话隔离及恢复草稿已实现，见 [验证记录](../development/LIB03_VERIFICATION.md)。后续以该记录为准，前述手动保存描述属于 LIB-02 阶段。

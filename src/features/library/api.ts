@@ -13,7 +13,16 @@ export interface SaveInput {
 export interface SaveResult {
   recordId: string; revisionId: string; requestId: string; sessionId: string; editSequence: number; savedAt: number
 }
+export interface RecoveryDraft { sessionId: string; editSequence: number; writtenAt: number; input: SaveInput; tags: Tag[] }
+export interface RecoverySummary { recordId: string; title: string | null; writtenAt: number }
+export interface RecoveryChoice { sessionId: string; editSequence: number; action: 'restore' | 'discard' }
+export interface EditingSession { record: RecordFile; sessionId: string; recovered: SaveInput | null; recoveredTags: Tag[] }
 export const libraryApi = {
+  recoveries: () => invoke<RecoverySummary[]>('recovery_list'),
+  recovery: (recordId: string) => invoke<RecoveryDraft | null>('recovery_read', { recordId }),
+  begin: (recordId: string, expectedRevisionId: string, recovery: RecoveryChoice | null = null) => invoke<EditingSession>('record_begin_edit', { input: { recordId, expectedRevisionId, recovery } }),
+  writeRecovery: (input: SaveInput) => invoke<boolean>('recovery_write', { input }),
+  end: (recordId: string, sessionId: string) => invoke<void>('record_end_edit', { recordId, sessionId }),
   create: (requestId: string, recordDate: string, createdTimezone: string) => invoke<RecordFile>('record_create', { input: { requestId, recordDate, createdTimezone } }),
   read: (recordId: string) => invoke<RecordFile>('record_read', { recordId }),
   list: (offset = 0) => invoke<RecordSummary[]>('record_list', { offset }),

@@ -2,13 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { Button } from '@/components/ui/button'
 import { desktopAvailable } from '@/shared/runtime'
-import { libraryApi, localDate, errorMessage, type RecordFile, type RecordSummary } from './api'
+import { libraryApi, localDate, errorMessage, type RecordFile, type RecordSummary, type EditingSession, type RecoveryDraft, type RecoverySummary } from './api'
+import { RecoveryPreview } from './RecoveryPreview'
 import { RecordEditor, type EditorHandle } from './RecordEditor'
 
 type Intent = { kind: 'open'; id: string } | { kind: 'create' } | { kind: 'exit' }
 export function LibraryWorkspace() {
   const [records, setRecords] = useState<RecordSummary[]>([])
   const [record, setRecord] = useState<RecordFile | null>(null)
+  const [session, setSession] = useState<EditingSession | null>(null)
+  const [recoveries, setRecoveries] = useState<RecoverySummary[]>([])
+  const [recovery, setRecovery] = useState<{ record: RecordFile; draft: RecoveryDraft } | null>(null)
   const [opened, setOpened] = useState(0)
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(false)
@@ -21,6 +25,7 @@ export function LibraryWorkspace() {
   useEffect(() => { if (pending) dialog.current?.showModal() }, [pending])
   const dirty = useRef(false), busy = useRef(false), navigating = useRef(false)
   const createRequest = useRef<string | null>(null)
+  const queued = useRef<Intent | null>(null)
   const refresh = useCallback(async (offset = 0) => {
     const items = await libraryApi.list(offset)
     setRecords(old => offset === 0 ? items : [...old, ...items.filter(item => !old.some(r => r.id === item.id))])
@@ -29,7 +34,11 @@ export function LibraryWorkspace() {
   useEffect(() => {
     if (!desktopAvailable) { setLoading(false); return }
     let alive = true
-    void refresh().catch(cause => { if (alive) setError(errorMessage(cause)) }).finally(() => { if (alive) setLoading(false) })
+    void Promise.all([refresh(), libraryApi.recoveries()]).then(([, drafts]) => {
+      if (!alive) return
+      setRecoveries(drafts)
+      if (drafts.length) requestRef.current({ kind: 'open', id: drafts[0].recordId })
+    }).catch(cause => { if (alive) setError(errorMessage(cause)) }).finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [refresh])
   const execute = async (intent: Intent) => {
@@ -43,14 +52,20 @@ export function LibraryWorkspace() {
         next = await libraryApi.create(createRequest.current, localDate(), Intl.DateTimeFormat().resolvedOptions().timeZone)
         createRequest.current = null
       } else { next = await libraryApi.read(intent.id) }
-      dirty.current = false; setRecord(next); setOpened(value => value + 1); setPending(null); setExported(false)
+      const draft = await libraryApi.recovery(next.id)
+      if (draft) { setRecovery({ record: next, draft }); setPending(null); return }
+      const editing = await libraryApi.begin(next.id, next.revisionId)
+      dirty.current = false; setRecord(editing.record); setSession(editing); setOpened(value => value + 1); setPending(null); setExported(false)
+      setRecoveries(old => old.filter(item => item.recordId !== next.id))
       void refresh().catch(cause => setError(errorMessage(cause)))
     } catch (cause) { setError(errorMessage(cause)) }
-    finally { navigating.current = false; setWorking(false) }
+    finally { navigating.current = false; setWorking(false); if (queued.current) { const next = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(next)) } }
   }
   const request = (intent: Intent) => {
-    if (navigating.current || busy.current) return
-    if (dirty.current) { setPending(intent); setExported(false) } else { void execute(intent) }
+    if (navigating.current || busy.current) { queued.current = intent; return }
+    if (dirty.current && editor.current) {
+      void editor.current.save().then(clean => { if (clean) void execute(intent); else { setPending(intent); setExported(false) } })
+    } else { void execute(intent) }
   }
   const requestRef = useRef(request); requestRef.current = request
   useEffect(() => {
@@ -70,7 +85,29 @@ export function LibraryWorkspace() {
     if (await editor.current.save()) await execute(intent)
   }
   const onDirty = useCallback((value: boolean) => { dirty.current = value; if (value) setExported(false) }, [])
-  const onBusy = useCallback((value: boolean) => { busy.current = value; setWorking(value) }, [])
+  const onBusy = useCallback((value: boolean) => {
+    busy.current = value; setWorking(value)
+    if (!value && queued.current) { const intent = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(intent)) }
+  }, [])
+  const discardAndContinue = async () => {
+    const intent = pending
+    if (!intent || !editor.current || busy.current) return
+    setWorking(true)
+    const discarded = await editor.current.discard()
+    if (discarded) { dirty.current = false; setRecord(null); setSession(null); setPending(null); await execute(intent) }
+    setWorking(false)
+  }
+  const resolveRecovery = async (action: 'restore' | 'discard') => {
+    if (!recovery || navigating.current) return
+    navigating.current = true; setWorking(true); setError('')
+    try {
+      const editing = await libraryApi.begin(recovery.record.id, recovery.record.revisionId, { sessionId: recovery.draft.sessionId, editSequence: recovery.draft.editSequence, action })
+      dirty.current = Boolean(editing.recovered)
+      setRecord(editing.record); setSession(editing); setOpened(value => value + 1); setRecovery(null)
+      setRecoveries(old => old.filter(item => item.recordId !== editing.record.id))
+    } catch (cause) { setError(errorMessage(cause)) }
+    finally { navigating.current = false; setWorking(false); if (queued.current) { const next = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(next)) } }
+  }
   const onSaved = useCallback(() => { void refresh().catch(cause => setError(errorMessage(cause))) }, [refresh])
   return <main className="flex h-dvh min-h-0 flex-col">
     <header className="flex h-12 shrink-0 items-center justify-between border-b bg-card px-5">
@@ -81,6 +118,7 @@ export function LibraryWorkspace() {
       <aside className="flex w-64 shrink-0 flex-col border-r lg:w-72" aria-label="记录列表">
         <div className="flex items-center justify-between border-b px-4 py-3"><h1 className="text-sm font-semibold">文字记录</h1><Button size="sm" disabled={working || loading} onClick={() => request({ kind: 'create' })}>新建记录</Button></div>
         {error && <div role="alert" className="border-b p-3 text-xs text-destructive">{error}<button className="ml-2 underline" onClick={() => { void refresh().then(() => setError('')).catch(cause => setError(errorMessage(cause))) }}>刷新列表</button></div>}
+        {recoveries.length > 0 && <section aria-label="待恢复草稿" className="border-b px-4 py-3"><p className="mb-2 text-xs font-semibold">本机有待处理的恢复草稿</p>{recoveries.map(item => <button key={item.recordId} disabled={working} className="mb-1 block w-full truncate text-left text-xs underline" onClick={() => request({ kind: 'open', id: item.recordId })}>{item.title || '无标题记录'} · {new Date(item.writtenAt).toLocaleString()}</button>)}</section>}
         <div className="min-h-0 flex-1 overflow-y-auto p-2">
           {loading ? <p role="status" className="p-3 text-sm text-muted-foreground">正在读取记录…</p> : records.length === 0 ? <p className="px-3 py-6 text-sm leading-6 text-muted-foreground">还没有记录。<br />从今天的一段经历开始。</p> : records.map(item => <button key={item.id} aria-current={record?.id === item.id ? 'true' : undefined} disabled={working} onClick={() => request({ kind: 'open', id: item.id })} className={`mb-1 block w-full rounded px-3 py-3 text-left transition-colors hover:bg-secondary ${record?.id === item.id ? 'bg-secondary' : ''}`}>
             <span className="mb-1 block text-[11px] tabular-nums text-muted-foreground">{item.recordDate}</span>
@@ -92,14 +130,15 @@ export function LibraryWorkspace() {
         <p className="border-t p-4 text-[11px] leading-5 text-muted-foreground">文字记录 · 按记录日期排列<br />记录保存在这台电脑上</p>
       </aside>
       <section className="flex min-w-0 flex-1 overflow-y-auto" aria-label="编辑工作区">
-        {record ? <RecordEditor key={`${record.id}:${opened}`} ref={editor} record={record} onDirty={onDirty} onBusy={onBusy} onSaved={onSaved} onFailure={setError} /> : <div className="m-auto max-w-sm px-8"><p className="mb-2 text-xs text-muted-foreground">你的生活，逐篇积累</p><h2 className="mb-3 text-xl font-medium">选择记录，或开始书写。</h2><p className="text-sm leading-7 text-muted-foreground">同一天可以留下多条记录。标题和标签都可稍后补充。</p></div>}
+        {record && session ? <RecordEditor key={`${record.id}:${opened}`} ref={editor} record={record} sessionId={session.sessionId} recovered={session.recovered} recoveredTags={session.recoveredTags} onDirty={onDirty} onBusy={onBusy} onSaved={onSaved} onFailure={setError} /> : <div className="m-auto max-w-sm px-8"><p className="mb-2 text-xs text-muted-foreground">你的生活，逐篇积累</p><h2 className="mb-3 text-xl font-medium">选择记录，或开始书写。</h2><p className="text-sm leading-7 text-muted-foreground">同一天可以留下多条记录。标题和标签都可稍后补充。</p></div>}
       </section>
     </div>}
+    {recovery && <RecoveryPreview record={recovery.record} draft={recovery.draft} busy={working} error={error} onChoose={action => void resolveRecovery(action)} onCancel={() => { setRecovery(null); setError('') }} onRefresh={() => void execute({ kind: 'open', id: recovery.record.id })} />}
     {pending && <dialog ref={dialog} onCancel={event => { event.preventDefault(); if (!working) setPending(null) }} aria-labelledby="leave-title" className="fixed inset-0 z-50 m-auto w-[calc(100%-3rem)] max-w-lg rounded-lg border bg-card p-6 text-foreground shadow-xl backdrop:bg-foreground/25">
       <h2 id="leave-title" className="text-lg font-semibold">有尚未保存的修改</h2><p className="my-3 text-sm leading-6 text-muted-foreground">保存成功后再继续，或主动另存当前编辑内容。放弃修改后，未保存的内容将被丢弃。</p>
       {error && <p role="alert" className="mb-3 text-sm text-destructive">{error}</p>}
       {exported && <p role="status" className="mb-3 text-sm text-primary">已另存到你选择的文件；资料库中的修改仍未保存。</p>}
-      <div className="flex flex-wrap gap-2"><Button disabled={working} onClick={() => void saveAndContinue()}>保存并继续</Button><Button variant="secondary" disabled={working} onClick={() => { setWorking(true); void editor.current?.export().then(result => { setExported(result) }).finally(() => setWorking(false)) }}>主动另存</Button><Button variant="outline" disabled={working} onClick={() => setPending(null)}>继续编辑</Button><Button variant="ghost" disabled={working} onClick={() => void execute(pending)}>放弃修改并继续</Button></div>
+      <div className="flex flex-wrap gap-2"><Button disabled={working} onClick={() => void saveAndContinue()}>保存并继续</Button><Button variant="secondary" disabled={working} onClick={() => { setWorking(true); void editor.current?.export().then(result => { setExported(result) }).finally(() => setWorking(false)) }}>主动另存</Button><Button variant="outline" disabled={working} onClick={() => setPending(null)}>继续编辑</Button><Button variant="ghost" disabled={working} onClick={() => void discardAndContinue()}>放弃修改并继续</Button></div>
     </dialog>}
   </main>
 }

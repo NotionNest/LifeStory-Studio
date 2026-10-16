@@ -20,22 +20,22 @@ impl fmt::Display for RecordError {
     }
 }
 impl std::error::Error for RecordError {}
-fn fail(code: &'static str, message: &str) -> Box<dyn std::error::Error + Send + Sync> {
+pub(crate) fn fail(code: &'static str, message: &str) -> Box<dyn std::error::Error + Send + Sync> {
     Box::new(RecordError {
         code,
         message: message.into(),
     })
 }
-fn now() -> StorageResult<i64> {
+pub(crate) fn now() -> StorageResult<i64> {
     Ok(SystemTime::now()
         .duration_since(UNIX_EPOCH)?
         .as_millis()
         .try_into()?)
 }
-fn id(db: &Connection) -> StorageResult<String> {
+pub(crate) fn id(db: &Connection) -> StorageResult<String> {
     Ok(db.query_row("SELECT lower(hex(randomblob(16)))", [], |r| r.get(0))?)
 }
-fn identifier(value: &str) -> StorageResult<()> {
+pub(crate) fn identifier(value: &str) -> StorageResult<()> {
     if value.is_empty() || value.len() > 128 || value.chars().any(char::is_control) {
         return Err(fail("validation", "记录或请求标识无效"));
     }
@@ -137,7 +137,7 @@ pub struct RecordSummary {
     pub excerpt: String,
 }
 
-fn load(db: &Connection, record_id: &str) -> StorageResult<Record> {
+pub(crate) fn load(db: &Connection, record_id: &str) -> StorageResult<Record> {
     let value = db.query_row("SELECT r.id,r.title,r.record_date,r.created_timezone,r.created_at,r.updated_at,v.id,v.document_json
                  FROM records r
                  JOIN record_revisions v ON v.id=r.current_revision_id
@@ -177,7 +177,7 @@ fn load(db: &Connection, record_id: &str) -> StorageResult<Record> {
 }
 
 // Validate the installed StarterKit schema instead of persisting arbitrary editor nodes or URLs.
-fn document_text(document: &Value) -> StorageResult<String> {
+pub(crate) fn document_text(document: &Value) -> StorageResult<String> {
     if document.to_string().len() > 2 * 1024 * 1024 {
         return Err(fail("validation", "正文超过 2 MiB，请拆分记录"));
     }
@@ -397,9 +397,14 @@ impl DatabaseWorker {
             let request_json=serde_json::to_string(&input)?;
             let tx=db.transaction()?;
             let current=load(&tx,&input.record_id)?;
+            let active: Option<(String,u32)> = tx.query_row("SELECT session_id,saved_sequence FROM edit_sessions WHERE record_id=?1",[&input.record_id],|r|Ok((r.get(0)?,r.get(1)?))).optional()?;
+            let Some((active_session,saved_sequence)) = active else { return Err(fail("conflict","编辑会话已结束，请重新打开记录")); };
+            if active_session != input.session_id { return Err(fail("conflict","记录已在其他会话中打开，当前修改仍保留")); }
+
             if let Some((request,response))=tx.query_row("SELECT request_json,response_json FROM record_save_receipts WHERE request_id=?1",[&input.request_id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?))).optional()? {
                 if request!=request_json {return Err(fail("conflict","同一请求标识不能用于不同修改"));} return Ok(serde_json::from_str(&response)?);
             }
+            if input.edit_sequence <= saved_sequence { return Err(fail("conflict","保存序号已过期，不能覆盖较新的修改")); }
             if input.base_revision_id.as_deref()!=Some(&current.revision_id) {return Err(fail("conflict","记录已在其他操作中更新，当前修改已保留，请重新核对版本"));}
             let title=input.title.as_deref().map(str::trim).filter(|s|!s.is_empty());
             let mut tags=input.tag_ids.clone(); tags.sort(); tags.dedup();
@@ -423,6 +428,8 @@ impl DatabaseWorker {
             }
             let result=SaveResult{record_id:input.record_id.clone(),revision_id:revision.clone(),request_id:input.request_id.clone(),session_id:input.session_id.clone(),edit_sequence:input.edit_sequence,saved_at:timestamp};
             tx.execute("INSERT INTO record_save_receipts VALUES (?1,?2,?3,?4,?5)",params![input.request_id,input.record_id,revision,request_json,serde_json::to_string(&result)?])?;
+            tx.execute("UPDATE edit_sessions SET saved_sequence=?1 WHERE record_id=?2 AND session_id=?3",params![input.edit_sequence,input.record_id,input.session_id])?;
+            tx.execute("DELETE FROM recovery_drafts WHERE record_id=?1 AND session_id=?2 AND edit_sequence<=?3",params![input.record_id,input.session_id,input.edit_sequence])?;
             tx.commit()?; Ok(result)
         })
     }
