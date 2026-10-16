@@ -18,6 +18,8 @@
 
 ## 本次交接
 
+2026-10-16 元数据门禁兼容修正：线上进一步发现，说明编辑事件若全部跳过，即使原 CI Gate 成功也会让 PR 受阻；前面对旧失败残留的归因不准确。已替换为每次都运行的轻量 CI Gate：仅复用冻结目标/基线名称与同一来源提交的完整验证，原验证运行中则等待，失败或缺证据拒绝，不启动新矩阵或取消原运行。GitHub API 的 PR 目标信息会变，不能当历史快照；已新增保护。本地 8 项回归通过；原“元数据全跳过”运行仅保留为问题定位证据，不代表最终方案。[修正说明](../development/CI_ACTIONS_REVIEW.md#在线验收证据)。
+
 2026-10-16 CI 在线验收：[PR #11](https://github.com/NotionNest/LifeStory-Studio/pull/11) 已推送，目标 develop。[完整双平台运行](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38870936285)全部通过；错误路由拒绝、说明编辑不覆盖失败、改目标自动重验、验证期间编辑说明不取消原运行均已有线上证据，见[验收记录](../development/CI_ACTIONS_REVIEW.md#在线验收证据)。Windows 缓存约 454 MB，保存 34 秒（旧约 1.19 GB / 4 分 17 秒）。同一提交仍保留错误路由试验的失败汇总，现以真实文档提交获得独立门禁结果，不绕过保护；最终提交结果见 PR。工作流修复尚未合入 develop/main，服务器保护未调整。
 
 2026-10-16 CI 审查修正：用户确认解决问题后，已在 fix/ci-gates 收紧候选证据、Gate 输出校验及未知路径检查；PR 改目标触发重验，标题/说明事件隔离，不取消或覆盖已有 CI Gate；应用 Rust/桌面/候选构建统一 --locked。使用固定提交的 Rust 专用缓存，仅保存依赖，并关闭 CI 开发/测试调试符号；删除重复的合并后来源核对，服务器保护不变。原审查记录已单独提交 610f1b2 保护。[修正及验证说明](../development/CI_ACTIONS_REVIEW.md)；本地 6 项回归、actionlint、类型/格式/Node 语法检查通过。在线双平台与触发行为以交付 PR 的 [Checks](https://github.com/NotionNest/LifeStory-Studio/actions/workflows/check.yml) 为准；真实候选安装、签名及产品发布未执行。后续审阅修复 PR，不自动开始 LIB-04。

@@ -1,4 +1,5 @@
 name: Checks
+run-name: ${{ github.event.action == 'edited' && !github.event.changes.base && 'Metadata verification' || format('Validation {0}@{1}', github.base_ref || github.ref_name, github.event.pull_request.base.sha || github.sha) }}
 on:
   pull_request:
     branches: [main, develop, 'release/**']
@@ -120,15 +121,22 @@ jobs:
       - run: cargo test --locked --manifest-path tools/image-validation/Cargo.toml
       - run: cargo clippy --locked --manifest-path tools/image-validation/Cargo.toml --all-targets -- -D warnings
   gate:
-    # A skipped metadata-only job must not report success under the required name.
-    name: ${{ github.event.action == 'edited' && !github.event.changes.base && 'Metadata edit' || 'CI Gate' }}
-    if: always() && (github.event.action != 'edited' || github.event.changes.base)
+    name: CI Gate
+    if: always()
+    timeout-minutes: 70
     needs: [policy, common, desktop, images]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - run: node scripts/ci/gate.mjs
+      - name: Verify required job results
+        if: github.event.action != 'edited' || github.event.changes.base
+        run: node scripts/ci/gate.mjs
         env:
           JOB_RESULTS: ${{ toJSON(needs) }}
+      - name: Verify existing validation for metadata edit
+        if: github.event.action == 'edited' && !github.event.changes.base
+        run: node scripts/ci/metadata.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}

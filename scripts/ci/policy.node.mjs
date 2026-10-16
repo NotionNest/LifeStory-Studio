@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { route, classify, requireCandidate } from './policy.mjs'
 import { planCandidate } from './candidate.mjs'
+import { matchingValidation } from './metadata.mjs'
 test('only approved integration routes are allowed', () => {
   assert.equal(route('main','feat/diary'),false)
   assert.equal(route('main','release/0.1.0'),true)
@@ -106,6 +107,48 @@ test('real policy CLI rejects missing candidate evidence and accepts only a vali
     writeFileSync(eventPath, JSON.stringify(event))
     assert.equal(run([]).status, 0)
     assert.equal(readFileSync(outputPath, 'utf8'), 'common=true\ndesktop=true\nimages=false\n')
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+})
+
+
+test('metadata evidence binds the immutable run title to the exact target, commit and PR', () => {
+  const pr = { number: 11, base: { ref: 'develop', sha: 'base-sha' }, head: { ref: 'fix/ci', sha: 'head-sha' } }
+  const good = { id: 1, event: 'pull_request', display_title: 'Validation develop@base-sha', head_branch: 'fix/ci', head_sha: 'head-sha', pull_requests: [{ number: 11 }] }
+  assert.equal(matchingValidation(pr, [good]), good)
+  for (const change of [
+    { display_title: 'Validation main@old-base' }, { head_sha: 'old-head' }, { head_branch: 'other-branch' },
+    { pull_requests: [{ number: 12 }] }, { event: 'workflow_dispatch' }, { display_title: 'Metadata verification' },
+  ]) assert.equal(matchingValidation(pr, [{ ...good, ...change }]), undefined)
+  assert.equal(matchingValidation(pr, [good, { ...good, id: 2, conclusion: 'failure' }]).id, 2)
+})
+
+test('metadata CLI preserves failure, waits for ongoing validation and never builds', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'lifestory-ci-metadata-'))
+  const path = fileURLToPath(new URL('./metadata.mjs', import.meta.url))
+  const pr = { number: 11, base: { ref: 'develop', sha: 'base-sha' }, head: { ref: 'fix/ci', sha: 'head-sha', repo: { full_name: 'synthetic/test' } } }
+  const good = { id: 1, event: 'pull_request', display_title: 'Validation develop@base-sha', head_branch: 'fix/ci', head_sha: 'head-sha', pull_requests: [{ number: 11 }], status: 'completed', conclusion: 'success', html_url: 'https://example.invalid/validation' }
+  try {
+    const eventPath = join(directory, 'event.json'), mockPath = join(directory, 'mock.mjs')
+    writeFileSync(eventPath, JSON.stringify({ action: 'edited', changes: { body: {} }, pull_request: pr }))
+    const run = sequences => {
+      writeFileSync(mockPath, `const responses = ${JSON.stringify(sequences)}; let index = 0; globalThis.setTimeout = callback => callback(); globalThis.fetch = async () => ({ok: true, json: async () => ({workflow_runs: responses[Math.min(index++, responses.length - 1)]})});`)
+      return spawnSync(process.execPath, ['--import', mockPath, path], {
+        cwd: directory, encoding: 'utf8', timeout: 10000,
+        env: { ...process.env, GITHUB_EVENT_PATH: eventPath, GITHUB_REPOSITORY: 'synthetic/test', GITHUB_TOKEN: 'synthetic-no-network' },
+      })
+    }
+    assert.equal(run([[good]]).status, 0)
+    assert.match(run([[]]).stderr, /No validation exists/)
+    assert.match(run([[{ ...good, conclusion: 'failure' }]]).stderr, /cannot make it pass/)
+    assert.match(run([[{ ...good, conclusion: 'cancelled' }]]).stderr, /cannot make it pass/)
+    const waited = run([[{ ...good, status: 'in_progress', conclusion: null }], [good]])
+    assert.equal(waited.status, 0)
+    assert.match(waited.stdout, /Waiting for existing validation/)
+    assert.match(run([[good, { ...good, id: 2, conclusion: 'failure' }]]).stderr, /cannot make it pass/)
+    writeFileSync(eventPath, JSON.stringify({ action: 'edited', changes: { base: {} }, pull_request: pr }))
+    assert.match(run([[good]]).stderr, /unchanged, allowed PR target/)
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }

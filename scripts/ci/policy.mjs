@@ -36,7 +36,7 @@ export function requireCandidate(pr, mergeTree, headTree, runs) {
 }
 
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' })
-async function api(path) {
+export async function api(path) {
   const response = await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/${path}`, {
     headers: { Authorization: `Bearer ${process.env.GITHUB_TOKEN}`, Accept: 'application/vnd.github+json' },
     signal: AbortSignal.timeout(15000),
