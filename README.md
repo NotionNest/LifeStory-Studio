@@ -38,7 +38,7 @@ npm run desktop:dev
 
 项目协作规则见 [AGENTS.md](AGENTS.md)。功能规格与决策记录模板见 [templates](docs/templates/)。
 
-远程仓库：[NotionNest/LifeStory-Studio](https://github.com/NotionNest/LifeStory-Studio)（私有）。日常使用 develop 集成、release/<版本> 预发布、main 正式基线；私有仓库强制保护受套餐限制未启用。分支、提交、PR 和 CI 约定见 [Git 流程](docs/process/GIT_WORKFLOW.md)。
+远程仓库：[NotionNest/LifeStory-Studio](https://github.com/NotionNest/LifeStory-Studio)（公开）。日常使用 develop 集成、release/<版本> 预发布、main 正式基线；main、develop、release/* 已启用 PR、CI Gate、禁止强推与删除保护。分支、提交、PR 和 CI 约定见 [Git 流程](docs/process/GIT_WORKFLOW.md)。
 
 测试投入与执行频率以 [测试边界](docs/process/TESTING_POLICY.md) 为准，按风险验证，不机械测试每次编辑或普通标点/装饰样式。
 

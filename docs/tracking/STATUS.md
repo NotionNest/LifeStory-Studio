@@ -18,11 +18,13 @@
 
 ## 本次交接
 
+2026-10-16 仓库公开与保护：用户明确要求将仓库公开以启用分支保护，已设置 public。规则集 Integration branches（25221010）为 active，匹配 main/develop/release/*，强制 PR、解决讨论、GitHub Actions CI Gate（15368）及最新目标分支验证，禁止强推和删除，无绕过名单；批准人数为 0。已查询 main 和 develop 的实际应用规则。公开前扫描所有可达历史的 237 个文件版本，未发现常见密钥格式或数据库/凭据文件路径；该扫描不是对任意私人内容的完整识别。此次只改仓库设置与说明，不改应用，不运行应用回归；后续以文档 PR 的真实 CI Gate 为准。[main 文档 PR #8](https://github.com/NotionNest/LifeStory-Studio/pull/8) 已通过必需 CI Gate 并合入；同步回 develop 时保留所有功能与交接记录，应用代码无改动。当前公开状态取代下面迁移记录中的私有仓库限制，未选择开源许可证、创建候选或发布产品。
+
 2026-10-16 Git 迁移完成：[流程 #4](https://github.com/NotionNest/LifeStory-Studio/pull/4) 合入 main，[同步 #6](https://github.com/NotionNest/LifeStory-Studio/pull/6) 通过 merge commit 合入 develop（9841d92），保留 main 祖先关系及用户已合并的保存功能。直接回流 #5 已被 #6 取代并关闭。当前开发基线为 develop；main 不含未发布保存功能，保护分支及原任务分支保留。
 
 验证：[完整集成 CI Gate](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38858479876)通过，包含一次前端检查及双平台 Rust/桌面和图片工具检查；[main 来源核对](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38858338301)、[develop 来源核对](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38859452109)通过。集成 run 通用检查 47 秒、macOS 桌面任务 4 分 21 秒、Windows 桌面任务 9 分 42 秒；Windows 编译约 57 秒，缓存保存收尾约 4 分 17 秒，不等同于测试耗时。6 份改动文档本地链接有效，应用代码与同步前 develop 一致。后续纯文档交接 PR 仅走策略与 CI Gate，不重复应用回归，实际结果见该 PR。
 
-限制：私有仓库受 GitHub 套餐限制未启用强制保护；未创建版本候选、签名包、标签或产品发布。Windows 原生交互与首次候选安装仍待对应验收。下一步在 develop 上继续已确认的资料库任务；不自动启动 LIB-04。
+迁移完成时的限制：私有仓库套餐不支持强制保护；此项已随之后公开仓库并启用规则集而解除。未创建版本候选、签名包、标签或产品发布。Windows 原生交互与首次候选安装仍待对应验收。下一步在 develop 上继续已确认的资料库任务；不自动启动 LIB-04。
 
 2026-10-16 用户提出增加 develop 与预发布分支。已核查 Checks 的 PR/main push 双重触发、路径/skip 风险和双平台重复检查，形成 [三层分支提案](../process/GIT_BRANCHING_PROPOSAL.md)：develop 集成、release/<版本> 预发布、main 正式线；任务 squash、集成回流保留历史、稳定 CI 门禁与分层验证。尚未创建分支、修改工作流/远程设置、提交或操作 PR；现有未提交成果保持原样。本轮经 ctx7 核实官方 Actions 行为，未运行应用测试，待先核对方案与迁入顺序。
 
