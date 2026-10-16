@@ -108,7 +108,7 @@ export function LibraryWorkspace() {
     } catch (cause) { setError(errorMessage(cause)) }
     finally { navigating.current = false; setWorking(false); if (queued.current) { const next = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(next)) } }
   }
-  const onSaved = useCallback(() => { void refresh().catch(cause => setError(errorMessage(cause))) }, [refresh])
+  const onSaved = useCallback(() => { setError(''); void refresh().catch(cause => setError(errorMessage(cause))) }, [refresh])
   return <main className="flex h-dvh min-h-0 flex-col">
     <header className="flex h-12 shrink-0 items-center justify-between border-b bg-card px-5">
       <span className="text-sm font-semibold tracking-tight">LifeStory Studio <span className="ml-3 font-normal text-muted-foreground">/ 资料库</span></span>
