@@ -18,6 +18,8 @@
 
 ## 本次交接
 
+2026-10-16 CI/Actions 审查（仅审查）：[完整记录](../development/CI_ACTIONS_REVIEW.md)。发现 1 项 P1（成功候选缺失仍可被普通编译替代）及 5 项 P2（范围输出缺失放行、PR 改目标缺触发、未知路径漏检、重缓存、应用 Rust 未强制锁文件一致）；建议精简合并后来源核对。现有策略 4 项测试通过，两个合成反例已复现，实际 Windows Rust 缓存保存 4 分 17 秒。没有发现外部 PR 直接获得写令牌或发布密钥的已证实漏洞；未进行完整依赖漏洞扫描或真实发布验收。本轮只在 docs/ci-actions-review 新增审查文档及本条记录，未修改 CI、应用和远程规则，未提交/推送/创建 PR；修复待用户决定。
+
 2026-10-16 仓库公开与保护：用户明确要求将仓库公开以启用分支保护，已设置 public。规则集 Integration branches（25221010）为 active，匹配 main/develop/release/*，强制 PR、解决讨论、GitHub Actions CI Gate（15368）及最新目标分支验证，禁止强推和删除，无绕过名单；批准人数为 0。已查询 main 和 develop 的实际应用规则。公开前扫描所有可达历史的 237 个文件版本，未发现常见密钥格式或数据库/凭据文件路径；该扫描不是对任意私人内容的完整识别。此次只改仓库设置与说明，不改应用，不运行应用回归；后续以文档 PR 的真实 CI Gate 为准。[main 文档 PR #8](https://github.com/NotionNest/LifeStory-Studio/pull/8) 已通过必需 CI Gate 并合入；同步回 develop 时保留所有功能与交接记录，应用代码无改动。当前公开状态取代下面迁移记录中的私有仓库限制，未选择开源许可证、创建候选或发布产品。
 
 2026-10-16 Git 迁移完成：[流程 #4](https://github.com/NotionNest/LifeStory-Studio/pull/4) 合入 main，[同步 #6](https://github.com/NotionNest/LifeStory-Studio/pull/6) 通过 merge commit 合入 develop（9841d92），保留 main 祖先关系及用户已合并的保存功能。直接回流 #5 已被 #6 取代并关闭。当前开发基线为 develop；main 不含未发布保存功能，保护分支及原任务分支保留。
