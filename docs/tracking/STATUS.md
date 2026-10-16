@@ -18,7 +18,7 @@
 
 ## 本次交接
 
-2026-10-15 LIB-03：已接入自动保存、持久恢复草稿、重开预览及用户选择、会话隔离和失败暂停；12 项存储集成与 8 项前端交互通过，类型/格式/Clippy 通过。原生桌面自动保存、失败保留、强制退出重开预览恢复与正常保存退出验证通过；远程 CI 待触发，详见 [交付记录](../development/LIB03_VERIFICATION.md)。下一步 LIB-04 历史查看、重要标记、恢复与保留清理。
+2026-10-15 LIB-03：已接入自动保存、持久恢复草稿、重开预览及用户选择、会话隔离和失败暂停；12 项存储集成与 8 项前端交互通过，类型/格式/Clippy 通过。原生桌面自动保存、失败保留、强制退出重开预览恢复与正常保存退出验证通过；最终代码 `607c133` 的 [双平台 CI](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38836028471) 已触发待完成；[草稿 PR #3](https://github.com/NotionNest/LifeStory-Studio/pull/3) 已交付，未合并，详见 [交付记录](../development/LIB03_VERIFICATION.md)。下一步 LIB-04 历史查看、重要标记、恢复与保留清理。
 
 
 2026-10-15 LIB-02：schema 2 快照迁移、文字记录创建/保存/读取/分页列表、标题/日期/标签及有限 IPC 已实现。保存幂等、版本冲突及事务保护已接入，界面采用用户选择的专业紧凑写作工具方向，设计背景存于 .impeccable.md。9 项 Rust 集成和 3 项前端关键交互、类型/格式/Clippy、macOS 调试包及原生窗口保存重开/菜单退出/主动另存验证通过，详见 [交付记录](../development/LIB02_VERIFICATION.md)。当前手动保存，LIB-03 自动保存与异常恢复未实现。[本次双平台 CI](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38707797826) 已通过前端/存储测试、静态检查及桌面编译，交付 [PR #1](https://github.com/NotionNest/LifeStory-Studio/pull/1)，未合并或发布。下一步 LIB-03 自动保存与恢复草稿。

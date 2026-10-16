@@ -24,6 +24,7 @@
 - 8 项前端关键交互通过：新增自动草稿先于正式保存、持续输入 5 秒上限、失败暂停与手动重试、标题组合输入暂停，以及恢复预览未经选择不能进入编辑/保存。复用原有失败保留、旧回执和离开保护。
 - TypeScript、Rust 格式与 Clippy 通过。
 - macOS 调试包构建通过；实际窗口自动保存合成中文多段记录、空日期校验失败后正文保留与暂停、强制结束本任务进程后重开对照预览、主动恢复后补全日期并手动保存、正常退出重开通过。未使用真实日记。
-- macOS/Windows CI：待推送后触发。
+- 最终代码提交 `607c133` 的 [macOS/Windows CI](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38836028471) 已触发，结果待完成；旧提交的运行已取消，避免重复验证。
+- 远程交付：[草稿 PR #3](https://github.com/NotionNest/LifeStory-Studio/pull/3)，分支 feat/library-autosave，基于 PR #1 的 feat/library-records 增量审阅，未合并或发布。
 
 Windows 原生窗口、真实中文输入法候选词过程、系统关机与签名发行未验收；组合事件自动化不等于真实输入法验收。后续 LIB-04 实现历史查看、重要标记、恢复和期限清理。
