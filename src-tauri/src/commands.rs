@@ -39,13 +39,49 @@ async fn record_task<T: Send + 'static>(
     let database = database.clone();
     tauri::async_runtime::spawn_blocking(move || action(database))
         .await
-        .map_err(|_| RecordError {code:"write_failed",message:"资料库任务未完成，编辑内容仍保留".into()})?
+        .map_err(|_| RecordError {
+            code: "write_failed",
+            message: "资料库任务未完成，编辑内容仍保留".into(),
+        })?
         .map_err(|error| {
             if let Some(error) = error.downcast_ref::<RecordError>() {
-                return RecordError {code:error.code,message:error.message.clone()};
+                return RecordError {
+                    code: error.code,
+                    message: error.message.clone(),
+                };
             }
-            let full=error.downcast_ref::<rusqlite::Error>().is_some_and(|e| matches!(e,rusqlite::Error::SqliteFailure(code,_) if code.code==rusqlite::ErrorCode::DiskFull));
-            RecordError {code:if full {"storage_full"} else {"write_failed"},message:if full {"磁盘空间不足，未保存修改仍保留"} else {"本地资料库操作失败，请重试；编辑内容仍保留"}.into()}
+            let sqlite = error
+                .downcast_ref::<rusqlite::Error>()
+                .and_then(|e| match e {
+                    rusqlite::Error::SqliteFailure(code, _) => Some(code.code),
+                    _ => None,
+                });
+            let (code, message) = match sqlite {
+                Some(rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked) => {
+                    ("storage_busy", "资料库暂忙，稍后自动重试")
+                }
+                Some(rusqlite::ErrorCode::OperationInterrupted) => {
+                    ("storage_interrupted", "本次写入被中断，稍后自动重试")
+                }
+                Some(rusqlite::ErrorCode::DiskFull) => {
+                    ("storage_full", "磁盘空间不足，请释放空间后重试")
+                }
+                Some(rusqlite::ErrorCode::ReadOnly | rusqlite::ErrorCode::PermissionDenied) => {
+                    ("storage_permission", "资料库不可写，请检查权限后重试")
+                }
+                Some(rusqlite::ErrorCode::DatabaseCorrupt | rusqlite::ErrorCode::NotADatabase) => (
+                    "storage_corrupt",
+                    "资料库无法正常读取，已停止自动重试；请保留编辑内容并检查资料库",
+                ),
+                _ => (
+                    "write_failed",
+                    "本地资料库操作未完成，请检查后重试；编辑内容仍保留",
+                ),
+            };
+            RecordError {
+                code,
+                message: message.into(),
+            }
         })
 }
 #[tauri::command]
@@ -161,13 +197,6 @@ pub async fn record_begin_edit(
     input: BeginEdit,
 ) -> Result<EditingSession, RecordError> {
     record_task(&database, move |db| db.begin_edit(input)).await
-}
-#[tauri::command]
-pub async fn recovery_write(
-    database: State<'_, DatabaseWorker>,
-    input: SaveRecord,
-) -> Result<bool, RecordError> {
-    record_task(&database, move |db| db.recovery_write(input)).await
 }
 #[tauri::command]
 pub async fn record_end_edit(

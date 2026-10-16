@@ -38,13 +38,14 @@ fn setup(db: &DatabaseWorker) -> SaveRecord {
     let session = db
         .begin_edit(BeginEdit {
             record_id: record.id.clone(),
-            expected_revision_id: record.revision_id.clone(),
+            expected_content_version: record.content_version,
             recovery: None,
         })
         .unwrap();
     SaveRecord {
         record_id: record.id,
-        base_revision_id: Some(record.revision_id),
+        base_revision_id: Some(session.record.revision_id),
+        base_content_version: Some(record.content_version),
         request_id: "save-one".into(),
         session_id: session.session_id,
         edit_sequence: 1,
@@ -70,7 +71,7 @@ fn restart_preview_restore_keeps_durable_copy_until_formal_save() {
     assert!(
         db.begin_edit(BeginEdit {
             record_id: "entry".into(),
-            expected_revision_id: formal.revision_id.clone(),
+            expected_content_version: formal.content_version,
             recovery: None
         })
         .is_err()
@@ -78,7 +79,7 @@ fn restart_preview_restore_keeps_durable_copy_until_formal_save() {
     let restored = db
         .begin_edit(BeginEdit {
             record_id: "entry".into(),
-            expected_revision_id: formal.revision_id,
+            expected_content_version: formal.content_version,
             recovery: Some(RecoveryChoice {
                 session_id: draft.session_id,
                 edit_sequence: draft.edit_sequence,
@@ -89,7 +90,7 @@ fn restart_preview_restore_keeps_durable_copy_until_formal_save() {
     let current = restored.recovered.unwrap();
     assert_ne!(current.session_id, input.session_id);
     let mut invalid = current.clone();
-    invalid.record_date = "".into();
+    invalid.record_date = "2025-02-29".into();
     assert!(db.save_record(invalid).is_err());
     assert!(db.recovery_read("entry".into()).unwrap().is_some());
     assert!(db.recovery_write(input).is_err());
@@ -115,7 +116,7 @@ fn discarding_and_replacing_sessions_rejects_late_writes() {
     let next = db
         .begin_edit(BeginEdit {
             record_id: "entry".into(),
-            expected_revision_id: record.revision_id,
+            expected_content_version: record.content_version,
             recovery: Some(RecoveryChoice {
                 session_id: input.session_id.clone(),
                 edit_sequence: 4,
@@ -150,6 +151,7 @@ fn older_save_only_clears_covered_drafts_and_late_old_snapshot_is_ignored() {
     let kept = db.recovery_read("entry".into()).unwrap().unwrap();
     assert_eq!(kept.edit_sequence, 2);
     newer.base_revision_id = Some(saved.revision_id);
+    newer.base_content_version = Some(saved.content_version);
     db.save_record(newer).unwrap();
     assert!(db.recovery_read("entry".into()).unwrap().is_none());
 }

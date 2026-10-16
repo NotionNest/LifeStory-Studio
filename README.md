@@ -4,7 +4,7 @@
 
 前端技术：React + TypeScript + Vite + Tailwind CSS + shadcn/ui；长文编辑使用 Tiptap。
 
-当前阶段：LIB-03 自动保存与恢复草稿已实现，macOS 桌面验收通过；文字记录、标题/日期/标签与失败保护可用。Windows 实机验收待完成。
+当前阶段：LIB-03 已调整为单一自动持久化，macOS 桌面验收通过；本次修改保留本地，暂不推进 PR/提交合并流程。Windows 实机验收待完成。
 
 ## 启动开发
 
@@ -13,7 +13,7 @@ npm ci
 npm run desktop:dev
 ```
 
-开发命令、目录职责与验证边界见 [开发环境说明](docs/development/ENVIRONMENT.md)。当前窗口可新建文字记录、编辑标题/日期/标签，自动保存或使用按钮及 ⌘S/Ctrl+S；重开时可预览并选择恢复草稿。交付边界与证据见 [LIB-03 验证记录](docs/development/LIB03_VERIFICATION.md)。
+开发命令、目录职责与验证边界见 [开发环境说明](docs/development/ENVIRONMENT.md)。当前窗口可新建文字记录、编辑标题/日期/标签，内容统一自动保存到本机，无常驻保存按钮；正常重开直接读取最新内容，旧版遗留草稿仍可预览。最新保存行为与验证见 [保存模型调整](docs/development/SAVING_MODEL_REVISION.md)，原 LIB-03 记录保留为阶段证据。
 
 ## 阅读入口
 

@@ -31,7 +31,7 @@ fn initializes_and_reopens_real_database_without_losing_metadata() {
     let root = Workspace::new();
     let worker = DatabaseWorker::start(root.0.clone()).unwrap();
     let info = worker.inspect().unwrap();
-    assert_eq!(info.schema_version, 3);
+    assert_eq!(info.schema_version, 5);
     assert!(info.fts5_available);
     drop(worker);
 
@@ -45,7 +45,7 @@ fn initializes_and_reopens_real_database_without_losing_metadata() {
     drop(connection);
 
     let reopened = DatabaseWorker::start(root.0.clone()).unwrap();
-    assert_eq!(reopened.inspect().unwrap().schema_version, 3);
+    assert_eq!(reopened.inspect().unwrap().schema_version, 5);
     drop(reopened);
     let connection = Connection::open(root.0.join("lifestory.db")).unwrap();
     let value: String = connection

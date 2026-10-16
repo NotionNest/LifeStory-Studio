@@ -3,15 +3,15 @@ import type { JSONContent } from '@tiptap/react'
 export interface Tag { id: string; name: string }
 export interface RecordFile {
   id: string; title: string | null; recordDate: string; createdTimezone: string
-  createdAt: number; updatedAt: number; revisionId: string; document: JSONContent; tags: Tag[]
+  createdAt: number; updatedAt: number; contentVersion: number; checkpointId: string; document: JSONContent; tags: Tag[]
 }
 export interface RecordSummary { id: string; title: string | null; recordDate: string; excerpt: string }
 export interface SaveInput {
-  recordId: string; baseRevisionId: string; requestId: string; sessionId: string; editSequence: number
+  recordId: string; baseCheckpointId: string; baseContentVersion: number; requestId: string; sessionId: string; editSequence: number
   title: string | null; recordDate: string; tagIds: string[]; document: JSONContent; attachmentIds: string[]
 }
 export interface SaveResult {
-  recordId: string; revisionId: string; requestId: string; sessionId: string; editSequence: number; savedAt: number
+  recordId: string; checkpointId: string; contentVersion: number; requestId: string; sessionId: string; editSequence: number; savedAt: number
 }
 export interface RecoveryDraft { sessionId: string; editSequence: number; writtenAt: number; input: SaveInput; tags: Tag[] }
 export interface RecoverySummary { recordId: string; title: string | null; writtenAt: number }
@@ -20,8 +20,7 @@ export interface EditingSession { record: RecordFile; sessionId: string; recover
 export const libraryApi = {
   recoveries: () => invoke<RecoverySummary[]>('recovery_list'),
   recovery: (recordId: string) => invoke<RecoveryDraft | null>('recovery_read', { recordId }),
-  begin: (recordId: string, expectedRevisionId: string, recovery: RecoveryChoice | null = null) => invoke<EditingSession>('record_begin_edit', { input: { recordId, expectedRevisionId, recovery } }),
-  writeRecovery: (input: SaveInput) => invoke<boolean>('recovery_write', { input }),
+  begin: (recordId: string, expectedContentVersion: number, recovery: RecoveryChoice | null = null) => invoke<EditingSession>('record_begin_edit', { input: { recordId, expectedContentVersion, recovery } }),
   end: (recordId: string, sessionId: string) => invoke<void>('record_end_edit', { recordId, sessionId }),
   create: (requestId: string, recordDate: string, createdTimezone: string) => invoke<RecordFile>('record_create', { input: { requestId, recordDate, createdTimezone } }),
   read: (recordId: string) => invoke<RecordFile>('record_read', { recordId }),

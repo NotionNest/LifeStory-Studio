@@ -12,7 +12,6 @@ fn main() {
             "recovery_list",
             "recovery_read",
             "record_begin_edit",
-            "recovery_write",
             "record_end_edit",
         ]),
     ))

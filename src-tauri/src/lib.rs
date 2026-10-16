@@ -89,7 +89,6 @@ pub fn run() {
             commands::recovery_list,
             commands::recovery_read,
             commands::record_begin_edit,
-            commands::recovery_write,
             commands::record_end_edit,
         ])
         .build(tauri::generate_context!())

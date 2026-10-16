@@ -6,13 +6,14 @@ import { LibraryWorkspace } from './LibraryWorkspace'
 import { libraryApi } from './api'
 vi.mock('@/shared/runtime', () => ({ desktopAvailable: true }))
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn().mockResolvedValue(() => {}) }))
-vi.mock('./api', async original => ({ ...await original<typeof import('./api')>(), libraryApi: { recoveries: vi.fn().mockResolvedValue([]), recovery: vi.fn().mockResolvedValue(null), begin: vi.fn(), end: vi.fn().mockResolvedValue(undefined), writeRecovery: vi.fn().mockResolvedValue(true), list: vi.fn(), read: vi.fn(), create: vi.fn(), save: vi.fn(), tag: vi.fn(), exit: vi.fn(), export: vi.fn() } }))
-it('guards navigation on failure and discards only after explicit choice, even reopening the same entry', async () => {
+vi.mock('./api', async original => ({ ...await original<typeof import('./api')>(), libraryApi: { recoveries: vi.fn().mockResolvedValue([]), recovery: vi.fn().mockResolvedValue(null), begin: vi.fn(), end: vi.fn().mockResolvedValue(undefined), list: vi.fn(), read: vi.fn(), create: vi.fn(), save: vi.fn(), tag: vi.fn(), exit: vi.fn(), export: vi.fn() } }))
+it('guards navigation on failure and discards only after explicit choice', async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   HTMLDialogElement.prototype.showModal = function () { this.open = true }
-  const record = { id: 'entry', title: '原始标题', recordDate: '2026-10-15', createdTimezone: 'Asia/Shanghai', createdAt: 0, updatedAt: 0, revisionId: 'version', document: { type: 'doc', content: [{ type: 'paragraph' }] }, tags: [] }
+  const record = { id: 'entry', title: '原始标题', recordDate: '2026-10-15', createdTimezone: 'Asia/Shanghai', createdAt: 0, updatedAt: 0, contentVersion: 0, checkpointId: 'version', document: { type: 'doc', content: [{ type: 'paragraph' }] }, tags: [] }
   vi.mocked(libraryApi.list).mockResolvedValue([{ id: 'entry', title: record.title, recordDate: record.recordDate, excerpt: '' }])
   vi.mocked(libraryApi.read).mockResolvedValue(record)
+  vi.mocked(libraryApi.create).mockResolvedValue(record)
   vi.mocked(libraryApi.begin).mockResolvedValue({record,sessionId:"session",recovered:null,recoveredTags:[]})
   vi.mocked(libraryApi.save).mockRejectedValue({ code: 'write_failed', message: '合成保存失败' })
   const host = document.createElement('div'); document.body.append(host); const root = createRoot(host)
@@ -28,7 +29,7 @@ it('guards navigation on failure and discards only after explicit choice, even r
     expect(host.querySelector('dialog [role="alert"]')!.textContent).toContain('合成保存失败')
     expect(input().value).toBe('未保存标题')
     await act(async () => click('继续编辑'))
-    await act(async () => { [...host.querySelectorAll<HTMLButtonElement>('aside button')].find(b => b.textContent?.includes('原始标题'))!.click() })
+    await act(async () => click('新建记录'))
     await act(async () => click('放弃修改并继续'))
     expect(input().value).toBe('原始标题')
   } finally { await act(async () => root.unmount()); host.remove() }
@@ -38,8 +39,8 @@ it('previews durable recovery without opening an editor until explicitly chosen'
   vi.clearAllMocks()
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   HTMLDialogElement.prototype.showModal = function () { this.open = true }
-  const record = { id: 'entry', title: '已保存标题', recordDate: '2026-10-15', createdTimezone: 'Asia/Shanghai', createdAt: 0, updatedAt: 0, revisionId: 'version', document: { type: 'doc', content: [{ type: 'paragraph' }] }, tags: [] }
-  const input = { recordId: 'entry', requestId: 'request', sessionId: 'old-session', editSequence: 2, baseRevisionId: 'version', title: null, recordDate: record.recordDate, document: record.document, tagIds: [], attachmentIds: [] }
+  const record = { id: 'entry', title: '已保存标题', recordDate: '2026-10-15', createdTimezone: 'Asia/Shanghai', createdAt: 0, updatedAt: 0, contentVersion: 0, checkpointId: 'version', document: { type: 'doc', content: [{ type: 'paragraph' }] }, tags: [] }
+  const input = { recordId: 'entry', requestId: 'request', sessionId: 'old-session', editSequence: 2, baseContentVersion: 0, baseCheckpointId: 'version', title: null, recordDate: record.recordDate, document: record.document, tagIds: [], attachmentIds: [] }
   vi.mocked(libraryApi.list).mockResolvedValue([])
   vi.mocked(libraryApi.read).mockResolvedValue(record)
   vi.mocked(libraryApi.recoveries).mockResolvedValue([{recordId:'entry',title:record.title,writtenAt:1}])
@@ -53,7 +54,30 @@ it('previews durable recovery without opening an editor until explicitly chosen'
     expect(libraryApi.begin).not.toHaveBeenCalled()
     expect(libraryApi.save).not.toHaveBeenCalled()
     await act(async () => { [...host.querySelectorAll<HTMLButtonElement>('dialog button')].find(b => b.textContent === '恢复到编辑器')!.click() })
-    expect(libraryApi.begin).toHaveBeenCalledWith('entry','version',{sessionId:'old-session',editSequence:2,action:'restore'})
+    expect(libraryApi.begin).toHaveBeenCalledWith('entry',0,{sessionId:'old-session',editSequence:2,action:'restore'})
     expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.value).toBe('')
   } finally { await act(async () => root.unmount()); host.remove() }
+})
+it('leaves without a confirmation after automatic persistence completes', async () => {
+  vi.clearAllMocks(); vi.useFakeTimers()
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  const record = { id:'saved',title:'已保存记录',recordDate:'2026-10-16',createdTimezone:'Asia/Shanghai',createdAt:0,updatedAt:0,contentVersion: 0, checkpointId:'version',document:{type:'doc',content:[{type:'paragraph'}]},tags:[] }
+  vi.mocked(libraryApi.recoveries).mockResolvedValue([])
+  vi.mocked(libraryApi.recovery).mockResolvedValue(null)
+  vi.mocked(libraryApi.list).mockResolvedValue([{id:record.id,title:record.title,recordDate:record.recordDate,excerpt:''}])
+  vi.mocked(libraryApi.read).mockResolvedValue(record)
+  vi.mocked(libraryApi.begin).mockResolvedValue({record,sessionId:'session',recovered:null,recoveredTags:[]})
+  vi.mocked(libraryApi.create).mockResolvedValue({...record,id:'new'})
+  vi.mocked(libraryApi.save).mockResolvedValue({recordId:record.id,contentVersion: 0, checkpointId:'version',requestId:'request',sessionId:'session',editSequence:1,savedAt:1})
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host)
+  try {
+    await act(async()=>{root.render(<LibraryWorkspace />)})
+    await act(async()=>{[...host.querySelectorAll<HTMLButtonElement>('aside button')].find(b=>b.textContent?.includes(record.title))!.click()})
+    const input=host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!
+    await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'新标题');input.dispatchEvent(new Event('input',{bubbles:true}))})
+    await act(async()=>{await vi.advanceTimersByTimeAsync(300)})
+    await act(async()=>{[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='新建记录')!.click()})
+    expect(libraryApi.create).toHaveBeenCalledTimes(1)
+    expect(host.querySelector('dialog')).toBeNull()
+  } finally {await act(async()=>root.unmount());host.remove();vi.useRealTimers()}
 })

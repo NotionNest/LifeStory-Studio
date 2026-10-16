@@ -38,7 +38,7 @@ pub enum RecoveryAction {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct BeginEdit {
     pub record_id: String,
-    pub expected_revision_id: String,
+    pub expected_content_version: i64,
     pub recovery: Option<RecoveryChoice>,
 }
 #[derive(Serialize)]
@@ -144,6 +144,41 @@ fn put_draft(db: &Connection, input: &SaveRecord) -> StorageResult<()> {
         params![input.record_id,input.base_revision_id,input.session_id,input.edit_sequence,serde_json::to_string(input)?,now()?])?;
     Ok(())
 }
+// A history snapshot is made only when entering an editing session, never by autosave.
+fn checkpoint_on_entry(db: &Connection, record: &Record) -> StorageResult<()> {
+    let snapshot = serde_json::json!({"document":record.document,"title":record.title,"recordDate":record.record_date,"tags":record.tags});
+    let previous: Option<String> = db.query_row(
+        "SELECT snapshot_json FROM record_revisions WHERE id=?1",
+        [&record.revision_id],
+        |r| r.get(0),
+    )?;
+    if let Some(previous) = previous {
+        if serde_json::from_str::<serde_json::Value>(&previous)? == snapshot {
+            return Ok(());
+        }
+    } else {
+        let edited: bool = db.query_row(
+            "SELECT working_document IS NOT NULL FROM records WHERE id=?1",
+            [&record.id],
+            |r| r.get(0),
+        )?;
+        if !edited
+            && record.content_version == 0
+            && record.title.is_none()
+            && record.tags.is_empty()
+            && document_text(&record.document)?.is_empty()
+        {
+            return Ok(());
+        }
+    }
+    let checkpoint = id(db)?;
+    db.execute("INSERT INTO record_revisions(id,record_id,document_json,searchable_text,created_at,request_id,snapshot_json,checkpoint_kind) VALUES(?1,?2,?3,?4,?5,?6,?7,'editing_entry')",params![checkpoint,record.id,serde_json::to_string(&record.document)?,document_text(&record.document)?,now()?,format!("checkpoint:{checkpoint}"),serde_json::to_string(&snapshot)?])?;
+    db.execute(
+        "UPDATE records SET current_revision_id=?1 WHERE id=?2",
+        params![checkpoint, record.id],
+    )?;
+    Ok(())
+}
 impl DatabaseWorker {
     pub fn recovery_list(&self) -> StorageResult<Vec<RecoverySummary>> {
         self.call(|db,_| {
@@ -159,8 +194,8 @@ impl DatabaseWorker {
     }
     pub fn begin_edit(&self, input: BeginEdit) -> StorageResult<EditingSession> {
         self.call(move|db,_| {
-            let tx=db.transaction()?;let record=load(&tx,&input.record_id)?;
-            if record.revision_id!=input.expected_revision_id {return Err(fail("conflict","正式内容已更新，请重新打开预览后选择"));}
+            let tx=db.transaction()?;let mut record=load(&tx,&input.record_id)?;
+            if record.content_version!=input.expected_content_version {return Err(fail("conflict","正式内容已更新，请重新打开预览后选择"));}
             let draft=draft_for_record(&tx,&record)?;
             match (&draft,&input.recovery) {
                 (Some(d),Some(c)) if d.session_id==c.session_id && d.edit_sequence==c.edit_sequence=>{},
@@ -168,12 +203,14 @@ impl DatabaseWorker {
                 (None,None)=>{},
                 _=>return Err(fail("conflict","恢复草稿已变化，请重新预览")),
             }
+            checkpoint_on_entry(&tx,&record)?;
+            record=load(&tx,&input.record_id)?;
             let session_id=id(&tx)?;let mut recovered=None;let mut recovered_tags=vec![];
             if let (Some(draft),Some(choice))=(draft,input.recovery) {
                 if matches!(choice.action,RecoveryAction::Restore) {
                     let mut restored=draft.input;
                     restored.session_id=session_id.clone();restored.edit_sequence=1;
-                    restored.base_revision_id=Some(record.revision_id.clone());restored.request_id=id(&tx)?;
+                    restored.base_revision_id=Some(record.revision_id.clone());restored.base_content_version=Some(record.content_version);restored.request_id=id(&tx)?;
                     validate(&tx,&restored)?;
                     for tag_id in &restored.tag_ids {recovered_tags.push(tx.query_row("SELECT id,display_name FROM tags WHERE id=?1",[tag_id],|r|Ok(Tag{id:r.get(0)?,name:r.get(1)?}))?);}
                     recovered=Some(restored);

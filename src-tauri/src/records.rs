@@ -89,7 +89,10 @@ pub struct CreateRecord {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SaveRecord {
     pub record_id: String,
+    #[serde(rename = "baseCheckpointId", alias = "baseRevisionId")]
     pub base_revision_id: Option<String>,
+    #[serde(default)]
+    pub base_content_version: Option<i64>,
     pub request_id: String,
     pub session_id: String,
     pub edit_sequence: u32,
@@ -103,7 +106,10 @@ pub struct SaveRecord {
 #[serde(rename_all = "camelCase")]
 pub struct SaveResult {
     pub record_id: String,
+    #[serde(rename = "checkpointId", alias = "revisionId")]
     pub revision_id: String,
+    #[serde(default)]
+    pub content_version: i64,
     pub request_id: String,
     pub session_id: String,
     pub edit_sequence: u32,
@@ -124,7 +130,10 @@ pub struct Record {
     pub created_timezone: String,
     pub created_at: i64,
     pub updated_at: i64,
+    #[serde(rename = "checkpointId", alias = "revisionId")]
     pub revision_id: String,
+    #[serde(default)]
+    pub content_version: i64,
     pub document: Value,
     pub tags: Vec<Tag>,
 }
@@ -138,12 +147,21 @@ pub struct RecordSummary {
 }
 
 pub(crate) fn load(db: &Connection, record_id: &str) -> StorageResult<Record> {
-    let value = db.query_row("SELECT r.id,r.title,r.record_date,r.created_timezone,r.created_at,r.updated_at,v.id,v.document_json
+    let value = db.query_row("SELECT r.id,r.title,COALESCE(r.pending_date,r.record_date),r.created_timezone,r.created_at,r.updated_at,v.id,COALESCE(r.working_document,v.document_json),r.content_version
                  FROM records r
                  JOIN record_revisions v ON v.id=r.current_revision_id
-                 WHERE r.id=?1 AND r.kind='text' AND r.deleted_at IS NULL", [record_id], |r| Ok((r.get::<_,String>(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get::<_,String>(7)?))).optional()?;
-    let Some((id, title, record_date, created_timezone, created_at, updated_at, revision_id, json)) =
-        value
+                 WHERE r.id=?1 AND r.kind='text' AND r.deleted_at IS NULL", [record_id], |r| Ok((r.get::<_,String>(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get::<_,String>(7)?,r.get::<_,i64>(8)?))).optional()?;
+    let Some((
+        id,
+        title,
+        record_date,
+        created_timezone,
+        created_at,
+        updated_at,
+        revision_id,
+        json,
+        content_version,
+    )) = value
     else {
         return Err(fail("not_found", "记录不存在或已删除"));
     };
@@ -170,6 +188,7 @@ pub(crate) fn load(db: &Connection, record_id: &str) -> StorageResult<Record> {
         created_at,
         updated_at,
         revision_id,
+        content_version,
         document: serde_json::from_str(&json)
             .map_err(|_| fail("corrupt_content", "记录正文无法读取，未改动资料"))?,
         tags,
@@ -252,7 +271,7 @@ pub(crate) fn document_text(document: &Value) -> StorageResult<String> {
                 .ok_or_else(|| fail("validation", "正文属性无效"))?;
             for (key, v) in attrs {
                 let valid = match (kind, key.as_str()) {
-                    ("heading", "level") => v.as_u64().is_some_and(|n| (1..=6).contains(&n)),
+                    ("heading", "level") => v.as_i64().is_some_and(|n| (1..=6).contains(&n)),
                     ("orderedList", "type") => {
                         v.is_null()
                             || v.as_str()
@@ -344,7 +363,7 @@ impl DatabaseWorker {
     pub fn list_records(&self, offset: u32) -> StorageResult<Vec<RecordSummary>> {
         self.call(move |db, _| {
             let mut stmt = db.prepare(
-                "SELECT r.id,r.title,r.record_date,substr(v.searchable_text,1,120)
+                "SELECT r.id,r.title,r.record_date,substr(COALESCE(r.working_text,v.searchable_text),1,120)
                  FROM records r
                  JOIN record_revisions v ON v.id=r.current_revision_id
                  WHERE r.kind='text' AND r.deleted_at IS NULL
@@ -390,7 +409,7 @@ impl DatabaseWorker {
     }
     pub fn save_record(&self, input: SaveRecord) -> StorageResult<SaveResult> {
         self.call(move|db,_| {
-            identifier(&input.record_id)?; identifier(&input.request_id)?; identifier(&input.session_id)?; date(&input.record_date)?;
+            identifier(&input.record_id)?; identifier(&input.request_id)?; identifier(&input.session_id)?; if !input.record_date.is_empty() { date(&input.record_date)?; }
             if input.title.as_ref().is_some_and(|s|s.chars().count()>240||s.contains(['\n','\r'])) || input.tag_ids.len()>50 {return Err(fail("validation","标题或标签数量超过限制"));}
             if !input.attachment_ids.is_empty() {return Err(fail("validation","附件写入尚未开放"));}
             let text=document_text(&input.document)?;
@@ -405,6 +424,7 @@ impl DatabaseWorker {
                 if request!=request_json {return Err(fail("conflict","同一请求标识不能用于不同修改"));} return Ok(serde_json::from_str(&response)?);
             }
             if input.edit_sequence <= saved_sequence { return Err(fail("conflict","保存序号已过期，不能覆盖较新的修改")); }
+            if input.base_content_version!=Some(current.content_version) {return Err(fail("conflict","当前内容已变化，请重新核对，未覆盖任何修改"));}
             if input.base_revision_id.as_deref()!=Some(&current.revision_id) {return Err(fail("conflict","记录已在其他操作中更新，当前修改已保留，请重新核对版本"));}
             let title=input.title.as_deref().map(str::trim).filter(|s|!s.is_empty());
             let mut tags=input.tag_ids.clone(); tags.sort(); tags.dedup();
@@ -412,21 +432,28 @@ impl DatabaseWorker {
                 if tx.query_row("SELECT 1 FROM tags WHERE id=?1",[tag],|r|r.get::<_,i64>(0)).optional()?.is_none() {return Err(fail("validation","标签不存在"));}
             }
             let mut old_tags:Vec<_>=current.tags.iter().map(|t|t.id.clone()).collect(); old_tags.sort();
-            let unchanged=current.document==input.document && current.title.as_deref()==title && current.record_date==input.record_date && old_tags==tags;
+            let document_changed=current.document!=input.document;
+            let unchanged=!document_changed && current.title.as_deref()==title && current.record_date==input.record_date && old_tags==tags;
             let timestamp=if unchanged {current.updated_at} else {now()?};
-            let revision=if unchanged {current.revision_id} else {id(&tx)?};
+            let revision=current.revision_id;
+            let content_version=current.content_version+i64::from(!unchanged);
             if !unchanged {
-                tx.execute("INSERT INTO record_revisions(id,record_id,document_json,searchable_text,created_at,request_id)
-                 VALUES (?1,?2,?3,?4,?5,?6)",params![revision,input.record_id,serde_json::to_string(&input.document)?,text,timestamp,input.request_id])?;
-                tx.execute("UPDATE records
-                 SET title=?1,record_date=?2,updated_at=?3,current_revision_id=?4
-                 WHERE id=?5",params![title,input.record_date,timestamp,revision,input.record_id])?;
+                tx.execute("UPDATE records SET title=?1,record_date=CASE WHEN ?2='' THEN record_date ELSE ?2 END,pending_date=CASE WHEN ?2='' THEN '' ELSE NULL END,updated_at=?3,content_version=?4 WHERE id=?5",params![title,input.record_date,timestamp,content_version,input.record_id])?;
+                if document_changed {
+                    tx.execute("UPDATE records SET working_document=?1,working_text=?2 WHERE id=?3",params![serde_json::to_string(&input.document)?,text,input.record_id])?;
+                }
+                if old_tags!=tags {
                 tx.execute("DELETE FROM record_tags WHERE record_id=?1",[&input.record_id])?;
                 for tag in tags {tx.execute("INSERT INTO record_tags VALUES (?1,?2)",params![input.record_id,tag])?;}
+                }
+                if current.document!=input.document || current.title.as_deref()!=title {
                 tx.execute("DELETE FROM record_search WHERE record_id=?1",[&input.record_id])?;
                 tx.execute("INSERT INTO record_search(record_id,content) VALUES (?1,?2)",params![input.record_id,format!("{}\n{}",title.unwrap_or(""),text)])?;
+                }
             }
-            let result=SaveResult{record_id:input.record_id.clone(),revision_id:revision.clone(),request_id:input.request_id.clone(),session_id:input.session_id.clone(),edit_sequence:input.edit_sequence,saved_at:timestamp};
+            let result=SaveResult{record_id:input.record_id.clone(),revision_id:revision.clone(),content_version,request_id:input.request_id.clone(),session_id:input.session_id.clone(),edit_sequence:input.edit_sequence,saved_at:timestamp};
+            // Only the newest request can be uncertain in this serialized editor pipeline.
+            tx.execute("DELETE FROM record_save_receipts WHERE record_id=?1",[&input.record_id])?;
             tx.execute("INSERT INTO record_save_receipts VALUES (?1,?2,?3,?4,?5)",params![input.request_id,input.record_id,revision,request_json,serde_json::to_string(&result)?])?;
             tx.execute("UPDATE edit_sessions SET saved_sequence=?1 WHERE record_id=?2 AND session_id=?3",params![input.edit_sequence,input.record_id,input.session_id])?;
             tx.execute("DELETE FROM recovery_drafts WHERE record_id=?1 AND session_id=?2 AND edit_sequence<=?3",params![input.record_id,input.session_id,input.edit_sequence])?;
