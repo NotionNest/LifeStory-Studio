@@ -1,6 +1,6 @@
 # 保存模型调整
 
-日期：2026-10-16。用户确认收敛 LIB-03，暂不创建 PR 或推进提交合并流程。本次改动保留在本地工作区，未提交、推送或操作远程 PR。
+日期：2026-10-16。本文保留保存模型调整的实现与验证证据；初次验证时按用户要求暂停 PR。此后在 Git 迁移授权下，成果已保护于 5f165c8，并随 [PR #3](https://github.com/NotionNest/LifeStory-Studio/pull/3) 合入 develop（72cc959）。
 
 ## 当前行为
 
@@ -32,7 +32,7 @@ schema 4 在 records 增加 working_document、working_text、pending_date，sch
 - macOS 调试应用包构建通过。原生窗口用新合成记录验证无保存按钮、空日期正文自动保存、切换不弹确认、正常退出重开后直接读取最新正文与空日期；未修改用户其他记录。
 - 文档：PRD、资料库规格、实施契约、人类使用手册与项目进度同步。
 
-未运行本轮远程 CI 或 Windows 原生验收；未发 PR、未提交、未推送或合并。中文组合事件有自动化保护，真实输入法候选词过程未验收。未落盘的最后输入仍不能承诺零丢失。旧迁移快照的保留和彻底删除需纳入后续清理，不代表独立备份或加密。
+初次本机验证时未运行远程 CI；后续 [PR #3 双平台 CI](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38856209731)已通过并合入 develop，Windows 原生验收仍未运行。中文组合事件有自动化保护，真实输入法候选词过程未验收。未落盘的最后输入仍不能承诺零丢失。旧迁移快照的保留和彻底删除需纳入后续清理，不代表独立备份或加密。
 
 事务实现依据按项目规则经 Context7 核实 [rusqlite 官方事务文档](https://docs.rs/rusqlite/latest/rusqlite/struct.Transaction.html)，没有新增依赖。
 
