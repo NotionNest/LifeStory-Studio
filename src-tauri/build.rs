@@ -9,6 +9,10 @@ fn main() {
             "tag_create",
             "record_export",
             "record_exit",
+            "recovery_list",
+            "recovery_read",
+            "record_begin_edit",
+            "record_end_edit",
         ]),
     ))
     .expect("Tauri build configuration failed");

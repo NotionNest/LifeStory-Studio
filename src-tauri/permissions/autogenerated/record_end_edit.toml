@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-record-end-edit"
+description = "Enables the record_end_edit command without any pre-configured scope."
+commands.allow = ["record_end_edit"]
+
+[[permission]]
+identifier = "deny-record-end-edit"
+description = "Denies the record_end_edit command without any pre-configured scope."
+commands.deny = ["record_end_edit"]

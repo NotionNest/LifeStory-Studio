@@ -11,7 +11,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 
 pub type StorageResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
-const SCHEMA_VERSION: i64 = 2;
+const SCHEMA_VERSION: i64 = 5;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -123,14 +123,15 @@ fn initialize(root: &Path) -> StorageResult<Connection> {
     if format != "lifestory-studio" {
         return Err(io::Error::other("资料格式不匹配，拒绝打开").into());
     }
-    if version < 2 {
-        // A completed SQLite backup must exist before any schema-2 changes.
+    let current: i64 = connection.pragma_query_value(None, "user_version", |r| r.get(0))?;
+    for target in (current + 1)..=SCHEMA_VERSION {
+        // Fail closed when the consistent pre-migration backup cannot be completed.
         let backups = root.join("migration-backups");
         fs::create_dir_all(&backups)?;
         let id: String =
             connection.query_row("SELECT lower(hex(randomblob(16)))", [], |r| r.get(0))?;
-        let pending = backups.join(format!("schema-1-{id}.partial"));
-        let complete = backups.join(format!("schema-1-{id}.sqlite"));
+        let pending = backups.join(format!("schema-{}-{id}.partial", target - 1));
+        let complete = backups.join(format!("schema-{}-{id}.sqlite", target - 1));
         connection.backup("main", &pending, None)?;
         fs::OpenOptions::new()
             .read(true)
@@ -138,9 +139,16 @@ fn initialize(root: &Path) -> StorageResult<Connection> {
             .open(&pending)?
             .sync_all()?;
         fs::rename(&pending, &complete)?;
+        let sql = match target {
+            2 => include_str!("../migrations/002_records.sql"),
+            3 => include_str!("../migrations/003_recovery_sessions.sql"),
+            4 => include_str!("../migrations/004_current_content.sql"),
+            5 => include_str!("../migrations/005_editing_history.sql"),
+            _ => unreachable!(),
+        };
         let transaction = connection.transaction()?;
-        transaction.execute_batch(include_str!("../migrations/002_records.sql"))?;
-        transaction.pragma_update(None, "user_version", 2)?;
+        transaction.execute_batch(sql)?;
+        transaction.pragma_update(None, "user_version", target)?;
         transaction.commit()?;
     }
     connection.pragma_update(None, "journal_mode", "WAL")?;

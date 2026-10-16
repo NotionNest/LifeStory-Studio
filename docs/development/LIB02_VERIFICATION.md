@@ -33,4 +33,4 @@ schema 1 → 2 前使用 SQLite backup 生成受管理目录内的快照，完�
 
 远程交付：[PR #1](https://github.com/NotionNest/LifeStory-Studio/pull/1)，分支 feat/library-records。PR 仍为草稿，未合并 main；双平台 GUI 与正式发行验收不因此完成。
 
-交接时 Windows CI 尚在缓存后处理，全部测试/静态检查/编译步骤成功；整体 run 结论以链接实时状态为准。后续只追加验证文档的提交使用 `[skip ci]`，避免重复执行未变化的代码检查；代码证据明确对应 `0d44420`。
+后续复核：该 CI 整体状态已为 success。后续只追加验证文档的提交使用 `[skip ci]`，避免重复执行未变化的代码检查；代码证据明确对应 `0d44420`。

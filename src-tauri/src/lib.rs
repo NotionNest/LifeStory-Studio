@@ -1,5 +1,6 @@
 mod commands;
 pub mod records;
+pub mod recovery;
 pub mod storage;
 
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -84,7 +85,11 @@ pub fn run() {
             commands::record_save,
             commands::tag_create,
             commands::record_export,
-            commands::record_exit
+            commands::record_exit,
+            commands::recovery_list,
+            commands::recovery_read,
+            commands::record_begin_edit,
+            commands::record_end_edit,
         ])
         .build(tauri::generate_context!())
         .expect("LifeStory Studio failed to start")

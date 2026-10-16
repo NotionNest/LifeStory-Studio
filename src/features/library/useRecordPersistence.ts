@@ -1,0 +1,108 @@
+import { useEffect, useRef, useState } from 'react'
+import type { Editor } from '@tiptap/react'
+import { libraryApi, errorMessage, type RecordFile, type SaveInput } from './api'
+export type FlushResult = 'saved' | 'failed'
+interface Options {
+  record: RecordFile; sessionId: string; recovered?: SaveInput | null; editor: Editor | null
+  content: () => Pick<SaveInput, 'title' | 'recordDate' | 'tagIds' | 'document'>
+  onDirty: (value: boolean) => void; onSaved: () => void; onFailure: (message: string) => void
+}
+export function useRecordPersistence(options: Options) {
+  const latest = useRef(options); latest.current = options
+  const [status, setStatus] = useState(options.recovered ? '正在保存恢复内容…' : options.record.recordDate ? '已保存到本机' : '已保存到本机 · 日期待补充')
+  const [error, setError] = useState(''), [busy, setBusy] = useState(false)
+  const sequence = useRef(options.recovered ? 1 : 0), saved = useRef(0)
+  const version = useRef(options.record.contentVersion), checkpoint = useRef(options.record.checkpointId)
+  const pending = useRef<SaveInput | null>(null), inFlight = useRef<Promise<boolean> | null>(null)
+  const mounted = useRef(true), composing = useRef(false), failed = useRef(false)
+  const failureKind = useRef(''), retries = useRef(0), retryAt = useRef(0)
+  const idle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), maximum = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const actions = useRef({ save: async () => false })
+  const clear = () => { clearTimeout(idle.current); clearTimeout(maximum.current); idle.current = undefined; maximum.current = undefined }
+  const snapshot = (): SaveInput => ({
+    ...latest.current.content(), recordId: options.record.id, sessionId: options.sessionId,
+    baseContentVersion: version.current, baseCheckpointId: checkpoint.current,
+    editSequence: sequence.current, requestId: crypto.randomUUID(), attachmentIds: [],
+  })
+  const schedule = () => {
+    if (!mounted.current || composing.current || failed.current) return
+    clearTimeout(idle.current)
+    const wait = Math.max(300, retryAt.current - Date.now())
+    idle.current = setTimeout(() => { clear(); void actions.current.save() }, wait)
+    if (!retryAt.current) maximum.current ??= setTimeout(() => { clear(); void actions.current.save() }, 2000)
+  }
+  const changed = () => {
+    // Correcting validation may resume saving; editing cannot bypass storage backoff or conflicts.
+    if (failureKind.current === 'validation') { failed.current = false; failureKind.current = '' }
+    sequence.current++; setStatus('未保存'); latest.current.onDirty(true); schedule()
+  }
+  const save = (): Promise<boolean> => {
+    if (inFlight.current) return inFlight.current
+    if (!latest.current.editor || composing.current || latest.current.editor.view.composing) return Promise.resolve(false)
+    clear()
+    if (sequence.current === saved.current && !pending.current) return Promise.resolve(true)
+    failed.current = false; setBusy(true); setError(''); setStatus('保存中…')
+    const operation = Promise.resolve().then(async () => {
+      const input = pending.current ?? snapshot(); pending.current = input
+      try {
+        const result = await libraryApi.save(input)
+        version.current = result.contentVersion; checkpoint.current = result.checkpointId
+        pending.current = null; saved.current = input.editSequence
+        failed.current = false; failureKind.current = ''; retries.current = 0; retryAt.current = 0
+        const clean = sequence.current === saved.current
+        if (mounted.current) {
+          setStatus(clean ? (latest.current.content().recordDate ? '已保存到本机' : '已保存到本机 · 日期待补充') : '正在保存新修改…')
+          latest.current.onDirty(!clean); latest.current.onSaved()
+        }
+        return clean
+      } catch (cause) {
+        const code = typeof cause === 'object' && cause !== null && 'code' in cause ? String(cause.code) : 'unknown'
+        if (['conflict', 'validation', 'not_found'].includes(code)) pending.current = null
+        failureKind.current = code
+        const retryable = code === 'storage_busy' || code === 'storage_interrupted'
+        failed.current = !retryable
+        retryAt.current = retryable ? Date.now() + Math.min(1000 * 2 ** retries.current++, 30000) : 0
+        if (mounted.current) {
+          const message = `${errorMessage(cause)}。${retryable ? '将自动重试，内容仍保留。' : code === 'validation' ? '修改内容后继续保存。' : '请处理问题后重试，当前内容仍保留。'}`
+          setError(message); setStatus('保存未完成'); latest.current.onDirty(true); latest.current.onFailure(message)
+        }
+        return false
+      } finally {
+        inFlight.current = null
+        if (mounted.current) { setBusy(false); if (sequence.current > saved.current) schedule() }
+      }
+    })
+    inFlight.current = operation
+    return operation
+  }
+  actions.current = { save }
+  const flush = async (): Promise<FlushResult> => {
+    // A successful older write is not a failure: drain newer edits before leaving.
+    if (!latest.current.editor) return 'failed'
+    while (mounted.current) {
+      while (composing.current || latest.current.editor?.view.composing) {
+        await new Promise(resolve => setTimeout(resolve, 20))
+        if (!mounted.current) return 'failed'
+      }
+      const clean = await save()
+      if (clean) return 'saved'
+      if (failureKind.current) return 'failed'
+    }
+    return 'failed'
+  }
+  const discard = async () => {
+    clear(); failed.current = true
+    try { await libraryApi.end(options.record.id, options.sessionId); return true }
+    catch (cause) { setError(errorMessage(cause)); latest.current.onFailure(errorMessage(cause)); return false }
+  }
+  const compositionStart = () => { composing.current = true; clear() }
+  const compositionEnd = () => { composing.current = false; schedule() }
+  useEffect(() => {
+    mounted.current = true
+    const key = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void actions.current.save() } }
+    window.addEventListener('keydown', key)
+    return () => { mounted.current = false; clear(); window.removeEventListener('keydown', key) }
+  }, [])
+  useEffect(() => { if (options.editor && options.recovered) { latest.current.onDirty(true); schedule() } }, [options.editor])
+  return { status, error, busy, changed, save, flush, discard, snapshot, compositionStart, compositionEnd }
+}
