@@ -18,6 +18,8 @@
 
 ## 本次交接
 
+2026-10-16 CI 在线验收：[PR #11](https://github.com/NotionNest/LifeStory-Studio/pull/11) 已推送，目标 develop。[完整双平台运行](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38870936285)全部通过；错误路由拒绝、说明编辑不覆盖失败、改目标自动重验、验证期间编辑说明不取消原运行均已有线上证据，见[验收记录](../development/CI_ACTIONS_REVIEW.md#在线验收证据)。Windows 缓存约 454 MB，保存 34 秒（旧约 1.19 GB / 4 分 17 秒）。同一提交仍保留错误路由试验的失败汇总，现以真实文档提交获得独立门禁结果，不绕过保护；最终提交结果见 PR。工作流修复尚未合入 develop/main，服务器保护未调整。
+
 2026-10-16 CI 审查修正：用户确认解决问题后，已在 fix/ci-gates 收紧候选证据、Gate 输出校验及未知路径检查；PR 改目标触发重验，标题/说明事件隔离，不取消或覆盖已有 CI Gate；应用 Rust/桌面/候选构建统一 --locked。使用固定提交的 Rust 专用缓存，仅保存依赖，并关闭 CI 开发/测试调试符号；删除重复的合并后来源核对，服务器保护不变。原审查记录已单独提交 610f1b2 保护。[修正及验证说明](../development/CI_ACTIONS_REVIEW.md)；本地 6 项回归、actionlint、类型/格式/Node 语法检查通过。在线双平台与触发行为以交付 PR 的 [Checks](https://github.com/NotionNest/LifeStory-Studio/actions/workflows/check.yml) 为准；真实候选安装、签名及产品发布未执行。后续审阅修复 PR，不自动开始 LIB-04。
 
 2026-10-16 CI/Actions 审查（仅审查）：[完整记录](../development/CI_ACTIONS_REVIEW.md)。发现 1 项 P1（成功候选缺失仍可被普通编译替代）及 5 项 P2（范围输出缺失放行、PR 改目标缺触发、未知路径漏检、重缓存、应用 Rust 未强制锁文件一致）；建议精简合并后来源核对。现有策略 4 项测试通过，两个合成反例已复现，实际 Windows Rust 缓存保存 4 分 17 秒。没有发现外部 PR 直接获得写令牌或发布密钥的已证实漏洞；未进行完整依赖漏洞扫描或真实发布验收。本轮只在 docs/ci-actions-review 新增审查文档及本条记录，未修改 CI、应用和远程规则，未提交/推送/创建 PR；修复待用户决定。

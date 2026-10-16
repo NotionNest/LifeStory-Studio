@@ -103,3 +103,18 @@ integration.yml 和 integration.mjs 约 30 行，只在合并后再次核对 PR 
 7. 删除重复的 Integration provenance 工作流及脚本，服务器分支保护保持。
 
 本地 6 项策略/真实 CLI 回归通过，覆盖两个原反例、候选状态/来源/合并树、改目标路由、未知路径；actionlint 1.7.12 校验工作流及表达式通过，类型/格式与 Node 语法、diff 空白检查通过。未为标点或装饰样式新增测试。在线验证结果见交付 PR 的 Checks；真实候选安装/签名与完整依赖漏洞扫描不属于本次已验证成果。
+
+
+## 在线验收证据
+
+交付 [PR #11](https://github.com/NotionNest/LifeStory-Studio/pull/11)，最终目标 develop。
+
+- [错误路由](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38870746958)：fix→main 被拒绝，必需 CI Gate 失败，昂贵任务未启动。
+- [失败后仅编辑说明](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38870882230)：新运行跳过，原有失败 Gate 保留，未被同名 skipped 覆盖。
+- [改目标触发验证](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38870936285)：edited 事件自动触发，策略、前端、双平台 Rust/Clippy/桌面及图片工具、CI Gate 全部通过。
+- [验证期间再次编辑说明](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38871056493)：新运行跳过，没有取消完整验证或启动新矩阵。
+- Windows Rust 缓存约 454 MB，保存清理 34 秒；旧运行约 1.19 GB、4 分 17 秒。macOS 新缓存约 389 MB，保存清理 25 秒。首轮冷构建不是严格性能基准，不承诺每次总耗时同比。
+
+GitHub 仍在同一提交的检查汇总中保留故意验证错误路由时的失败，导致 mergeStateStatus=BLOCKED，虽然最新必需 Gate 已通过。此处不删除、伪造或绕过检查：提交这份真实验收文档，再让新提交通过正常门禁。日后改目标时若旧失败仍关联同一提交，也需通过正常新提交与检查解除；不能仅编辑说明来清除失败。
+
+本次仍未运行真实候选安装、签名、公证或正式发布；候选拒绝/接受规则由合成 API 与真实脚本回归保护。最终新提交状态以该 PR 实际 Checks 为准。
