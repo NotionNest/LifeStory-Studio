@@ -2,3 +2,8 @@
 identifier = "inspect-runtime"
 description = "Read application and local database health from the main window."
 commands.allow = ["runtime_info"]
+
+[[permission]]
+identifier = "manage-records"
+description = "Create, read and save local text records and tags."
+commands.allow = ["record_create", "record_read", "record_list", "record_save", "tag_create", "record_export", "record_exit"]

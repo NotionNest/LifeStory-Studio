@@ -14,6 +14,7 @@ on:
       - 'vite.config.ts'
       - 'components.json'
       - 'index.html'
+      - 'docs/features/contracts/**'
       - '.node-version'
       - '.npmrc'
       - 'rust-toolchain.toml'
@@ -53,10 +54,14 @@ jobs:
             ~/.cargo/git
             src-tauri/target
           key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src-tauri/Cargo.lock', 'rust-toolchain.toml') }}
+          restore-keys: |
+            rust-${{ runner.os }}-${{ runner.arch }}-
       - name: Install locked frontend dependencies
         run: npm ci --no-audit --no-fund
       - name: Type and Rust format checks
         run: npm run check
+      - name: Key frontend saving interactions
+        run: npm run test:ui
       - name: Storage integration tests
         run: npm run test:rust
       - name: Rust static checks

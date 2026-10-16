@@ -11,7 +11,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 
 pub type StorageResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
-const SCHEMA_VERSION: i64 = 1;
+const SCHEMA_VERSION: i64 = 2;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -22,7 +22,7 @@ pub struct StorageInfo {
     pub fts5_available: bool,
 }
 
-struct InspectRequest(mpsc::Sender<StorageResult<StorageInfo>>);
+type DatabaseJob = Box<dyn FnOnce(&mut Connection, &Path) + Send>;
 
 /// Owns the SQLite connection on one thread; IPC never executes SQL on the UI thread.
 #[derive(Clone)]
@@ -31,7 +31,7 @@ pub struct DatabaseWorker {
 }
 
 struct WorkerHandle {
-    requests: Option<mpsc::Sender<InspectRequest>>,
+    requests: Option<mpsc::Sender<DatabaseJob>>,
     thread: Option<thread::JoinHandle<()>>,
 }
 
@@ -47,12 +47,12 @@ impl Drop for WorkerHandle {
 
 impl DatabaseWorker {
     pub fn start(root: PathBuf) -> StorageResult<Self> {
-        let (requests, receiver) = mpsc::channel::<InspectRequest>();
+        let (requests, receiver) = mpsc::channel::<DatabaseJob>();
         let (ready, initialized) = mpsc::channel();
         let thread = thread::Builder::new()
             .name("lifestory-database".into())
             .spawn(move || {
-                let connection = match initialize(&root) {
+                let mut connection = match initialize(&root) {
                     Ok(connection) => {
                         if ready.send(Ok(())).is_err() {
                             return;
@@ -64,8 +64,8 @@ impl DatabaseWorker {
                         return;
                     }
                 };
-                for InspectRequest(reply) in receiver {
-                    let _ = reply.send(inspect_connection(&connection, &root));
+                for job in receiver {
+                    job(&mut connection, &root);
                 }
             })?;
         initialized.recv().map_err(io::Error::other)??;
@@ -78,13 +78,22 @@ impl DatabaseWorker {
     }
 
     pub fn inspect(&self) -> StorageResult<StorageInfo> {
+        self.call(|connection, root| inspect_connection(connection, root))
+    }
+
+    pub(crate) fn call<T: Send + 'static>(
+        &self,
+        action: impl FnOnce(&mut Connection, &Path) -> StorageResult<T> + Send + 'static,
+    ) -> StorageResult<T> {
         let (reply, response) = mpsc::channel();
         self.inner
             .requests
             .as_ref()
             .ok_or_else(|| io::Error::other("资料库线程已关闭"))?
-            .send(InspectRequest(reply))
-            .map_err(io::Error::other)?;
+            .send(Box::new(move |connection, root| {
+                let _ = reply.send(action(connection, root));
+            }))
+            .map_err(|_| io::Error::other("资料库线程已关闭"))?;
         response.recv().map_err(io::Error::other)?
     }
 }
@@ -103,7 +112,7 @@ fn initialize(root: &Path) -> StorageResult<Connection> {
     if version == 0 {
         let transaction = connection.transaction()?;
         transaction.execute_batch(include_str!("../migrations/001_workspace.sql"))?;
-        transaction.pragma_update(None, "user_version", SCHEMA_VERSION)?;
+        transaction.pragma_update(None, "user_version", 1)?;
         transaction.commit()?;
     }
     let format: String = connection.query_row(
@@ -113,6 +122,26 @@ fn initialize(root: &Path) -> StorageResult<Connection> {
     )?;
     if format != "lifestory-studio" {
         return Err(io::Error::other("资料格式不匹配，拒绝打开").into());
+    }
+    if version < 2 {
+        // A completed SQLite backup must exist before any schema-2 changes.
+        let backups = root.join("migration-backups");
+        fs::create_dir_all(&backups)?;
+        let id: String =
+            connection.query_row("SELECT lower(hex(randomblob(16)))", [], |r| r.get(0))?;
+        let pending = backups.join(format!("schema-1-{id}.partial"));
+        let complete = backups.join(format!("schema-1-{id}.sqlite"));
+        connection.backup("main", &pending, None)?;
+        fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&pending)?
+            .sync_all()?;
+        fs::rename(&pending, &complete)?;
+        let transaction = connection.transaction()?;
+        transaction.execute_batch(include_str!("../migrations/002_records.sql"))?;
+        transaction.pragma_update(None, "user_version", 2)?;
+        transaction.commit()?;
     }
     connection.pragma_update(None, "journal_mode", "WAL")?;
     connection.pragma_update(None, "synchronous", "FULL")?;

@@ -136,3 +136,15 @@
   }
   .tiptap p + p { margin-top: 0.75em; }
 }
+
+@layer components {
+  .record-editor .tiptap { min-height: 50vh; border: 0; border-radius: 0; padding: 0.5rem 0; background: transparent; font-size: 15px; line-height: 1.95; }
+  .record-editor .tiptap:focus-visible { outline: none; }
+  .record-editor .tiptap h1 { font-size: 1.8em; font-weight: 600; margin: 1em 0 .5em; }
+  .record-editor .tiptap h2 { font-size: 1.4em; font-weight: 600; margin: 1em 0 .5em; }
+  .record-editor .tiptap h3 { font-size: 1.2em; font-weight: 600; margin: 1em 0 .5em; }
+  .record-editor .tiptap ul { list-style: disc; padding-left: 1.5em; }
+  .record-editor .tiptap ol { list-style: decimal; padding-left: 1.5em; }
+  .record-editor .tiptap blockquote { border-left: 2px solid var(--border); padding-left: 1em; color: var(--muted-foreground); }
+  .record-editor .tiptap pre { white-space: pre-wrap; background: var(--secondary); padding: .8em; border-radius: .25em; }
+}

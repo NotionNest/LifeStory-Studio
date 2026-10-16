@@ -4,7 +4,7 @@
 
 前端技术：React + TypeScript + Vite + Tailwind CSS + shadcn/ui；长文编辑使用 Tiptap。
 
-当前阶段：DEC-12～DEC-15 已确认，开发环境与代码骨架已建立并在 macOS 验证。Windows 实机验证与正式功能开发待推进。
+当前阶段：LIB-02 文字记录创建、手动保存与重开已实现并完成 macOS 本机验证。自动保存/恢复草稿及其他模块按计划继续，Windows 实机验收待完成。
 
 ## 启动开发
 
@@ -13,7 +13,7 @@ npm ci
 npm run desktop:dev
 ```
 
-开发命令、目录职责与验证边界见 [开发环境说明](docs/development/ENVIRONMENT.md)。当前窗口验证 React、Rust、SQLite 和编辑器联通，不作为已完成的日记功能。
+开发命令、目录职责与验证边界见 [开发环境说明](docs/development/ENVIRONMENT.md)。当前窗口可新建文字记录、编辑标题/日期/标签并手动保存；支持关闭重开。自动保存尚未接入，请使用保存按钮或 ⌘S/Ctrl+S。交付边界与证据见 [LIB-02 验证记录](docs/development/LIB02_VERIFICATION.md)。
 
 ## 阅读入口
 
@@ -24,6 +24,10 @@ npm run desktop:dev
 3. [项目跟进](docs/tracking/STATUS.md)：当前进度、决策与下一步。
 4. [待决策事项](docs/product/DECISIONS.md)：已确认的方向与需要进一步确定的内容。
 5. [原始对话整理](docs/产品需求与对话整理.md)：需求来源。
+
+## 当前功能评审
+
+[资料库与日常记录规格](docs/features/LIBRARY_AND_RECORDING.md)记录已确认行为；[页面流程与开发评审稿](docs/features/LIBRARY_REVIEW.md)包含页面结构、完整流程、剩余建议与依赖任务。
 
 ## 架构方案入口
 
