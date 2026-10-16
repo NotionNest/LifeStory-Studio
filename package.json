@@ -15,7 +15,9 @@
     "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --tests",
     "check": "npm run typecheck && cargo fmt --manifest-path src-tauri/Cargo.toml --check",
     "test:ui": "vitest run",
-    "codex:check": "node scripts/check-codex.mjs"
+    "codex:check": "node scripts/check-codex.mjs",
+    "desktop:ci": "tauri build --debug --no-bundle --config src-tauri/tauri.ci.conf.json",
+    "test:ci-policy": "node --test scripts/ci/policy.test.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

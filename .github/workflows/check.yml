@@ -1,70 +1,131 @@
 name: Checks
-
 on:
-  push:
-    branches: [main]
-    paths: &code-paths
-      - 'src/**'
-      - 'src-tauri/**'
-      - 'scripts/**'
-      - '.cargo/**'
-      - '.github/workflows/check.yml'
-      - 'package*.json'
-      - 'tsconfig*.json'
-      - 'vite.config.ts'
-      - 'components.json'
-      - 'index.html'
-      - 'docs/features/contracts/**'
-      - '.node-version'
-      - '.npmrc'
-      - 'rust-toolchain.toml'
   pull_request:
-    branches: [main]
-    paths: *code-paths
+    branches: [main, develop, 'release/**']
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
-
+  workflow_call:
+    inputs:
+      candidate:
+        type: boolean
+        default: false
 permissions:
   contents: read
-
+  pull-requests: read
+  actions: read
 concurrency:
   group: checks-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
+  policy:
+    name: Policy and change scope
+    runs-on: ubuntu-latest
+    outputs:
+      common: ${{ steps.scope.outputs.common }}
+      desktop: ${{ steps.scope.outputs.desktop }}
+      images: ${{ steps.scope.outputs.images }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify routing and select checks
+        id: scope
+        run: node scripts/ci/policy.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CANDIDATE: ${{ inputs.candidate || false }}
+      - name: Verify policy boundaries
+        run: node --test scripts/ci/policy.test.mjs
+  common:
+    name: Common checks
+    needs: policy
+    if: needs.policy.outputs.common == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version-file: '.node-version'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npm run test:ui
   desktop:
     name: Desktop (${{ matrix.os }})
+    needs: policy
+    if: needs.policy.outputs.desktop == 'true'
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with:
           node-version-file: '.node-version'
           cache: npm
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
             src-tauri/target
           key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src-tauri/Cargo.lock', 'rust-toolchain.toml') }}
-          restore-keys: |
-            rust-${{ runner.os }}-${{ runner.arch }}-
-      - name: Install locked frontend dependencies
-        run: npm ci --no-audit --no-fund
-      - name: Type and Rust format checks
-        run: npm run check
-      - name: Key frontend saving interactions
-        run: npm run test:ui
-      - name: Storage integration tests
-        run: npm run test:rust
-      - name: Rust static checks
-        run: npm run check:rust
-      - name: Desktop compile with production frontend resources
-        run: npm run desktop:build -- --debug --no-bundle
+          restore-keys: rust-${{ runner.os }}-${{ runner.arch }}-
+      - run: npm ci --no-audit --no-fund
+      - run: npm run test:rust
+      - run: npm run check:rust
+      - name: Compile desktop
+        if: inputs.candidate != true
+        run: npm run desktop:ci
+      - name: Build isolated preview installer
+        if: inputs.candidate == true
+        run: node scripts/ci/candidate.mjs
+      - name: Upload candidate and provenance
+        if: inputs.candidate == true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: preview-${{ matrix.os }}-${{ github.sha }}
+          path: |
+            src-tauri/target/release/bundle/dmg/*.dmg
+            src-tauri/target/release/bundle/nsis/*.exe
+            .ci/candidate-manifest.json
+          if-no-files-found: error
+          retention-days: 14
+          include-hidden-files: true
+  images:
+    name: Image validation (${{ matrix.os }})
+    needs: policy
+    if: needs.policy.outputs.images == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: cargo fmt --manifest-path tools/image-validation/Cargo.toml --check
+      - run: cargo test --locked --manifest-path tools/image-validation/Cargo.toml
+      - run: cargo clippy --locked --manifest-path tools/image-validation/Cargo.toml --all-targets -- -D warnings
+  gate:
+    name: CI Gate
+    if: always()
+    needs: [policy, common, desktop, images]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: node scripts/ci/gate.mjs
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}

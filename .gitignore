@@ -35,3 +35,6 @@ src-tauri/gen/
 vite.config.js
 vite.config.d.ts
 tools/image-validation/target/
+
+# Generated CI channel configuration and provenance
+.ci/
