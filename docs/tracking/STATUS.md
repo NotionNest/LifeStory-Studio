@@ -1,6 +1,6 @@
 # 项目跟进
 
-更新：2026-10-16。当前阶段：LIB-03 最新保存与历史进入规则已随 PR #3 合入 develop；Git 流程已随 #4 进入 main，正在同步到 develop。LIB-04 未开始，Windows 实机验收待完成。
+更新：2026-10-16。当前阶段：LIB-03 最新保存与历史进入规则已随 PR #3 合入 develop；Git 分层流程迁移完成：#4 进入 main，#6 以 merge commit 同步到 develop，完整集成检查与两条分支合并来源核对通过。LIB-04 未开始，Windows 实机验收待完成。
 
 ## 当前任务
 
@@ -8,15 +8,21 @@
 |---|---|---|---|---|
 | TASK-01 | 历史对话整理 | 需求来源 | 已交付 | 用户已阅读 docs/产品需求与对话整理.md |
 | TASK-02 | 正式 PRD | REQ-01—15 | 方向已认可，详细验收持续细化 | docs/product/PRD.md，已同步五项范围决定 |
-| TASK-03 | 协作流程与项目规则 | DEC-05 | 已建立，Git 分层迁移验证中 | WORKFLOW.md、AGENTS.md、Git 流程、模板与人类使用手册 |
+| TASK-03 | 协作流程与项目规则 | DEC-05 | 已建立，Git 分层迁移已验证 | WORKFLOW.md、AGENTS.md、Git 流程、模板与人类使用手册 |
 | TASK-04 | 核心产品决策 | DEC-06—11 | 主要范围已确认；剩余事项待决定 | 双平台、两类 AI、本地资料、文字/对话/图片、生活回顾与导出已确认；系统/CPU、加密及具体服务名单待定 |
 | TASK-05 | 体验、架构及技术选型 | 全部核心需求 | 已确认 | architecture 下四份方案，官方文档研究及本机 CLI/schema 检查 |
 | TASK-06 | 可运行开发环境与代码骨架 | 技术方案 | 本机及双平台 CI 已验证；Windows 实机待验收 | [开发环境说明](../development/ENVIRONMENT.md)；真实应用包与 IPC、SQLite、编辑器检查通过 |
-| TASK-07 | 功能规格与开发任务拆解 | REQ-01—15 | 资料库规格已确认，实施进行中 | [资料库与日常记录](../features/LIBRARY_AND_RECORDING.md)：功能规格、页面流程及任务已获用户确认；LIB-01 契约及图片验证完成，LIB-02 已交付，LIB-03 验证中 |
+| TASK-07 | 功能规格与开发任务拆解 | REQ-01—15 | 资料库规格已确认，实施进行中 | [资料库与日常记录](../features/LIBRARY_AND_RECORDING.md)：功能规格、页面流程及任务已获用户确认；LIB-01 契约及图片验证完成，LIB-02 已交付，LIB-03 最新方案已合入 develop |
 
 任务表是本地进度记录，没有建立定时自动跟进或外部任务同步。
 
 ## 本次交接
+
+2026-10-16 Git 迁移完成：[流程 #4](https://github.com/NotionNest/LifeStory-Studio/pull/4) 合入 main，[同步 #6](https://github.com/NotionNest/LifeStory-Studio/pull/6) 通过 merge commit 合入 develop（9841d92），保留 main 祖先关系及用户已合并的保存功能。直接回流 #5 已被 #6 取代并关闭。当前开发基线为 develop；main 不含未发布保存功能，保护分支及原任务分支保留。
+
+验证：[完整集成 CI Gate](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38858479876)通过，包含一次前端检查及双平台 Rust/桌面和图片工具检查；[main 来源核对](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38858338301)、[develop 来源核对](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38859452109)通过。集成 run 通用检查 47 秒、macOS 桌面任务 4 分 21 秒、Windows 桌面任务 9 分 42 秒；Windows 编译约 57 秒，缓存保存收尾约 4 分 17 秒，不等同于测试耗时。6 份改动文档本地链接有效，应用代码与同步前 develop 一致。后续纯文档交接 PR 仅走策略与 CI Gate，不重复应用回归，实际结果见该 PR。
+
+限制：私有仓库受 GitHub 套餐限制未启用强制保护；未创建版本候选、签名包、标签或产品发布。Windows 原生交互与首次候选安装仍待对应验收。下一步在 develop 上继续已确认的资料库任务；不自动启动 LIB-04。
 
 2026-10-16 用户提出增加 develop 与预发布分支。已核查 Checks 的 PR/main push 双重触发、路径/skip 风险和双平台重复检查，形成 [三层分支提案](../process/GIT_BRANCHING_PROPOSAL.md)：develop 集成、release/<版本> 预发布、main 正式线；任务 squash、集成回流保留历史、稳定 CI 门禁与分层验证。尚未创建分支、修改工作流/远程设置、提交或操作 PR；现有未提交成果保持原样。本轮经 ctx7 核实官方 Actions 行为，未运行应用测试，待先核对方案与迁入顺序。
 
@@ -101,4 +107,4 @@ AI 决定：用户自配模型服务/API Key 与本机 Codex 等工具连接同�
 - 本地 CI 策略测试 4 项通过，包括失败/取消/意外跳过的拒绝；差异空白检查通过。真实预发布安装、签名及发布未运行，未确定版本不创建 release 分支。
 - workflow 权限已补齐；[PR #4](https://github.com/NotionNest/LifeStory-Studio/pull/4) 的[新门禁完整双平台检查](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38857441214)通过，已合入 main（9af5214），[main 合并来源核对](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38858338301)通过。Node 流程测试独立运行，避免被 Vitest 重复收集。
 - #3 先行合入 develop，导致直接 main→develop 的 #5 出现文档冲突；改用 chore/sync-main-workflow 从最新 develop 合入 main，保留全部应用代码，仅协调文档冲突，再通过 PR 以 merge commit 集成。#5 由该同步取代。
-- 同步 PR 完成后，develop 同时包含已验证保存功能和新流程；最终集成检查及合并来源核对以该 PR 与 Actions 实际结果为准。保护分支保留，不创建 release 版本或产品发布。
+- 同步 #6 已合入 develop；完整集成检查与合并来源核对通过，见本页最新交接。保护分支保留，不创建 release 版本或产品发布。
