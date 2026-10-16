@@ -2,7 +2,7 @@ name: Checks
 on:
   pull_request:
     branches: [main, develop, 'release/**']
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened, ready_for_review, edited]
   workflow_dispatch:
   workflow_call:
     inputs:
@@ -14,11 +14,13 @@ permissions:
   pull-requests: read
   actions: read
 concurrency:
-  group: checks-${{ github.workflow }}-${{ github.ref }}
+  # Metadata edits must neither cancel validation nor replace its required check.
+  group: checks-${{ github.workflow }}-${{ github.ref }}-${{ github.event.action == 'edited' && !github.event.changes.base && 'metadata' || 'validation' }}
   cancel-in-progress: true
 jobs:
   policy:
     name: Policy and change scope
+    if: github.event.action != 'edited' || github.event.changes.base
     runs-on: ubuntu-latest
     outputs:
       common: ${{ steps.scope.outputs.common }}
@@ -63,6 +65,9 @@ jobs:
         os: [macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
+    env:
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -71,14 +76,11 @@ jobs:
         with:
           node-version-file: '.node-version'
           cache: npm
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            src-tauri/target
-          key: rust-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('src-tauri/Cargo.lock', 'rust-toolchain.toml') }}
-          restore-keys: rust-${{ runner.os }}-${{ runner.arch }}-
+          workspaces: src-tauri -> target
+          cache-workspace-crates: 'false'
+          cache-bin: 'false'
       - run: npm ci --no-audit --no-fund
       - run: npm run test:rust
       - run: npm run check:rust
@@ -118,8 +120,9 @@ jobs:
       - run: cargo test --locked --manifest-path tools/image-validation/Cargo.toml
       - run: cargo clippy --locked --manifest-path tools/image-validation/Cargo.toml --all-targets -- -D warnings
   gate:
-    name: CI Gate
-    if: always()
+    # A skipped metadata-only job must not report success under the required name.
+    name: ${{ github.event.action == 'edited' && !github.event.changes.base && 'Metadata edit' || 'CI Gate' }}
+    if: always() && (github.event.action != 'edited' || github.event.changes.base)
     needs: [policy, common, desktop, images]
     runs-on: ubuntu-latest
     steps:

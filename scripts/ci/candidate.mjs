@@ -35,7 +35,7 @@ const cliPath=resolve('node_modules/@tauri-apps/cli',cli.bin.tauri)
 const bundle=process.platform==='darwin'?'dmg':process.platform==='win32'?'nsis':null
 if(!bundle) throw new Error('Candidate installers require macOS or Windows')
 rmSync('src-tauri/target/release/bundle',{recursive:true,force:true})
-execFileSync(process.execPath,[cliPath,'build','--config',resolve(override),'--bundles',bundle],{stdio:'inherit'})
+execFileSync(process.execPath,[cliPath,'build','--config',resolve(override),'--bundles',bundle,'--','--locked'],{stdio:'inherit'})
 const root='src-tauri/target/release/bundle'
 const files=[]
 function collect(dir){for(const name of readdirSync(dir)){const path=join(dir,name);if(statSync(path).isDirectory())collect(path);else if(/\.(dmg|exe)$/.test(name))files.push({path,sha256:createHash('sha256').update(readFileSync(path)).digest('hex'),bytes:statSync(path).size})}}
