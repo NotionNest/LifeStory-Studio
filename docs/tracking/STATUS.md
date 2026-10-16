@@ -81,4 +81,5 @@ AI 决定：用户自配模型服务/API Key 与本机 Codex 等工具连接同�
 - 本地功能提交 5f165c8 已推送保护分支；#2 关闭，#3 更新最新功能、转向 develop，暂为 Draft。
 - 已创建远程 develop。基础设施分支 hotfix/git-workflow 实现按范围检查、稳定 CI Gate、合并来源核对、隔离预发布产物；合并与同步按迁移顺序执行。
 - 本地 CI 策略测试 4 项通过，包括失败/取消/意外跳过的拒绝；差异空白检查通过。真实预发布安装、签名及发布未运行，未确定版本不创建 release 分支。
-- 后续：验证基础设施 PR 的实际 Actions，合入 main 并回合 develop，再同步 #3。保护分支保留，不清理功能成果。
+- 基础设施已本地提交 4d4bc58；首次推送被 GitHub 拒绝：OAuth 凭据缺少 workflow scope。已请求用户通过 gh auth refresh 增加该权限。远程尚未收到此提交，基础设施 PR 尚未创建，新的 Actions 未运行。
+- 后续：权限补齐后推送，验证基础设施 PR 的实际 Actions，合入 main 并回合 develop，再同步 #3。保护分支保留，不清理功能成果。
