@@ -18,6 +18,8 @@
 
 ## 本次交接
 
+2026-10-16 仓库公开与保护：用户明确要求将仓库公开以启用分支保护，已设置 public。规则集 Integration branches（25221010）为 active，匹配 main/develop/release/*，强制 PR、解决讨论、GitHub Actions CI Gate（15368）及最新目标分支验证，禁止强推和删除，无绕过名单；批准人数为 0。已查询 main 和 develop 的实际应用规则。公开前扫描所有可达历史的 237 个文件版本，未发现常见密钥格式或数据库/凭据文件路径；该扫描不是对任意私人内容的完整识别。此次只改仓库设置与说明，不改应用，不运行应用回归；后续以文档 PR 的真实 CI Gate 为准。当前公开状态取代下面迁移记录中的私有仓库限制，未选择开源许可证、创建候选或发布产品。
+
 2026-10-15 LIB-02：schema 2 快照迁移、文字记录创建/保存/读取/分页列表、标题/日期/标签及有限 IPC 已实现。保存幂等、版本冲突及事务保护已接入，界面采用用户选择的专业紧凑写作工具方向，设计背景存于 .impeccable.md。9 项 Rust 集成和 3 项前端关键交互、类型/格式/Clippy、macOS 调试包及原生窗口保存重开/菜单退出/主动另存验证通过，详见 [交付记录](../development/LIB02_VERIFICATION.md)。当前手动保存，LIB-03 自动保存与异常恢复未实现。[本次双平台 CI](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38707797826) 已通过前端/存储测试、静态检查及桌面编译，交付 [PR #1](https://github.com/NotionNest/LifeStory-Studio/pull/1)，未合并或发布。下一步 LIB-03 自动保存与恢复草稿。
 
 2026-10-15 LIB-01 交付：目标 SQL 与前后端类型契约已定稿；真实 bundled SQLite 的 3 项契约保护通过，应用及契约类型、格式检查通过。独立图片验证在本机和 [macOS/Windows CI](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38703938848) 通过测试及 Clippy。支持静态 PNG/JPEG/WebP，25 MiB、4000 万像素、单边 16384 限制，其他/动画格式明确拒绝；结果见 [支持矩阵](../features/IMAGE_CAPABILITIES.md)。提交位于 docs/library-recording-spec，未合并 main。未启用新 schema、未实现导入/编辑 UI，未重复完整桌面构建；下一步 LIB-02 编号迁移、记录服务与真实保存重开。
