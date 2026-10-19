@@ -4,9 +4,9 @@ import { useRecordPersistence } from './useRecordPersistence'
 import StarterKit from '@tiptap/starter-kit'
 import { Button } from '@/components/ui/button'
 import { libraryApi, errorMessage, type RecordFile, type SaveInput, type Tag } from './api'
-export interface EditorHandle { prepareLeave: () => Promise<'saved' | 'failed'>; resume: () => void; flush: () => Promise<'saved' | 'failed'>; save: () => Promise<boolean>; export: () => Promise<boolean>; discard: () => Promise<boolean> }
-interface Props { record: RecordFile; sessionId: string; recovered?: SaveInput | null; recoveredTags?: Tag[]; ref: Ref<EditorHandle>; onDirty: (dirty: boolean) => void; onBusy: (busy: boolean) => void; onSaved: () => void; onFailure: (message: string) => void }
-export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref, onDirty, onBusy, onSaved, onFailure }: Props) {
+export interface EditorHandle { contentVersion: () => number; prepareLeave: () => Promise<'saved' | 'failed'>; resume: () => void; flush: () => Promise<'saved' | 'failed'>; save: () => Promise<boolean>; export: () => Promise<boolean>; discard: () => Promise<boolean> }
+interface Props { record: RecordFile; sessionId: string; recovered?: SaveInput | null; recoveredTags?: Tag[]; ref: Ref<EditorHandle>; onDirty: (dirty: boolean) => void; onBusy: (busy: boolean) => void; onSaved: () => void; onFailure: (message: string) => void; onHistory?: () => void }
+export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref, onDirty, onBusy, onSaved, onFailure, onHistory }: Props) {
   const [title, setTitle] = useState(recovered ? recovered.title ?? '' : record.title ?? '')
   const [date, setDate] = useState(recovered?.recordDate ?? record.recordDate)
   const [tags, setTags] = useState(recovered ? recoveredTags ?? [] : record.tags)
@@ -40,6 +40,7 @@ export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref,
     article.current?.querySelectorAll<HTMLInputElement>('input').forEach(input => { input.readOnly = value })
   }
   useImperativeHandle(ref, () => ({
+    contentVersion: () => persistence.snapshot().baseContentVersion,
     prepareLeave: async () => {
       if (!await persistence.waitForComposition()) return 'failed'
       freeze(true)
@@ -68,7 +69,7 @@ export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref,
   return <article ref={article} aria-busy={readOnly} onBeforeInputCapture={guardInput} onPasteCapture={guardInput} onDropCapture={guardInput} onCompositionStart={persistence.compositionStart} onCompositionEnd={persistence.compositionEnd} className="flex min-w-0 flex-1 flex-col bg-card">
     <header className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-3">
       <div><span role="status" className="text-xs text-muted-foreground">{status}</span></div>
-      <span className="text-xs text-muted-foreground">自动保存</span>
+      <div className="flex items-center gap-3"><span className="text-xs text-muted-foreground">自动保存</span>{onHistory && <Button variant="outline" size="sm" disabled={readOnly || tagBusy} onClick={onHistory}>查看历史</Button>}</div>
     </header>
     <div className="mx-auto flex w-full max-w-[860px] flex-1 flex-col gap-4 px-7 py-6 lg:px-12">
       {(error || persistence.error) && <p role="alert" className="rounded border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error || persistence.error} <Button variant="ghost" size="sm" disabled={busy} onClick={() => void save()}>立即重试</Button></p>}

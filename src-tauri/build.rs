@@ -13,6 +13,10 @@ fn main() {
             "recovery_read",
             "record_begin_edit",
             "record_end_edit",
+            "history_list",
+            "history_read",
+            "history_mark",
+            "history_restore",
         ]),
     ))
     .expect("Tauri build configuration failed");

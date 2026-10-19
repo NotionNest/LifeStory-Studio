@@ -41,7 +41,7 @@ pub struct BeginEdit {
     pub expected_content_version: i64,
     pub recovery: Option<RecoveryChoice>,
 }
-#[derive(Serialize)]
+#[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EditingSession {
     pub record: Record,
@@ -145,7 +145,7 @@ fn put_draft(db: &Connection, input: &SaveRecord) -> StorageResult<()> {
     Ok(())
 }
 // A history snapshot is made only when entering an editing session, never by autosave.
-fn checkpoint_on_entry(db: &Connection, record: &Record) -> StorageResult<()> {
+pub(crate) fn checkpoint_on_entry(db: &Connection, record: &Record) -> StorageResult<()> {
     let snapshot = serde_json::json!({"document":record.document,"title":record.title,"recordDate":record.record_date,"tags":record.tags});
     let previous: Option<String> = db.query_row(
         "SELECT snapshot_json FROM record_revisions WHERE id=?1",

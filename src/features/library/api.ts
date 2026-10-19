@@ -17,7 +17,20 @@ export interface RecoveryDraft { sessionId: string; editSequence: number; writte
 export interface RecoverySummary { recordId: string; title: string | null; writtenAt: number }
 export interface RecoveryChoice { sessionId: string; editSequence: number; action: 'restore' | 'discard' }
 export interface EditingSession { record: RecordFile; sessionId: string; recovered: SaveInput | null; recoveredTags: Tag[] }
+export interface HistoryCursor { createdAt: number; id: string }
+export interface HistorySummary {
+  id: string; createdAt: number; important: boolean; referenced: boolean
+  currentCheckpoint: boolean; restorable: boolean; restoredFromId: string | null; excerpt: string
+}
+export interface HistorySnapshot { document: JSONContent; title: string | null; recordDate: string; tags: Tag[] }
+export interface HistoryVersion { summary: HistorySummary; document: JSONContent; snapshot: HistorySnapshot | null }
+export interface HistoryPage { items: HistorySummary[]; nextBefore: HistoryCursor | null }
+export interface RestoreHistory { recordId: string; revisionId: string; expectedContentVersion: number; sessionId: string; requestId: string }
 export const libraryApi = {
+  history: (recordId: string, before: HistoryCursor | null = null) => invoke<HistoryPage>('history_list', { recordId, before }),
+  version: (recordId: string, revisionId: string) => invoke<HistoryVersion>('history_read', { recordId, revisionId }),
+  mark: (recordId: string, revisionId: string, important: boolean) => invoke<void>('history_mark', { recordId, revisionId, important }),
+  restore: (input: RestoreHistory) => invoke<EditingSession>('history_restore', { input }),
   recoveries: () => invoke<RecoverySummary[]>('recovery_list'),
   recovery: (recordId: string) => invoke<RecoveryDraft | null>('recovery_read', { recordId }),
   begin: (recordId: string, expectedContentVersion: number, recovery: RecoveryChoice | null = null) => invoke<EditingSession>('record_begin_edit', { input: { recordId, expectedContentVersion, recovery } }),

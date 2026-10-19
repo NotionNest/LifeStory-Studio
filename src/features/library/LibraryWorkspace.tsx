@@ -3,16 +3,19 @@ import { listen } from '@tauri-apps/api/event'
 import { Button } from '@/components/ui/button'
 import { desktopAvailable } from '@/shared/runtime'
 import { libraryApi, localDate, errorMessage, type RecordFile, type RecordSummary, type EditingSession, type RecoveryDraft, type RecoverySummary } from './api'
+import { HistoryPanel } from './HistoryPanel'
 import { RecoveryPreview } from './RecoveryPreview'
 import { RecordEditor, type EditorHandle } from './RecordEditor'
 
-type Intent = { kind: 'open'; id: string } | { kind: 'create' } | { kind: 'exit' }
+type Intent = { kind: 'open'; id: string } | { kind: 'create' } | { kind: 'exit' } | { kind: 'history' }
 export function LibraryWorkspace() {
   const [records, setRecords] = useState<RecordSummary[]>([])
   const [record, setRecord] = useState<RecordFile | null>(null)
   const [session, setSession] = useState<EditingSession | null>(null)
   const [recoveries, setRecoveries] = useState<RecoverySummary[]>([])
   const [recovery, setRecovery] = useState<{ record: RecordFile; draft: RecoveryDraft } | null>(null)
+  const [history, setHistory] = useState<RecordFile | null>(null)
+  const historyOpen = useRef(false)
   const [opened, setOpened] = useState(0)
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(false)
@@ -47,6 +50,12 @@ export function LibraryWorkspace() {
     navigating.current = true; setWorking(true); setError('')
     try {
       if (intent.kind === 'exit') { await libraryApi.exit(); return }
+      if (intent.kind === 'history') {
+        if (!record || !editor.current) return
+        const saved = await libraryApi.read(record.id)
+        if (saved.contentVersion !== editor.current.contentVersion()) throw new Error('当前内容已在其他操作中变化，请重新打开记录核对后查看历史')
+        historyOpen.current = true; setHistory(saved); setPending(null); return
+      }
       let next: RecordFile
       if (intent.kind === 'create') {
         createRequest.current ??= crypto.randomUUID()
@@ -63,17 +72,19 @@ export function LibraryWorkspace() {
     finally { navigating.current = false; setWorking(leaving.current); if (!leaving.current && queued.current) { const next = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(next)) } }
   }
   const request = (intent: Intent) => {
+    if (historyOpen.current) return
     if (navigating.current || busy.current || leaving.current) { queued.current = intent; return }
     leaving.current = true; setWorking(true)
     void (async () => {
       try {
         if (editor.current && await editor.current.prepareLeave() !== 'saved') {
+          if (intent.kind === 'history') { setError('当前修改尚未保存，请先完成保存或处理错误后再查看历史。'); return }
           setPending(intent); setExported(false); return
         }
         await execute(intent)
       } catch (cause) { setError(errorMessage(cause)) }
       finally {
-        editor.current?.resume()
+        if (!historyOpen.current) editor.current?.resume()
         leaving.current = false; setWorking(false)
         if (queued.current) { const next = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(next)) }
       }
@@ -138,9 +149,12 @@ export function LibraryWorkspace() {
         <p className="border-t p-4 text-[11px] leading-5 text-muted-foreground">文字记录 · 按记录日期排列<br />记录保存在这台电脑上</p>
       </aside>
       <section className="flex min-w-0 flex-1 overflow-y-auto" aria-label="编辑工作区">
-        {record && session ? <RecordEditor key={`${record.id}:${opened}`} ref={editor} record={record} sessionId={session.sessionId} recovered={session.recovered} recoveredTags={session.recoveredTags} onDirty={onDirty} onBusy={onBusy} onSaved={onSaved} onFailure={setError} /> : <div className="m-auto max-w-sm px-8"><p className="mb-2 text-xs text-muted-foreground">你的生活，逐篇积累</p><h2 className="mb-3 text-xl font-medium">选择记录，或开始书写。</h2><p className="text-sm leading-7 text-muted-foreground">同一天可以留下多条记录。标题和标签都可稍后补充。</p></div>}
+        {record && session ? <RecordEditor key={`${record.id}:${opened}`} ref={editor} record={record} sessionId={session.sessionId} recovered={session.recovered} recoveredTags={session.recoveredTags} onDirty={onDirty} onBusy={onBusy} onSaved={onSaved} onFailure={setError} onHistory={() => request({ kind: 'history' })} /> : <div className="m-auto max-w-sm px-8"><p className="mb-2 text-xs text-muted-foreground">你的生活，逐篇积累</p><h2 className="mb-3 text-xl font-medium">选择记录，或开始书写。</h2><p className="text-sm leading-7 text-muted-foreground">同一天可以留下多条记录。标题和标签都可稍后补充。</p></div>}
       </section>
     </div>}
+    {history && session && <HistoryPanel record={history} sessionId={session.sessionId} onClose={() => { historyOpen.current = false; setHistory(null); editor.current?.resume() }} onRestored={editing => {
+      dirty.current = false; historyOpen.current = false; setHistory(null); setRecord(editing.record); setSession(editing); setOpened(value => value + 1); setError(''); onSaved()
+    }} />}
     {recovery && <RecoveryPreview record={recovery.record} draft={recovery.draft} busy={working} error={error} onChoose={action => void resolveRecovery(action)} onCancel={() => { setRecovery(null); setError('') }} onRefresh={() => void execute({ kind: 'open', id: recovery.record.id })} />}
     {pending && <dialog ref={dialog} onCancel={event => { event.preventDefault(); if (!working) setPending(null) }} aria-labelledby="leave-title" className="fixed inset-0 z-50 m-auto w-[calc(100%-3rem)] max-w-lg rounded-lg border bg-card p-6 text-foreground shadow-xl backdrop:bg-foreground/25">
       <h2 id="leave-title" className="text-lg font-semibold">有尚未保存的修改</h2><p className="my-3 text-sm leading-6 text-muted-foreground">保存成功后再继续，或主动另存当前编辑内容。放弃修改后，未保存的内容将被丢弃。</p>
