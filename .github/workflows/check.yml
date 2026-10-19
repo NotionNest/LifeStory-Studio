@@ -25,6 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       common: ${{ steps.scope.outputs.common }}
+      rust: ${{ steps.scope.outputs.rust }}
       desktop: ${{ steps.scope.outputs.desktop }}
       images: ${{ steps.scope.outputs.images }}
     steps:
@@ -54,8 +55,29 @@ jobs:
           node-version-file: '.node-version'
           cache: npm
       - run: npm ci --no-audit --no-fund
-      - run: npm run check
+      - run: npm run build
       - run: npm run test:ui
+  rust:
+    name: Rust checks (macOS)
+    needs: policy
+    if: needs.policy.outputs.rust == 'true'
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6
+        with:
+          workspaces: src-tauri -> target
+          cache-workspace-crates: 'false'
+          cache-bin: 'false'
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
+      - run: cargo test --locked --manifest-path src-tauri/Cargo.toml --tests
+      - run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings
   desktop:
     name: Desktop (${{ matrix.os }})
     needs: policy
@@ -83,6 +105,7 @@ jobs:
           cache-workspace-crates: 'false'
           cache-bin: 'false'
       - run: npm ci --no-audit --no-fund
+      - run: cargo fmt --manifest-path src-tauri/Cargo.toml --check
       - run: npm run test:rust
       - run: npm run check:rust
       - name: Compile desktop
@@ -110,7 +133,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        os: ${{ fromJSON(needs.policy.outputs.desktop == 'true' && '["macos-latest","windows-latest"]' || '["ubuntu-latest"]') }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     steps:
@@ -124,7 +147,7 @@ jobs:
     name: CI Gate
     if: always()
     timeout-minutes: 70
-    needs: [policy, common, desktop, images]
+    needs: [policy, common, rust, desktop, images]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1

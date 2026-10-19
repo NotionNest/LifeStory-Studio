@@ -17,17 +17,20 @@ test('only approved integration routes are allowed', () => {
   assert.equal(route('release/0.1.0','fix/installer'),true)
   assert.equal(route('release/0.1.0','feat/diary'),false)
 })
-test('docs skip expensive checks; code/tool/shared changes select the necessary matrix', () => {
-  assert.deepEqual(classify(['docs/product/PRD.md']),{common:false,desktop:false,images:false})
-  assert.deepEqual(classify(['src-tauri/src/storage.rs']),{common:true,desktop:true,images:false})
-  assert.deepEqual(classify(['tools/image-validation/src/lib.rs']),{common:false,desktop:false,images:true})
-  assert.deepEqual(classify(['.github/workflows/check.yml']),{common:true,desktop:true,images:true})
-  assert.deepEqual(classify(['src-tauri/src/storage.rs'],{releaseFix:true}),{common:true,desktop:false,images:false})
-  assert.deepEqual(classify([],{candidate:true,full:true}),{common:true,desktop:true,images:true})
-  for (const file of ['public/runtime.js', 'vitest.config.ts']) assert.deepEqual(classify([file]),{common:true,desktop:true,images:false})
-  for (const file of ['new-runtime/config.js', ' scripts/ci/hidden.mjs']) assert.deepEqual(classify([file]),{common:true,desktop:true,images:true})
-  assert.deepEqual(classify(['.github/pull_request_template.md']),{common:false,desktop:false,images:false})
-  assert.deepEqual(classify(['docs/features/contracts/schema.sql']),{common:true,desktop:true,images:false})
+test('daily PRs select lightweight checks by content; full validation is explicit', () => {
+  const empty = {common:false,rust:false,desktop:false,images:false}
+  assert.deepEqual(classify(['docs/product/PRD.md']),empty)
+  for (const file of ['src/App.tsx','public/runtime.js','vitest.config.ts','package-lock.json'])
+    assert.deepEqual(classify([file]),{...empty,common:true})
+  for (const file of ['src-tauri/src/storage.rs','src-tauri/Cargo.lock','src-tauri/tauri.conf.json','docs/features/contracts/schema.sql'])
+    assert.deepEqual(classify([file]),{...empty,rust:true})
+  assert.deepEqual(classify(['tools/image-validation/src/lib.rs']),{...empty,images:true})
+  for (const file of ['.github/workflows/check.yml','new-runtime/config.js',' scripts/ci/hidden.mjs'])
+    assert.deepEqual(classify([file]),{common:true,rust:true,desktop:false,images:true})
+  assert.deepEqual(classify(['src/App.tsx','src-tauri/src/storage.rs']),{...empty,common:true,rust:true})
+  assert.deepEqual(classify(['.github/pull_request_template.md']),empty)
+  for (const options of [{full:true},{candidate:true}])
+    assert.deepEqual(classify([],options),{common:true,rust:false,desktop:true,images:true})
 })
 
 test('preview version and app identity are isolated and mismatched version branches are rejected',()=>{
@@ -41,9 +44,12 @@ test('CI Gate rejects failed, cancelled and unexpectedly skipped required checks
   const run = (results) => spawnSync(process.execPath, ['scripts/ci/gate.mjs'], {
     env: { ...process.env, JOB_RESULTS: JSON.stringify(results) }, encoding: 'utf8',
   }).status
-  const results = { policy: { result: 'success', outputs: { common: 'true', desktop: 'false', images: 'false' } }, common: { result: 'success' }, desktop: { result: 'skipped' }, images: { result: 'skipped' } }
+  const results = { policy: { result: 'success', outputs: { common: 'true', rust: 'false', desktop: 'false', images: 'false' } }, common: { result: 'success' }, rust: { result: 'skipped' }, desktop: { result: 'skipped' }, images: { result: 'skipped' } }
   assert.equal(run(results), 0)
   for (const result of ['failure', 'cancelled', 'skipped']) assert.notEqual(run({ ...results, common: { result } }), 0)
+  for (const result of ['failure','cancelled','skipped']) {
+    assert.notEqual(run({...results,policy:{result:'success',outputs:{common:'false',rust:'true',desktop:'false',images:'false'}},common:{result:'skipped'},rust:{result}}),0)
+  }
   assert.notEqual(run({ ...results, policy: { ...results.policy, result: 'failure' } }), 0)
   for (const outputs of [undefined, {}, { common: 'false' }, { common: 'false', desktop: 'false', images: 'yes' }]) {
     assert.notEqual(run({ policy: { result: 'success', outputs }, common: { result: 'skipped' }, desktop: { result: 'skipped' }, images: { result: 'skipped' } }), 0)
@@ -99,14 +105,19 @@ test('real policy CLI rejects missing candidate evidence and accepts only a vali
     assert.equal(readFileSync(outputPath, 'utf8'), '')
     const good = { id: 1, head_sha: head, head_branch: 'release/0.1.0', event: 'push', status: 'completed', conclusion: 'success', html_url: 'https://example.invalid/candidate' }
     assert.equal(run([good]).status, 0)
-    assert.equal(readFileSync(outputPath, 'utf8'), 'common=true\ndesktop=false\nimages=false\n')
+    assert.equal(readFileSync(outputPath, 'utf8'), 'common=false\nrust=false\ndesktop=false\nimages=false\n')
     event.pull_request.head.ref = 'fix/example'
     writeFileSync(eventPath, JSON.stringify(event))
     assert.match(run([]).stderr, /Disallowed PR route/)
+    event.pull_request.head.ref = 'hotfix/example'
+    writeFileSync(eventPath, JSON.stringify(event))
+    assert.equal(run([]).status, 0)
+    assert.equal(readFileSync(outputPath, 'utf8'), 'common=true\nrust=false\ndesktop=true\nimages=true\n')
+    event.pull_request.head.ref = 'fix/example'
     event.pull_request.base.ref = 'develop'
     writeFileSync(eventPath, JSON.stringify(event))
     assert.equal(run([]).status, 0)
-    assert.equal(readFileSync(outputPath, 'utf8'), 'common=true\ndesktop=true\nimages=false\n')
+    assert.equal(readFileSync(outputPath, 'utf8'), 'common=true\nrust=false\ndesktop=false\nimages=false\n')
   } finally {
     rmSync(directory, { recursive: true, force: true })
   }
