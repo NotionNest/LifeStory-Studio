@@ -18,6 +18,9 @@
 
 ## 本次交接
 
+2026-10-19 CI 分层优化：用户授权自主细化 CI。已在 fix/ci-validation-tiers（独立基于 develop，PR #12 尚未合并）改为前端 Ubuntu 类型/构建/交互、后端单平台 Rust、图片工具单平台验证；双平台桌面仅候选/手动完整检查/main hotfix，release→main 校验证据免重复。CI Gate 与保护规则保留。8 项策略回归、actionlint/Node 语法与 diff 检查通过；在线新任务验证待交付 PR，未运行重复应用回归、合并或发布。见 [CI 分层优化](../development/CI_VALIDATION_TIERS.md)。
+
+
 2026-10-16 元数据门禁兼容修正：线上进一步发现，说明编辑事件若全部跳过，即使原 CI Gate 成功也会让 PR 受阻；前面对旧失败残留的归因不准确。已替换为每次都运行的轻量 CI Gate：仅复用冻结目标/基线名称与同一来源提交的完整验证，原验证运行中则等待，失败或缺证据拒绝，不启动新矩阵或取消原运行。GitHub API 的 PR 目标信息会变，不能当历史快照；已新增保护。本地 8 项回归通过；原“元数据全跳过”运行仅保留为问题定位证据，不代表最终方案。[修正说明](../development/CI_ACTIONS_REVIEW.md#在线验收证据)。
 
 2026-10-16 CI 在线验收：[PR #11](https://github.com/NotionNest/LifeStory-Studio/pull/11) 已推送，目标 develop。[完整双平台运行](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38870936285)全部通过；错误路由拒绝、说明编辑不覆盖失败、改目标自动重验、验证期间编辑说明不取消原运行均已有线上证据，见[验收记录](../development/CI_ACTIONS_REVIEW.md#在线验收证据)。Windows 缓存约 454 MB，保存 34 秒（旧约 1.19 GB / 4 分 17 秒）。同一提交仍保留错误路由试验的失败汇总，现以真实文档提交获得独立门禁结果，不绕过保护；最终提交结果见 PR。工作流修复尚未合入 develop/main，服务器保护未调整。

@@ -10,18 +10,21 @@ export function route(base, head) {
   return /^release\/\d+\.\d+\.\d+$/.test(base) && (head === 'main' || /^(fix|chore)\/.+/.test(head))
 }
 
-export function classify(files, { full = false, candidate = false, releaseFix = false } = {}) {
+export function classify(files, { full = false, candidate = false } = {}) {
   const documentation = p => (p.startsWith('docs/') && p.endsWith('.md') && !p.startsWith('docs/features/contracts/')) ||
     ['README.md', 'AGENTS.md', 'LICENSE', '.impeccable.md', '.github/pull_request_template.md'].includes(p)
   const shared = p => /^(\.github\/|scripts\/ci\/|\.node-version$|rust-toolchain\.toml$|\.cargo\/)/.test(p)
-  const app = p => /^(src\/|src-tauri\/|public\/|package(?:-lock)?\.json$|tsconfig.*\.json$|vite(?:st)?\.config\.[cm]?[jt]s$|components\.json$|index\.html$|docs\/features\/contracts\/)/.test(p)
+  const frontend = p => /^(src\/|public\/|package(?:-lock)?\.json$|tsconfig.*\.json$|vite(?:st)?\.config\.[cm]?[jt]s$|components\.json$|index\.html$)/.test(p)
+  const backend = p => /^(src-tauri\/|docs\/features\/contracts\/)/.test(p)
   const images = p => p.startsWith('tools/image-validation/')
   const code = files.filter(p => !documentation(p))
-  const all = full || candidate || code.some(p => shared(p) || (!app(p) && !images(p)))
+  const all = code.some(p => shared(p) || (!frontend(p) && !backend(p) && !images(p)))
+  const complete = full || candidate
   return {
-    common: all || code.some(app),
-    desktop: candidate || (!releaseFix && (all || code.some(app))),
-    images: candidate || (!releaseFix && (all || code.some(images))),
+    common: complete || all || code.some(frontend),
+    rust: !complete && (all || code.some(backend)),
+    desktop: complete,
+    images: complete || all || code.some(images),
   }
 }
 
@@ -48,22 +51,23 @@ export async function api(path) {
 async function main() {
   const event = JSON.parse(readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'))
   const candidate = process.env.CANDIDATE === 'true'
-  let files, releaseFix = false
+  let files
   if (event.pull_request) {
     const pr = event.pull_request
     if (!route(pr.base.ref, pr.head.ref)) throw new Error(`Disallowed PR route: ${pr.head.ref} -> ${pr.base.ref}`)
     if (pr.head.repo.full_name !== process.env.GITHUB_REPOSITORY) throw new Error('Trusted checks currently accept only branches in this repository')
     if (skip.test(git('log', '-1', '--format=%B', pr.head.sha))) throw new Error('Remove CI-skip markers from the PR head commit')
     files = git('diff', '--name-only', '-z', `${pr.base.sha}...${pr.head.sha}`).split('\0').filter(Boolean)
-    releaseFix = pr.base.ref.startsWith('release/')
   } else {
     files = git('ls-files', '-z').split('\0').filter(Boolean)
   }
-  const checks = classify(files, { full: !event.pull_request, candidate, releaseFix })
+  const checks = classify(files, { full: !event.pull_request || event.pull_request.base.ref === 'main', candidate })
   if (event.pull_request?.base.ref === 'main' && event.pull_request.head.ref.startsWith('release/')) {
     const pr = event.pull_request
     const runs = await api(`actions/workflows/release-candidate.yml/runs?head_sha=${pr.head.sha}&per_page=100`)
     const verified = requireCandidate(pr, git('rev-parse', 'HEAD^{tree}').trim(), git('rev-parse', `${pr.head.sha}^{tree}`).trim(), runs.workflow_runs)
+    checks.common = false
+    checks.rust = false
     checks.desktop = false
     checks.images = false
     console.log(`Required candidate evidence: ${verified.html_url}; merged tree is identical`)
