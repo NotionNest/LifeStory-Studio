@@ -206,3 +206,40 @@ pub async fn record_end_edit(
 ) -> Result<(), RecordError> {
     record_task(&database, move |db| db.end_edit(record_id, session_id)).await
 }
+
+use crate::history::{HistoryCursor, HistoryPage, HistoryVersion, RestoreHistory};
+#[tauri::command]
+pub async fn history_list(
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+    before: Option<HistoryCursor>,
+) -> Result<HistoryPage, RecordError> {
+    record_task(&database, move |db| db.history_list(record_id, before)).await
+}
+#[tauri::command]
+pub async fn history_read(
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+    revision_id: String,
+) -> Result<HistoryVersion, RecordError> {
+    record_task(&database, move |db| db.history_read(record_id, revision_id)).await
+}
+#[tauri::command]
+pub async fn history_mark(
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+    revision_id: String,
+    important: bool,
+) -> Result<(), RecordError> {
+    record_task(&database, move |db| {
+        db.history_mark(record_id, revision_id, important)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn history_restore(
+    database: State<'_, DatabaseWorker>,
+    input: RestoreHistory,
+) -> Result<EditingSession, RecordError> {
+    record_task(&database, move |db| db.history_restore(input)).await
+}

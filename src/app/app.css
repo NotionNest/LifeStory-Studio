@@ -148,3 +148,7 @@
   .record-editor .tiptap blockquote { border-left: 2px solid var(--border); padding-left: 1em; color: var(--muted-foreground); }
   .record-editor .tiptap pre { white-space: pre-wrap; background: var(--secondary); padding: .8em; border-radius: .25em; }
 }
+
+@layer components {
+  .history-document .tiptap { min-height: 0; }
+}

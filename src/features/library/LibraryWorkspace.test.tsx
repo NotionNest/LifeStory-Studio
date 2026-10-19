@@ -6,7 +6,7 @@ import { LibraryWorkspace } from './LibraryWorkspace'
 import { libraryApi } from './api'
 vi.mock('@/shared/runtime', () => ({ desktopAvailable: true }))
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn().mockResolvedValue(() => {}) }))
-vi.mock('./api', async original => ({ ...await original<typeof import('./api')>(), libraryApi: { recoveries: vi.fn().mockResolvedValue([]), recovery: vi.fn().mockResolvedValue(null), begin: vi.fn(), end: vi.fn().mockResolvedValue(undefined), list: vi.fn(), read: vi.fn(), create: vi.fn(), save: vi.fn(), tag: vi.fn(), exit: vi.fn(), export: vi.fn() } }))
+vi.mock('./api', async original => ({ ...await original<typeof import('./api')>(), libraryApi: { history: vi.fn(), version: vi.fn(), mark: vi.fn(), restore: vi.fn(), recoveries: vi.fn().mockResolvedValue([]), recovery: vi.fn().mockResolvedValue(null), begin: vi.fn(), end: vi.fn().mockResolvedValue(undefined), list: vi.fn(), read: vi.fn(), create: vi.fn(), save: vi.fn(), tag: vi.fn(), exit: vi.fn(), export: vi.fn() } }))
 it('guards navigation on failure and discards only after explicit choice', async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   HTMLDialogElement.prototype.showModal = function () { this.open = true }
@@ -122,4 +122,33 @@ it('locks accepted edits throughout target loading and resumes after target fail
     expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.value).toBe('记录B')
     expect(host.querySelector('dialog')).toBeNull()
   }finally{await act(async()=>root.unmount());host.remove();vi.useRealTimers()}
+})
+
+it('saves before opening history, preserves failed edits and remounts the restored editing session', async () => {
+  vi.clearAllMocks(); Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  HTMLDialogElement.prototype.showModal = function () { this.open = true }
+  const record = {id:'history-entry',title:'当前标题',recordDate:'2026-10-19',createdTimezone:'Asia/Shanghai',createdAt:1,updatedAt:2,contentVersion:1,checkpointId:'base',document:{type:'doc',content:[{type:'paragraph'}]},tags:[]}
+  const historical = {id:'old',createdAt:1,important:false,referenced:false,currentCheckpoint:false,restorable:true,restoredFromId:null,excerpt:'历史合成正文'}
+  vi.mocked(libraryApi.recoveries).mockResolvedValue([]); vi.mocked(libraryApi.recovery).mockResolvedValue(null)
+  vi.mocked(libraryApi.list).mockResolvedValue([{...record,excerpt:''}]); vi.mocked(libraryApi.read).mockResolvedValue(record)
+  vi.mocked(libraryApi.begin).mockResolvedValue({record,sessionId:'old-session',recovered:null,recoveredTags:[]})
+  vi.mocked(libraryApi.save).mockRejectedValue({code:'storage_full',message:'合成磁盘满'})
+  vi.mocked(libraryApi.history).mockResolvedValue({items:[historical],nextBefore:null})
+  vi.mocked(libraryApi.version).mockResolvedValue({summary:historical,document:record.document,snapshot:{document:record.document,title:'恢复标题',recordDate:'2026-10-17',tags:[]}})
+  vi.mocked(libraryApi.restore).mockResolvedValue({record:{...record,title:'恢复标题',recordDate:'2026-10-17',contentVersion:3,checkpointId:'restored'},sessionId:'restored-session',recovered:null,recoveredTags:[]})
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host)
+  const click=(text:string)=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent===text || b.textContent?.includes(text))!.click()
+  const input=()=>host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!
+  const edit=(value:string)=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input(),value);input().dispatchEvent(new Event('input',{bubbles:true}))}
+  try {
+    await act(async()=>root.render(<LibraryWorkspace/>));await act(async()=>click('当前标题'));await act(async()=>edit('尚未落盘'))
+    await act(async()=>click('查看历史'));expect(libraryApi.history).not.toHaveBeenCalled();expect(input().value).toBe('尚未落盘');expect(input().readOnly).toBe(false)
+    vi.mocked(libraryApi.save).mockImplementation(async save=>({recordId:save.recordId,checkpointId:'base',contentVersion:2,requestId:save.requestId,sessionId:save.sessionId,editSequence:save.editSequence,savedAt:3}))
+    vi.mocked(libraryApi.read).mockResolvedValue({...record,title:'尚未落盘',contentVersion:2})
+    await act(async()=>click('查看历史'));expect(input().readOnly).toBe(true)
+    await act(async()=>click('历史合成正文'));await act(async()=>click('恢复此版本'));await act(async()=>click('确认恢复为新版本'))
+    expect(input().value).toBe('恢复标题');expect(input().readOnly).toBe(false)
+    await act(async()=>edit('继续写作'));await act(async()=>{window.dispatchEvent(new KeyboardEvent('keydown',{key:'s',ctrlKey:true,bubbles:true}))})
+    expect(libraryApi.save).toHaveBeenLastCalledWith(expect.objectContaining({sessionId:'restored-session',baseContentVersion:3,baseCheckpointId:'restored',title:'继续写作'}))
+  } finally { await act(async()=>root.unmount());host.remove() }
 })
