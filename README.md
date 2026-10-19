@@ -4,7 +4,7 @@
 
 前端技术：React + TypeScript + Vite + Tailwind CSS + shadcn/ui；长文编辑使用 Tiptap。
 
-当前阶段：LIB-03 单一自动持久化已合入 develop，macOS 桌面验收和双平台 CI 通过；CI 审查修正见项目跟进。Windows 实机验收待完成。
+当前阶段：文字记录与单一自动保存已实现，保存边界修复 PR #12 与 CI 分层优化 PR #13 已合入 develop。历史管理（LIB-04）已实现并通过 macOS 验证，下一项为图片管理（LIB-05）；Windows 实机验收待完成。具体证据与限制见项目跟进。
 
 ## 启动开发
 
@@ -19,15 +19,17 @@ npm run desktop:dev
 
 第一次使用这套协作体系，先看 [人类使用手册](docs/人类使用手册.md)：说明你如何审阅、决策、反馈和继续工作。
 
-1. [正式产品文档](docs/product/PRD.md)：用户、问题、能力、需求编号及验收条件。
-2. [产品开发工作流](docs/process/WORKFLOW.md)：每个阶段如何推进和完成。
-3. [项目跟进](docs/tracking/STATUS.md)：当前进度、决策与下一步。
-4. [待决策事项](docs/product/DECISIONS.md)：已确认的方向与需要进一步确定的内容。
-5. [原始对话整理](docs/产品需求与对话整理.md)：需求来源。
+日常关注三个入口，与人类使用手册一致：
 
-## 当前功能评审
+1. [正式产品文档](docs/product/PRD.md)：产品范围、需求编号及验收条件。
+2. [待决策事项](docs/product/DECISIONS.md)：已确认的方向与需要进一步确定的内容。
+3. [项目跟进](docs/tracking/STATUS.md)：已完成成果、当前任务、验证限制与下一步。
 
-[资料库与日常记录规格](docs/features/LIBRARY_AND_RECORDING.md)记录已确认行为；[页面流程与开发评审稿](docs/features/LIBRARY_REVIEW.md)包含页面结构、完整流程、剩余建议与依赖任务。
+## 按需查阅的细化资料
+
+[资料库与日常记录规格](docs/features/LIBRARY_AND_RECORDING.md)记录已确认行为；[资料库页面流程与任务拆解](docs/features/LIBRARY_REVIEW.md)细化页面与完整流程、确认边界及 LIB-01—09 任务依赖。它们是 PRD 下属资料，当前进度统一查看项目跟进。
+
+[产品开发工作流](docs/process/WORKFLOW.md)供执行时参考；[原始对话整理](docs/产品需求与对话整理.md)保留需求来源。
 
 ## 架构方案入口
 
