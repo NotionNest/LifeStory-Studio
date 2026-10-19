@@ -75,9 +75,51 @@ it('leaves without a confirmation after automatic persistence completes', async 
     await act(async()=>{[...host.querySelectorAll<HTMLButtonElement>('aside button')].find(b=>b.textContent?.includes(record.title))!.click()})
     const input=host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!
     await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'新标题');input.dispatchEvent(new Event('input',{bubbles:true}))})
-    await act(async()=>{await vi.advanceTimersByTimeAsync(300)})
+    await act(async()=>{await vi.advanceTimersByTimeAsync(800)})
     await act(async()=>{[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='新建记录')!.click()})
     expect(libraryApi.create).toHaveBeenCalledTimes(1)
     expect(host.querySelector('dialog')).toBeNull()
   } finally {await act(async()=>root.unmount());host.remove();vi.useRealTimers()}
+})
+it('locks accepted edits throughout target loading and resumes after target failure or cancelled recovery', async()=>{
+  vi.clearAllMocks();vi.useFakeTimers()
+  Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true})
+  HTMLDialogElement.prototype.showModal=function(){this.open=true}
+  const a={id:'a',title:'记录A',recordDate:'2026-10-19',createdTimezone:'Asia/Shanghai',createdAt:0,updatedAt:0,contentVersion:0,checkpointId:'version',document:{type:'doc',content:[{type:'paragraph'}]},tags:[]}
+  const b={...a,id:'b',title:'记录B'}
+  vi.mocked(libraryApi.recoveries).mockResolvedValue([]);vi.mocked(libraryApi.recovery).mockResolvedValue(null)
+  vi.mocked(libraryApi.list).mockResolvedValue([a,b].map(r=>({...r,excerpt:''})))
+  let reject!:(e:unknown)=>void
+  vi.mocked(libraryApi.read).mockImplementation(id=>id==='a'?Promise.resolve(a):new Promise((_,r)=>{reject=r}))
+  vi.mocked(libraryApi.begin).mockResolvedValue({record:a,sessionId:'session',recovered:null,recoveredTags:[]})
+  vi.mocked(libraryApi.save).mockResolvedValue({recordId:'a',contentVersion:1,checkpointId:'version',requestId:'request',sessionId:'session',editSequence:1,savedAt:1})
+  const host=document.createElement('div');document.body.append(host);const root=createRoot(host)
+  const click=(text:string)=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes(text))!.click()
+  const edit=(text:string)=>{const input=host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,text);input.dispatchEvent(new Event('input',{bubbles:true}))}
+  try{
+    await act(async()=>{root.render(<LibraryWorkspace/>)});await act(async()=>click('记录A'))
+    await act(async()=>edit('已接受的新标题'))
+    await act(async()=>click('记录B'))
+    expect(vi.mocked(libraryApi.save).mock.calls[0][0].title).toBe('已接受的新标题')
+    expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.readOnly).toBe(true)
+    expect(host.querySelector('[aria-label="记录正文"]')!.getAttribute('contenteditable')).toBe('false')
+    await act(async()=>edit('不接受的迟到输入'))
+    await act(async()=>{reject({message:'合成读取失败'});await vi.advanceTimersByTimeAsync(3000)})
+    expect(libraryApi.save).toHaveBeenCalledTimes(1)
+    expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.readOnly).toBe(false)
+    vi.mocked(libraryApi.read).mockResolvedValue(b)
+    vi.mocked(libraryApi.recovery).mockResolvedValue({sessionId:'old',editSequence:2,writtenAt:1,tags:[],input:{recordId:'b',sessionId:'old',editSequence:2,requestId:'r',baseContentVersion:0,baseCheckpointId:'version',title:null,recordDate:b.recordDate,document:b.document,tagIds:[],attachmentIds:[]}})
+    await act(async()=>click('记录B'))
+    expect(host.querySelector('dialog')).not.toBeNull()
+    await act(async()=>click('稍后处理'))
+    expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.readOnly).toBe(false)
+    await act(async()=>edit('继续写作'))
+    await act(async()=>{await vi.advanceTimersByTimeAsync(800)})
+    expect(vi.mocked(libraryApi.save).mock.calls[vi.mocked(libraryApi.save).mock.calls.length - 1][0].title).toBe('继续写作')
+    vi.mocked(libraryApi.recovery).mockResolvedValue(null)
+    vi.mocked(libraryApi.begin).mockResolvedValue({record:b,sessionId:'b-session',recovered:null,recoveredTags:[]})
+    await act(async()=>click('记录B'))
+    expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.value).toBe('记录B')
+    expect(host.querySelector('dialog')).toBeNull()
+  }finally{await act(async()=>root.unmount());host.remove();vi.useRealTimers()}
 })

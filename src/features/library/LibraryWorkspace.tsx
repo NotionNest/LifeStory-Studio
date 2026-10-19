@@ -60,17 +60,24 @@ export function LibraryWorkspace() {
       setRecoveries(old => old.filter(item => item.recordId !== next.id))
       void refresh().catch(cause => setError(errorMessage(cause)))
     } catch (cause) { setError(errorMessage(cause)) }
-    finally { navigating.current = false; setWorking(false); if (queued.current) { const next = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(next)) } }
+    finally { navigating.current = false; setWorking(leaving.current); if (!leaving.current && queued.current) { const next = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(next)) } }
   }
   const request = (intent: Intent) => {
     if (navigating.current || busy.current || leaving.current) { queued.current = intent; return }
-    if (dirty.current && editor.current) {
-      leaving.current = true
-      void editor.current.flush().then(result => {
-        if (result === 'saved') return execute(intent)
-        setPending(intent); setExported(false)
-      }).finally(() => { leaving.current = false; if (queued.current) {const next=queued.current;queued.current=null;queueMicrotask(()=>requestRef.current(next))} })
-    } else { void execute(intent) }
+    leaving.current = true; setWorking(true)
+    void (async () => {
+      try {
+        if (editor.current && await editor.current.prepareLeave() !== 'saved') {
+          setPending(intent); setExported(false); return
+        }
+        await execute(intent)
+      } catch (cause) { setError(errorMessage(cause)) }
+      finally {
+        editor.current?.resume()
+        leaving.current = false; setWorking(false)
+        if (queued.current) { const next = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(next)) }
+      }
+    })()
   }
   const requestRef = useRef(request); requestRef.current = request
   useEffect(() => {
@@ -84,14 +91,10 @@ export function LibraryWorkspace() {
     for (const subscription of subscriptions) void subscription.then(unlisten => { if (disposed) unlisten() }).catch(cause => setError(`关闭保护不可用：${errorMessage(cause)}`))
     return () => { disposed = true; for (const subscription of subscriptions) void subscription.then(unlisten => unlisten()).catch(() => {}) }
   }, [])
-  const saveAndContinue = async () => {
-    const intent = pending
-    if (!intent || !editor.current) return
-    if (await editor.current.flush() === 'saved') await execute(intent)
-  }
+  const saveAndContinue = () => { if (pending) request(pending) }
   const onDirty = useCallback((value: boolean) => { dirty.current = value; if (value) setExported(false) }, [])
   const onBusy = useCallback((value: boolean) => {
-    busy.current = value; setWorking(value)
+    busy.current = value; setWorking(value || leaving.current || navigating.current)
     if (!value && queued.current) { const intent = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(intent)) }
   }, [])
   const discardAndContinue = async () => {
@@ -111,7 +114,7 @@ export function LibraryWorkspace() {
       setRecord(editing.record); setSession(editing); setOpened(value => value + 1); setRecovery(null)
       setRecoveries(old => old.filter(item => item.recordId !== editing.record.id))
     } catch (cause) { setError(errorMessage(cause)) }
-    finally { navigating.current = false; setWorking(false); if (queued.current) { const next = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(next)) } }
+    finally { navigating.current = false; setWorking(leaving.current); if (!leaving.current && queued.current) { const next = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(next)) } }
   }
   const onSaved = useCallback(() => { setError(''); void refresh().catch(cause => setError(errorMessage(cause))) }, [refresh])
   return <main className="flex h-dvh min-h-0 flex-col">
