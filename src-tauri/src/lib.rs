@@ -1,4 +1,5 @@
 mod commands;
+pub mod history;
 pub mod records;
 pub mod recovery;
 pub mod storage;
@@ -90,6 +91,10 @@ pub fn run() {
             commands::recovery_read,
             commands::record_begin_edit,
             commands::record_end_edit,
+            commands::history_list,
+            commands::history_read,
+            commands::history_mark,
+            commands::history_restore,
         ])
         .build(tauri::generate_context!())
         .expect("LifeStory Studio failed to start")

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-history-mark"
+description = "Enables the history_mark command without any pre-configured scope."
+commands.allow = ["history_mark"]
+
+[[permission]]
+identifier = "deny-history-mark"
+description = "Denies the history_mark command without any pre-configured scope."
+commands.deny = ["history_mark"]

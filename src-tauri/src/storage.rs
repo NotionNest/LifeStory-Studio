@@ -11,7 +11,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 
 pub type StorageResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
-const SCHEMA_VERSION: i64 = 5;
+const SCHEMA_VERSION: i64 = 6;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -64,8 +64,26 @@ impl DatabaseWorker {
                         return;
                     }
                 };
-                for job in receiver {
-                    job(&mut connection, &root);
+                let mut next_cleanup = std::time::Instant::now();
+                loop {
+                    if std::time::Instant::now() >= next_cleanup {
+                        if crate::records::now()
+                            .and_then(|time| crate::history::prune(&mut connection, time))
+                            .is_err()
+                        {
+                            eprintln!(
+                                "历史保留清理未完成；历史面板将重试并显示失败，未绕过保护规则"
+                            );
+                        }
+                        next_cleanup = std::time::Instant::now() + Duration::from_secs(3600);
+                    }
+                    match receiver.recv_timeout(
+                        next_cleanup.saturating_duration_since(std::time::Instant::now()),
+                    ) {
+                        Ok(job) => job(&mut connection, &root),
+                        Err(mpsc::RecvTimeoutError::Timeout) => {}
+                        Err(mpsc::RecvTimeoutError::Disconnected) => break,
+                    }
                 }
             })?;
         initialized.recv().map_err(io::Error::other)??;
@@ -144,6 +162,7 @@ fn initialize(root: &Path) -> StorageResult<Connection> {
             3 => include_str!("../migrations/003_recovery_sessions.sql"),
             4 => include_str!("../migrations/004_current_content.sql"),
             5 => include_str!("../migrations/005_editing_history.sql"),
+            6 => include_str!("../migrations/006_history_management.sql"),
             _ => unreachable!(),
         };
         let transaction = connection.transaction()?;
