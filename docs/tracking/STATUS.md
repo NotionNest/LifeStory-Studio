@@ -1,6 +1,6 @@
 # 项目跟进
 
-更新：2026-10-16。当前阶段：LIB-03 最新保存与历史进入规则已随 PR #3 合入 develop；Git 分层流程迁移完成：#4 进入 main，#6 以 merge commit 同步到 develop，完整集成检查与两条分支合并来源核对通过。LIB-04 未开始，Windows 实机验收待完成。
+更新：2026-10-19。当前阶段：LIB-03 最新保存与历史进入规则已随 PR #3 合入 develop；Git 分层流程迁移完成：#4 进入 main，#6 以 merge commit 同步到 develop，完整集成检查与两条分支合并来源核对通过。LIB-04 未开始，Windows 实机验收待完成。
 
 ## 当前任务
 
@@ -18,7 +18,25 @@
 
 ## 本次交接
 
-2026-10-19 CI 分层优化：用户授权自主细化 CI。已在 fix/ci-validation-tiers（独立基于 develop，PR #12 尚未合并）改为前端 Ubuntu 类型/构建/交互、后端单平台 Rust、图片工具单平台验证；双平台桌面仅候选/手动完整检查/main hotfix，release→main 校验证据免重复。CI Gate 与保护规则保留。8 项策略回归、actionlint/Node 语法与 diff 检查通过；在线新任务验证待交付 PR，未运行重复应用回归、合并或发布。见 [CI 分层优化](../development/CI_VALIDATION_TIERS.md)。
+2026-10-19 PR #13 文档冲突处理：PR #12 已由用户合入 develop（1bb4298）。将最新 develop 合入 CI 来源分支，合并 STATUS 中双方交接记录，手册保留 800ms 保存说明、Git 分支图及新增 CI 分层说明。CI 实现保持不变；原提交 fd660c1 的线上运行 39196010154 已成功，本次同步后的门禁由 PR 自动重新校验。未合并 PR #13 或发布。
+
+
+2026-10-19 CI 分层优化：用户授权自主细化 CI。已在 fix/ci-validation-tiers（创建时独立基于 develop，后同步已合并的 PR #12）改为前端 Ubuntu 类型/构建/交互、后端单平台 Rust、图片工具单平台验证；双平台桌面仅候选/手动完整检查/main hotfix，release→main 校验证据免重复。CI Gate 与保护规则保留。8 项策略回归、actionlint/Node 语法与 diff 检查通过；在线新任务验证待交付 PR，未运行重复应用回归、合并或发布。见 [CI 分层优化](../development/CI_VALIDATION_TIERS.md)。
+
+2026-10-19 远程交付准备：用户授权将当前改动按 Git 流程提交到远端。保存边界修复、审查/研究/实施方案及当前文档修改一起保存在 fix/library-saving-boundaries，通过 PR 指向 develop；验证复用本次 17 项前端交互、TypeScript 与 macOS 调试包/实际窗口结果，远程 CI 由 PR 触发。未授权合并或发布，LIB-04 尚未启动。实际提交与 PR 结果见本次会话交付。
+
+
+2026-10-19 保存边界修复完成：用户确认按方案实施，已在 fix/library-saving-boundaries 接入统一 prepareLeave/resume、切换期间同步只读与失败恢复；独立重试截止计时器不受继续输入影响，并保留到期输入法等待和原请求身份；自动保存改为 800ms/2s。17 项关键交互、TypeScript、macOS 调试包及实际窗口合成资料自动保存/切换返回/立即退出重开通过，详见 [实施记录](../development/SAVING_FIX_PLAN_2026-10-19.md#实施验证2026-10-19)。未更改数据库结构/依赖，未重复 Rust 回归；Windows GUI 与真实输入法未验收。保留原有未提交文档，本次代码尚未提交或推送，LIB-04 未启动。
+
+
+2026-10-19 保存修正方案：按用户要求形成 [修改方案](../development/SAVING_FIX_PLAN_2026-10-19.md)。范围为统一离开生命周期与短暂只读、异常重试独立截止点、建议 800ms/2s 自动保存间隔；覆盖输入法、目标失败/恢复预览取消、旧请求回执及固定计时器边界。架构和数据库保持原方案，未新增依赖。当前仅方案待审阅，未实现、运行应用测试、提交或推送；800ms 建议尚未作为用户确认写入规格。
+
+
+2026-10-19 保存设计复核：用户要求重新评估前次两项问题的现实触发条件与过度设计风险。已调研 VS Code/Typora/Notion 官方资料、ctx7 SQLite 文档，并用独立合成库测量真实后端保存/切换与外部连接写锁。结论为保留现有单一自动保存与 SQLite 架构，前次受控反例不等于日常高频；尚无真实键鼠稳定复现或概率证据。建议局部完善离开边界和重试截止点，保存间隔 800ms/2s 仅为待审阅建议，未更改产品。详见 [保存设计调研](../development/SAVING_RESEARCH_2026-10-19.md)。未修改应用、提交/推送、操作 PR 或启动 LIB-04。
+
+
+2026-10-19 只读代码审查：比较 375f14b 至 develop d07e3ce，覆盖保存模型、编辑历史与 CI 流程变更。复现 P1 切换期间仍可输入导致未保存内容被卸载，以及 P2 持续输入可无限延期暂忙自动重试。CI 策略 8 项通过，两个合成反例已验证，临时测试已移除；未修改应用、提交、推送或变更远程规则。详见 [改动审查](../development/CHANGE_REVIEW_2026-10-19.md)。建议先修正这两项，再继续 LIB-04；修复尚未获本轮授权。
+
 
 
 2026-10-16 元数据门禁兼容修正：线上进一步发现，说明编辑事件若全部跳过，即使原 CI Gate 成功也会让 PR 受阻；前面对旧失败残留的归因不准确。已替换为每次都运行的轻量 CI Gate：仅复用冻结目标/基线名称与同一来源提交的完整验证，原验证运行中则等待，失败或缺证据拒绝，不启动新矩阵或取消原运行。GitHub API 的 PR 目标信息会变，不能当历史快照；已新增保护。本地 8 项回归通过；原“元数据全跳过”运行仅保留为问题定位证据，不代表最终方案。[修正说明](../development/CI_ACTIONS_REVIEW.md#在线验收证据)。
@@ -121,3 +139,12 @@ AI 决定：用户自配模型服务/API Key 与本机 Codex 等工具连接同�
 - workflow 权限已补齐；[PR #4](https://github.com/NotionNest/LifeStory-Studio/pull/4) 的[新门禁完整双平台检查](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38857441214)通过，已合入 main（9af5214），[main 合并来源核对](https://github.com/NotionNest/LifeStory-Studio/actions/runs/38858338301)通过。Node 流程测试独立运行，避免被 Vitest 重复收集。
 - #3 先行合入 develop，导致直接 main→develop 的 #5 出现文档冲突；改用 chore/sync-main-workflow 从最新 develop 合入 main，保留全部应用代码，仅协调文档冲突，再通过 PR 以 merge commit 集成。#5 由该同步取代。
 - 同步 #6 已合入 develop；完整集成检查与合并来源核对通过，见本页最新交接。保护分支保留，不创建 release 版本或产品发布。
+
+
+## 分支与 PR 核对（2026-10-19）
+
+当前 develop 与远程同为 d07e3ce；通过 git ls-remote 核对远程分支，并查询仓库全部11个PR，开放PR为0。向develop合入的任务PR为#3/#6/#7/#10/#11。fix/ci-gates与develop整棵树一致；其他旧分支的成果已直接合入，或通过main回流/后续任务包含，未发现需补提PR的独立成果。
+
+从未单独建PR的backup/local-saving-before-git-migration是#3来源祖先，docs/ci-actions-review仅本地且是#11来源祖先。docs/library-recording-spec的#2已关闭未合并，但该分支是#1来源祖先；#1的squash结果是develop祖先。#1/#3来源与各自squash结果整树一致。不得仅凭旧提交SHA未被祖先检查识别，就重复合并这些分支。
+
+工作区仍有STATUS、人类使用手册修改与CHANGE_REVIEW_2026-10-19.md未跟踪文件，尚未形成新提交/PR；本次仅追加核对记录，保留既有修改。未切换/删除分支、提交、推送、创建或合并PR，未运行应用测试。

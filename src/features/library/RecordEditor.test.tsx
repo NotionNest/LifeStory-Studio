@@ -51,7 +51,7 @@ describe('record saving user state', () => {
   it('uses one automatic persistence pipeline without a separate recovery write', async () => {
     vi.mocked(libraryApi.save).mockResolvedValue(result())
     await act(async () => title('自动保存内容'))
-    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(800) })
     expect(libraryApi.save).toHaveBeenCalledTimes(1)
     expect(host.querySelector('[role="status"]')!.textContent).toBe('已保存到本机')
     expect([...host.querySelectorAll('button')].some(b => b.textContent === '保存')).toBe(false)
@@ -70,7 +70,7 @@ describe('record saving user state', () => {
   it('automatically retries transient failures using the same uncertain request', async () => {
     vi.mocked(libraryApi.save).mockRejectedValueOnce({ code: 'storage_busy', message: '合成失败' }).mockResolvedValueOnce(result())
     await act(async () => title('失败仍保留'))
-    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(800) })
     expect(host.querySelector('[role="alert"]')!.textContent).toContain('自动重试')
     await act(async () => { await vi.advanceTimersByTimeAsync(1000) })
     expect(libraryApi.save).toHaveBeenCalledTimes(2)
@@ -80,7 +80,7 @@ describe('record saving user state', () => {
   it('keeps conflicts paused when input changes, without automatic overwrites', async () => {
     vi.mocked(libraryApi.save).mockRejectedValue({code:'conflict',message:'会话已变化'})
     await act(async () => title('不能覆盖'))
-    await act(async () => { await vi.advanceTimersByTimeAsync(300) })
+    await act(async () => { await vi.advanceTimersByTimeAsync(800) })
     await act(async () => title('仍保留在编辑器'))
     await act(async () => { await vi.advanceTimersByTimeAsync(60000) })
     expect(libraryApi.save).toHaveBeenCalledTimes(1)
@@ -89,16 +89,16 @@ describe('record saving user state', () => {
   it('does not let continuing input bypass the retry delay', async () => {
     vi.mocked(libraryApi.save).mockRejectedValue({code:'storage_busy',message:'暂忙'})
     await act(async()=>title('第一稿'))
-    await act(async()=>{await vi.advanceTimersByTimeAsync(300)})
+    await act(async()=>{await vi.advanceTimersByTimeAsync(800)})
     for(let i=0;i<4;i++) await act(async()=>{await vi.advanceTimersByTimeAsync(200);title(`继续${i}`)})
     expect(libraryApi.save).toHaveBeenCalledTimes(1)
-    await act(async()=>{await vi.advanceTimersByTimeAsync(300)})
+    await act(async()=>{await vi.advanceTimersByTimeAsync(800)})
     expect(libraryApi.save).toHaveBeenCalledTimes(2)
   })
   it('does not automatically retry permission failures even after more editing', async () => {
     vi.mocked(libraryApi.save).mockRejectedValue({code:'storage_permission',message:'不可写'})
     await act(async()=>title('保留'))
-    await act(async()=>{await vi.advanceTimersByTimeAsync(300)})
+    await act(async()=>{await vi.advanceTimersByTimeAsync(800)})
     await act(async()=>title('继续保留'))
     await act(async()=>{await vi.advanceTimersByTimeAsync(60000)})
     expect(libraryApi.save).toHaveBeenCalledTimes(1)
@@ -107,7 +107,7 @@ describe('record saving user state', () => {
     let resolve!:(value:SaveResult)=>void
     vi.mocked(libraryApi.save).mockImplementationOnce(()=>new Promise(r=>{resolve=r})).mockResolvedValueOnce({...result(),contentVersion:2})
     await act(async()=>title('A'))
-    await act(async()=>{await vi.advanceTimersByTimeAsync(300)})
+    await act(async()=>{await vi.advanceTimersByTimeAsync(800)})
     await act(async()=>title('AB'))
     let flushing!:Promise<'saved'|'failed'>
     await act(async()=>{flushing=ref.current!.flush()})
@@ -129,4 +129,40 @@ describe('record saving user state', () => {
     expect(libraryApi.save).toHaveBeenCalledTimes(1)
   })
 
+})
+it('retries at its deadline while continuous typing proceeds and preserves request identity', async () => {
+  vi.mocked(libraryApi.save).mockRejectedValueOnce({code:'storage_busy',message:'暂忙'}).mockResolvedValue(result())
+  await act(async()=>title('原请求'))
+  await act(async()=>{await vi.advanceTimersByTimeAsync(800)})
+  for(let i=0;i<10;i++) await act(async()=>{await vi.advanceTimersByTimeAsync(100);title(`持续输入${i}`)})
+  expect(libraryApi.save).toHaveBeenCalledTimes(2)
+  expect(vi.mocked(libraryApi.save).mock.calls[1][0]).toEqual(vi.mocked(libraryApi.save).mock.calls[0][0])
+  await act(async()=>{await vi.advanceTimersByTimeAsync(800)})
+  expect(vi.mocked(libraryApi.save).mock.calls[2][0]).toMatchObject({title:'持续输入9',baseContentVersion:1})
+})
+it('keeps an overdue retry through composition and resumes without another backoff', async () => {
+  vi.mocked(libraryApi.save).mockRejectedValueOnce({code:'storage_busy',message:'暂忙'}).mockResolvedValue(result())
+  await act(async()=>title('原请求'))
+  await act(async()=>{await vi.advanceTimersByTimeAsync(800)})
+  const input=host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!
+  await act(async()=>{input.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));title('候选')})
+  await act(async()=>{await vi.advanceTimersByTimeAsync(1500)})
+  expect(libraryApi.save).toHaveBeenCalledTimes(1)
+  await act(async()=>{title('最终文字');input.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true}));await vi.advanceTimersByTimeAsync(20)})
+  expect(libraryApi.save).toHaveBeenCalledTimes(2)
+})
+it('finishes composition before locking all editing and flushing on leave', async () => {
+  vi.mocked(libraryApi.save).mockResolvedValue(result())
+  const input=host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!
+  await act(async()=>{input.dispatchEvent(new CompositionEvent('compositionstart',{bubbles:true}));title('候选')})
+  let leave!:Promise<'saved'|'failed'>
+  await act(async()=>{leave=ref.current!.prepareLeave()})
+  expect(input.readOnly).toBe(false);expect(libraryApi.save).not.toHaveBeenCalled()
+  await act(async()=>{title('最终文字');input.dispatchEvent(new CompositionEvent('compositionend',{bubbles:true}));await vi.advanceTimersByTimeAsync(20)})
+  expect(await leave).toBe('saved')
+  expect(input.readOnly).toBe(true)
+  expect(host.querySelector('[aria-label="记录正文"]')!.getAttribute('contenteditable')).toBe('false')
+  expect(vi.mocked(libraryApi.save).mock.calls[0][0].title).toBe('最终文字')
+  await act(async()=>{ref.current!.resume()})
+  expect(input.readOnly).toBe(false)
 })

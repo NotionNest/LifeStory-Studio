@@ -17,6 +17,7 @@ export function useRecordPersistence(options: Options) {
   const mounted = useRef(true), composing = useRef(false), failed = useRef(false)
   const failureKind = useRef(''), retries = useRef(0), retryAt = useRef(0)
   const idle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined), maximum = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const retry = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const actions = useRef({ save: async () => false })
   const clear = () => { clearTimeout(idle.current); clearTimeout(maximum.current); idle.current = undefined; maximum.current = undefined }
   const snapshot = (): SaveInput => ({
@@ -24,12 +25,33 @@ export function useRecordPersistence(options: Options) {
     baseContentVersion: version.current, baseCheckpointId: checkpoint.current,
     editSequence: sequence.current, requestId: crypto.randomUUID(), attachmentIds: [],
   })
+  const clearRetry = () => { clearTimeout(retry.current); retry.current = undefined }
   const schedule = () => {
-    if (!mounted.current || composing.current || failed.current) return
+    if (!mounted.current || failed.current || sequence.current <= saved.current) return
+    if (retryAt.current) {
+      clear()
+      if (!retry.current && !composing.current) {
+        const timer = setTimeout(() => {
+          void waitForComposition().then(active => {
+            if (retry.current !== timer) return
+            retry.current = undefined
+            if (active && !failed.current) void actions.current.save()
+          })
+        }, Math.max(0, retryAt.current - Date.now()))
+        retry.current = timer
+      }
+      return
+    }
+    if (composing.current) return
     clearTimeout(idle.current)
-    const wait = Math.max(300, retryAt.current - Date.now())
-    idle.current = setTimeout(() => { clear(); void actions.current.save() }, wait)
-    if (!retryAt.current) maximum.current ??= setTimeout(() => { clear(); void actions.current.save() }, 2000)
+    idle.current = setTimeout(() => { clear(); void actions.current.save() }, 800)
+    maximum.current ??= setTimeout(() => { clear(); void actions.current.save() }, 2000)
+  }
+  const waitForComposition = async () => {
+    while (mounted.current && (composing.current || latest.current.editor?.view.composing)) {
+      await new Promise(resolve => setTimeout(resolve, 20))
+    }
+    return mounted.current
   }
   const changed = () => {
     // Correcting validation may resume saving; editing cannot bypass storage backoff or conflicts.
@@ -39,7 +61,7 @@ export function useRecordPersistence(options: Options) {
   const save = (): Promise<boolean> => {
     if (inFlight.current) return inFlight.current
     if (!latest.current.editor || composing.current || latest.current.editor.view.composing) return Promise.resolve(false)
-    clear()
+    clear(); clearRetry()
     if (sequence.current === saved.current && !pending.current) return Promise.resolve(true)
     failed.current = false; setBusy(true); setError(''); setStatus('保存中…')
     const operation = Promise.resolve().then(async () => {
@@ -80,10 +102,7 @@ export function useRecordPersistence(options: Options) {
     // A successful older write is not a failure: drain newer edits before leaving.
     if (!latest.current.editor) return 'failed'
     while (mounted.current) {
-      while (composing.current || latest.current.editor?.view.composing) {
-        await new Promise(resolve => setTimeout(resolve, 20))
-        if (!mounted.current) return 'failed'
-      }
+      if (!await waitForComposition()) return 'failed'
       const clean = await save()
       if (clean) return 'saved'
       if (failureKind.current) return 'failed'
@@ -91,7 +110,7 @@ export function useRecordPersistence(options: Options) {
     return 'failed'
   }
   const discard = async () => {
-    clear(); failed.current = true
+    clear(); clearRetry(); failed.current = true
     try { await libraryApi.end(options.record.id, options.sessionId); return true }
     catch (cause) { setError(errorMessage(cause)); latest.current.onFailure(errorMessage(cause)); return false }
   }
@@ -101,8 +120,8 @@ export function useRecordPersistence(options: Options) {
     mounted.current = true
     const key = (event: KeyboardEvent) => { if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 's') { event.preventDefault(); void actions.current.save() } }
     window.addEventListener('keydown', key)
-    return () => { mounted.current = false; clear(); window.removeEventListener('keydown', key) }
+    return () => { mounted.current = false; clear(); clearRetry(); window.removeEventListener('keydown', key) }
   }, [])
   useEffect(() => { if (options.editor && options.recovered) { latest.current.onDirty(true); schedule() } }, [options.editor])
-  return { status, error, busy, changed, save, flush, discard, snapshot, compositionStart, compositionEnd }
+  return { waitForComposition, status, error, busy, changed, save, flush, discard, snapshot, compositionStart, compositionEnd }
 }
