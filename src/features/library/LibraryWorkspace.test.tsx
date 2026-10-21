@@ -6,7 +6,7 @@ import { LibraryWorkspace } from './LibraryWorkspace'
 import { libraryApi } from './api'
 vi.mock('@/shared/runtime', () => ({ desktopAvailable: true }))
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn().mockResolvedValue(() => {}) }))
-vi.mock('./api', async original => ({ ...await original<typeof import('./api')>(), libraryApi: { history: vi.fn(), version: vi.fn(), mark: vi.fn(), restore: vi.fn(), recoveries: vi.fn().mockResolvedValue([]), recovery: vi.fn().mockResolvedValue(null), begin: vi.fn(), end: vi.fn().mockResolvedValue(undefined), list: vi.fn(), read: vi.fn(), create: vi.fn(), save: vi.fn(), tag: vi.fn(), exit: vi.fn(), export: vi.fn() } }))
+vi.mock('./api', async original => ({ ...await original<typeof import('./api')>(), libraryApi: { history: vi.fn(), version: vi.fn(), mark: vi.fn(), restore: vi.fn(), recoveries: vi.fn().mockResolvedValue([]), recovery: vi.fn().mockResolvedValue(null), begin: vi.fn(), end: vi.fn().mockResolvedValue(undefined), list: vi.fn(), query: vi.fn(async(query:{offset:number})=>{const rows=await libraryApi.list(query.offset);return {items:(rows??[]).map(item=>({...item,kind:'text',tags:[],hasImages:false,matchField:null})),total:rows?.length??0,nextOffset:null,days:[],tags:[]}}), preview:vi.fn(), read: vi.fn(), create: vi.fn(), save: vi.fn(), tag: vi.fn(), exit: vi.fn(), export: vi.fn() } }))
 it('guards navigation on failure and discards only after explicit choice', async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   HTMLDialogElement.prototype.showModal = function () { this.open = true }
@@ -151,4 +151,35 @@ it('saves before opening history, preserves failed edits and remounts the restor
     await act(async()=>edit('继续写作'));await act(async()=>{window.dispatchEvent(new KeyboardEvent('keydown',{key:'s',ctrlKey:true,bubbles:true}))})
     expect(libraryApi.save).toHaveBeenLastCalledWith(expect.objectContaining({sessionId:'restored-session',baseContentVersion:3,baseCheckpointId:'restored',title:'继续写作'}))
   } finally { await act(async()=>root.unmount());host.remove() }
+})
+
+it('keeps an unsaved editor when filters hide its record and still guards opening a search result',async()=>{
+ vi.clearAllMocks();Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});HTMLDialogElement.prototype.showModal=function(){this.open=true}
+ const record={id:'filter-entry',title:'筛选原记录',recordDate:'2026-10-21',createdTimezone:'Asia/Shanghai',createdAt:1,updatedAt:1,contentVersion:0,checkpointId:'base',document:{type:'doc',content:[{type:'paragraph'}]},tags:[]}
+ const item={id:record.id,title:record.title,recordDate:record.recordDate,excerpt:'',kind:'text' as const,tags:[],hasImages:false,matchField:null}
+ vi.mocked(libraryApi.recoveries).mockResolvedValue([]);vi.mocked(libraryApi.recovery).mockResolvedValue(null);vi.mocked(libraryApi.read).mockResolvedValue(record);vi.mocked(libraryApi.begin).mockResolvedValue({record,sessionId:'filter-session',recovered:null,recoveredTags:[]});vi.mocked(libraryApi.save).mockRejectedValue({code:'storage_full',message:'合成保存失败'})
+ vi.mocked(libraryApi.query).mockImplementation(async query=>({items:query.keyword?[{...item,id:'other',title:'新的搜索结果'}]:[item],total:1,nextOffset:null,days:[],tags:[]}))
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host)
+ try{
+  await act(async()=>root.render(<LibraryWorkspace/>));await act(async()=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes('筛选原记录'))!.click())
+  const set=(label:string,value:string)=>{const node=host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(node,value);node.dispatchEvent(new Event('input',{bubbles:true}))}
+  await act(async()=>set('记录标题','筛选后仍保留的修改'));await act(async()=>set('搜索记录','其他'));await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})))
+  expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.value).toBe('筛选后仍保留的修改');expect(libraryApi.end).not.toHaveBeenCalled()
+  await act(async()=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes('新的搜索结果'))!.click())
+  expect(host.querySelector('dialog')!.textContent).toContain('有尚未保存');expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.value).toBe('筛选后仍保留的修改')
+ }finally{await act(async()=>root.unmount());host.remove()}
+})
+
+it('opens the text editor after resolving recovery from a conversation preview',async()=>{
+ vi.clearAllMocks();Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});HTMLDialogElement.prototype.showModal=function(){this.open=true}
+ const record={id:'recovered-text',title:'待恢复文字',recordDate:'2026-10-21',createdTimezone:'Asia/Shanghai',createdAt:1,updatedAt:1,contentVersion:0,checkpointId:'base',document:{type:'doc',content:[{type:'paragraph'}]},tags:[]}
+ const item={id:record.id,title:record.title,recordDate:record.recordDate,excerpt:'',kind:'text' as const,tags:[],hasImages:false,matchField:null}
+ vi.mocked(libraryApi.query).mockResolvedValue({items:[{...item,id:'conversation',title:'合成对话',kind:'conversation'},item],total:2,nextOffset:null,days:[],tags:[]})
+ vi.mocked(libraryApi.recoveries).mockResolvedValue([]);vi.mocked(libraryApi.preview).mockResolvedValue({id:'conversation',title:'合成对话',recordDate:record.recordDate,kind:'conversation',document:null,messages:['合成预览正文']});vi.mocked(libraryApi.read).mockResolvedValue(record)
+ vi.mocked(libraryApi.recovery).mockResolvedValue({sessionId:'old',editSequence:2,writtenAt:1,tags:[],input:{recordId:record.id,sessionId:'old',editSequence:2,requestId:'r',baseContentVersion:0,baseCheckpointId:'base',title:null,recordDate:record.recordDate,document:record.document,tagIds:[],attachmentIds:[]}})
+ vi.mocked(libraryApi.begin).mockResolvedValue({record,sessionId:'new',recovered:null,recoveredTags:[]})
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host)
+ const click=(text:string)=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes(text))!.click()
+ try{await act(async()=>root.render(<LibraryWorkspace/>));await act(async()=>click('合成对话'));expect(host.textContent).toContain('合成预览正文');await act(async()=>click('待恢复文字'));await act(async()=>click('丢弃此草稿'));expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.value).toBe('待恢复文字');expect(host.textContent).not.toContain('合成预览正文')}
+ finally{await act(async()=>root.unmount());host.remove()}
 })

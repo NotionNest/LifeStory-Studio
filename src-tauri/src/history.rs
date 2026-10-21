@@ -214,8 +214,6 @@ impl DatabaseWorker {
             tx.execute("UPDATE records SET current_revision_id=?1,title=?2,record_date=CASE WHEN ?3='' THEN record_date ELSE ?3 END,pending_date=CASE WHEN ?3='' THEN '' ELSE NULL END,working_document=?4,working_text=?5,content_version=content_version+1,updated_at=?6 WHERE id=?7", params![checkpoint,snapshot.title,snapshot.record_date,serde_json::to_string(&snapshot.document)?,text,timestamp,input.record_id])?;
             tx.execute("DELETE FROM record_tags WHERE record_id=?1", [&input.record_id])?;
             for tag in &snapshot.tags { tx.execute("INSERT INTO record_tags VALUES(?1,?2)", params![input.record_id,tag.id])?; }
-            tx.execute("DELETE FROM record_search WHERE record_id=?1", [&input.record_id])?;
-            tx.execute("INSERT INTO record_search(record_id,content) VALUES(?1,?2)", params![input.record_id,format!("{}\n{}",snapshot.title.as_deref().unwrap_or(""),text)])?;
             let session_id = id(&tx)?;
             tx.execute("UPDATE edit_sessions SET session_id=?1,saved_sequence=0 WHERE record_id=?2", params![session_id,input.record_id])?;
             tx.execute("DELETE FROM record_save_receipts WHERE record_id=?1", [&input.record_id])?;

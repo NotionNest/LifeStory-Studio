@@ -41,7 +41,7 @@ pub(crate) fn identifier(value: &str) -> StorageResult<()> {
     }
     Ok(())
 }
-fn date(value: &str) -> StorageResult<()> {
+pub(crate) fn date(value: &str) -> StorageResult<()> {
     let bytes = value.as_bytes();
     if bytes.len() != 10
         || bytes[4] != b'-'
@@ -359,7 +359,7 @@ impl DatabaseWorker {
                  VALUES (?1,'text',?2,?3,?4,?4,?5)",params![input.request_id,input.record_date,input.created_timezone,timestamp,revision])?;
             tx.execute("INSERT INTO record_revisions(id,record_id,document_json,searchable_text,created_at,request_id)
                  VALUES (?1,?2,?3,'',?4,?5)",params![revision,input.request_id,r#"{"type":"doc","content":[{"type":"paragraph"}]}"#,timestamp,format!("create:{}",input.request_id)])?;
-            tx.execute("INSERT INTO record_search(record_id,content) VALUES (?1,'')",[&input.request_id])?; tx.commit()?; load(db,&input.request_id)
+            tx.commit()?; load(db,&input.request_id)
         })
     }
     pub fn read_record(&self, record_id: String) -> StorageResult<Record> {
@@ -458,10 +458,7 @@ impl DatabaseWorker {
                 tx.execute("DELETE FROM record_tags WHERE record_id=?1",[&input.record_id])?;
                 for tag in tags {tx.execute("INSERT INTO record_tags VALUES (?1,?2)",params![input.record_id,tag])?;}
                 }
-                if current.document!=input.document || current.title.as_deref()!=title {
-                tx.execute("DELETE FROM record_search WHERE record_id=?1",[&input.record_id])?;
-                tx.execute("INSERT INTO record_search(record_id,content) VALUES (?1,?2)",params![input.record_id,format!("{}\n{}",title.unwrap_or(""),text)])?;
-                }
+
             }
             let result=SaveResult{record_id:input.record_id.clone(),revision_id:revision.clone(),content_version,request_id:input.request_id.clone(),session_id:input.session_id.clone(),edit_sequence:input.edit_sequence,saved_at:timestamp};
             // Only the newest request can be uncertain in this serialized editor pipeline.
