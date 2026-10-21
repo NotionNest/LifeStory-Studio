@@ -53,7 +53,7 @@
 |---|---|
 | record.save / list / search | ID、base revision、编辑内容与筛选条件；返回版本或分页结果 |
 | conversation.append | 会话 ID、消息内容与幂等请求 ID；返回保存消息 |
-| attachment.import / remove | 系统文件选择授权后的输入；返回附件 ID；不接收任意删除路径 |
+| attachment.import / image / copy | 授权图片字节及目标正文；原子提交图片与正文；按记录/历史身份读取和复制，不接收任意路径 |
 | topic.save / project.save | 来源版本 ID、稿件与 base revision；校验引用和冲突 |
 | style.confirm / reject | claim ID 与用户决定；不允许模型直接确认 |
 | review.create | 周期、时区与用户选定来源；返回任务 ID |
