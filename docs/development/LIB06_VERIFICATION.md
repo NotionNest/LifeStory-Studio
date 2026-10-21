@@ -1,6 +1,6 @@
 # LIB-06 验证记录
 
-2026-10-21，TASK-07 / REQ-02、REQ-14。基线 develop 567bb15，分支 codex/library-search。已完成本地实现及以下验证，用户验收通过；用户已授权提交、推送及创建指向 develop 的 PR，交付结果见 Git 与当前会话；未合并或发布。
+2026-10-21，TASK-07 / REQ-02、REQ-14。基线 develop 567bb15，交付分支 feat/library-search（原 codex/library-search 已被替代）。已完成本地实现及以下验证，用户验收通过；用户已授权提交、推送及创建指向 develop 的 PR，交付结果见 Git 与当前会话；未合并或发布。
 
 ## 已实现
 

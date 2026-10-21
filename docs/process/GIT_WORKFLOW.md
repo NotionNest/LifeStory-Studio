@@ -4,7 +4,7 @@
 
 ## 分支与流转
 
-- `develop`：日常集成基线。任务从这里创建 `feat/*`、`fix/*`、`docs/*`、`chore/*` 或 Codex 的 `codex/*`，通过 PR 回到 develop。
+- `develop`：日常集成基线。任务从这里创建 `feat/*`、`fix/*`、`docs/*`、`chore/*`，通过 PR 回到 develop。
 - `release/<版本>`：从 develop 切出的版本候选，只接收 fix/chore 修复和发布准备；不接收新功能。版本未确定时不创建分支。
 - `main`：正式基线，接收 release 候选或从 main 出发的 `hotfix/*`。本次 hotfix/git-workflow 是流程迁移的一次性基础设施引导。
 - 正式合入后 main 通过 PR 回合 develop；紧急修复也回合仍维护的 release。
