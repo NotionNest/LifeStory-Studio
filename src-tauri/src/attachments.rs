@@ -497,9 +497,6 @@ impl DatabaseWorker {
             let ids=document_ids(&document)?;validate_current(&tx,&input.operation.record_id,&document,&ids)?;
             restore_links(&tx,&input.operation.record_id,&ids)?;
             tx.execute("UPDATE records SET working_document=?1,working_text=?2,content_version=content_version+1,updated_at=?3 WHERE id=?4",params![serde_json::to_string(&document)?,text,timestamp,input.operation.record_id])?;
-            tx.execute("DELETE FROM record_search WHERE record_id=?1",[&input.operation.record_id])?;
-            let current=load(&tx,&input.operation.record_id)?;
-            tx.execute("INSERT INTO record_search(record_id,content) VALUES(?1,?2)",params![input.operation.record_id,format!("{}\n{}",current.title.as_deref().unwrap_or(""),text)])?;
             let editing=finish(&tx,&input.operation,&key)?;
             tx.commit()?;Ok(ImportedAttachment{editing,attachment_id})
         })

@@ -1,6 +1,7 @@
 pub mod attachments;
 mod commands;
 pub mod history;
+pub mod library_query;
 pub mod records;
 pub mod recovery;
 pub mod storage;
@@ -85,6 +86,8 @@ pub fn run() {
             commands::record_create,
             commands::record_read,
             commands::record_list,
+            commands::library_query,
+            commands::library_preview,
             commands::record_save,
             commands::tag_create,
             commands::record_export,

@@ -419,7 +419,7 @@ fn schema7_preserves_attachment_only_reference_and_recycled_images() {
         [&third.attachment_id],
     )
     .unwrap();
-    sql.execute_batch("ALTER TABLE attachment_links DROP COLUMN in_body; PRAGMA user_version=7;")
+    sql.execute_batch("DROP TRIGGER library_search_insert; DROP TRIGGER library_search_update; DROP TRIGGER library_search_delete; ALTER TABLE attachment_links DROP COLUMN in_body; PRAGMA user_version=7;")
         .unwrap();
     drop(sql);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();

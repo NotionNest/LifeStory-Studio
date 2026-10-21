@@ -9,6 +9,11 @@ export interface RecordFile {
   createdAt: number; updatedAt: number; contentVersion: number; checkpointId: string; document: JSONContent; tags: Tag[]; attachments?: Attachment[]
 }
 export interface RecordSummary { id: string; title: string | null; recordDate: string; excerpt: string }
+export type RecordKind = 'text' | 'conversation' | 'draft'
+export interface LibraryQuery { keyword: string; dateFrom: string | null; dateTo: string | null; kinds: RecordKind[]; tagIds: string[]; tagMode: 'all' | 'any'; hasImages: boolean | null; month: string | null; offset: number }
+export interface SearchItem extends RecordSummary {kind:RecordKind; tags:Tag[];hasImages:boolean;matchField:'title'|'body'|'message'|null}
+export interface QueryPage {items:SearchItem[];total:number;nextOffset:number|null;days:{date:string;count:number}[];tags:Tag[]}
+export interface ContentPreview {id:string;title:string|null;recordDate:string;kind:RecordKind;document:JSONContent|null;messages:string[]}
 export interface SaveInput {
   recordId: string; baseCheckpointId: string; baseContentVersion: number; requestId: string; sessionId: string; editSequence: number
   title: string | null; recordDate: string; tagIds: string[]; document: JSONContent; attachmentIds: string[]
@@ -31,6 +36,8 @@ export interface HistoryPage { items: HistorySummary[]; nextBefore: HistoryCurso
 export interface RestoreHistory { recordId: string; revisionId: string; expectedContentVersion: number; sessionId: string; requestId: string }
 export const MAX_IMAGE_BYTES = 25 * 1024 * 1024
 export const libraryApi = {
+  query: (query: LibraryQuery) => invoke<QueryPage>('library_query', {query}),
+  preview: (recordId:string) => invoke<ContentPreview>('library_preview',{recordId}),
   importImage: async (operation: AttachmentOperation, file: File, document: object) => {
     if (file.size > MAX_IMAGE_BYTES) throw { code: 'validation', message: '图片超过 25 MiB' }
     const bytes = new Uint8Array(await file.slice(0, MAX_IMAGE_BYTES + 1).arrayBuffer())

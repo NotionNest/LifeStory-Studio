@@ -14,6 +14,8 @@ test('only approved integration routes are allowed', () => {
   assert.equal(route('main','hotfix/restore'),true)
   assert.equal(route('develop','main'),true)
   assert.equal(route('develop','feat/diary'),true)
+  assert.equal(route('develop','feat/library-search'),true)
+  assert.equal(route('develop','codex/library-search'),false)
   assert.equal(route('release/0.1.0','fix/installer'),true)
   assert.equal(route('release/0.1.0','feat/diary'),false)
 })

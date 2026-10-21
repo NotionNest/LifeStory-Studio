@@ -5,6 +5,8 @@ fn main() {
             "record_create",
             "record_read",
             "record_list",
+            "library_query",
+            "library_preview",
             "record_save",
             "tag_create",
             "record_export",

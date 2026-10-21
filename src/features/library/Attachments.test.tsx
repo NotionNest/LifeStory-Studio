@@ -6,7 +6,7 @@ import { LibraryWorkspace } from './LibraryWorkspace'
 import { libraryApi, type RecordFile } from './api'
 vi.mock('@/shared/runtime', () => ({ desktopAvailable: true }))
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn().mockResolvedValue(() => {}) }))
-vi.mock('./api', async original => ({ ...await original<typeof import('./api')>(), libraryApi: { recoveries: vi.fn(), recovery: vi.fn(), begin: vi.fn(), end: vi.fn(), list: vi.fn(), read: vi.fn(), create: vi.fn(), save: vi.fn(), tag: vi.fn(), exit: vi.fn(), export: vi.fn(), importImage: vi.fn(), image: vi.fn(), copyImage: vi.fn() } }))
+vi.mock('./api', async original => ({ ...await original<typeof import('./api')>(), libraryApi: { recoveries: vi.fn(), recovery: vi.fn(), begin: vi.fn(), end: vi.fn(), list: vi.fn(), query: vi.fn(async(query:{offset:number})=>{const rows=await libraryApi.list(query.offset);return {items:(rows??[]).map(item=>({...item,kind:'text',tags:[],hasImages:false,matchField:null})),total:rows?.length??0,nextOffset:null,days:[],tags:[]}}), preview:vi.fn(), read: vi.fn(), create: vi.fn(), save: vi.fn(), tag: vi.fn(), exit: vi.fn(), export: vi.fn(), importImage: vi.fn(), image: vi.fn(), copyImage: vi.fn() } }))
 const empty: RecordFile = { id:'images',title:'合成图片记录',recordDate:'2026-10-19',createdTimezone:'Asia/Shanghai',createdAt:1,updatedAt:1,contentVersion:0,checkpointId:'base',document:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'原始文字'}]}]},tags:[],attachments:[] }
 let current: RecordFile, sequence: number
 beforeEach(() => {

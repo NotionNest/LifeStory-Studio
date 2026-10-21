@@ -309,3 +309,18 @@ pub async fn attachment_copy(
             message: format!("图片复制失败：{e}"),
         })
 }
+
+#[tauri::command]
+pub async fn library_query(
+    database: State<'_, DatabaseWorker>,
+    query: crate::library_query::LibraryQuery,
+) -> Result<crate::library_query::QueryPage, RecordError> {
+    record_task(&database, move |db| db.query_library(query)).await
+}
+#[tauri::command]
+pub async fn library_preview(
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+) -> Result<crate::library_query::ContentPreview, RecordError> {
+    record_task(&database, move |db| db.preview_library_content(record_id)).await
+}
