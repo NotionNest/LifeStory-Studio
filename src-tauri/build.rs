@@ -17,6 +17,9 @@ fn main() {
             "history_read",
             "history_mark",
             "history_restore",
+            "attachment_import",
+            "attachment_image",
+            "attachment_copy",
         ]),
     ))
     .expect("Tauri build configuration failed");

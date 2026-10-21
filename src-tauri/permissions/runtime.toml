@@ -6,4 +6,4 @@ commands.allow = ["runtime_info"]
 [[permission]]
 identifier = "manage-records"
 description = "Create, read and save local text records and tags."
-commands.allow = ["record_create", "record_read", "record_list", "record_save", "tag_create", "record_export", "record_exit", "recovery_list", "recovery_read", "record_begin_edit", "record_end_edit", "history_list", "history_read", "history_mark", "history_restore"]
+commands.allow = ["record_create", "record_read", "record_list", "record_save", "tag_create", "record_export", "record_exit", "recovery_list", "recovery_read", "record_begin_edit", "record_end_edit", "history_list", "history_read", "history_mark", "history_restore", "attachment_import", "attachment_image", "attachment_copy"]

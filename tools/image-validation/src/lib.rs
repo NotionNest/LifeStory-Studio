@@ -1,11 +1,11 @@
-use image::{ImageFormat, ImageReader, Limits};
+use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, Limits};
 use std::io::Cursor;
 
 pub const MAX_BYTES: usize = 25 * 1024 * 1024;
 pub const MAX_PIXELS: u64 = 40_000_000;
 pub const MAX_EDGE: u32 = 16_384;
 
-pub fn validate(bytes: &[u8]) -> Result<(ImageFormat, u32, u32), String> {
+fn decode(bytes: &[u8]) -> Result<(ImageFormat, DynamicImage), String> {
     if bytes.len() > MAX_BYTES {
         return Err("图片超过 25 MiB".into());
     }
@@ -43,8 +43,49 @@ pub fn validate(bytes: &[u8]) -> Result<(ImageFormat, u32, u32), String> {
     limits.max_alloc = Some(256 * 1024 * 1024);
     let mut reader = ImageReader::with_format(Cursor::new(bytes), format);
     reader.limits(limits);
-    reader.decode().map_err(|e| e.to_string())?;
-    Ok((format, width, height))
+    let mut decoder = reader.into_decoder().map_err(|e| e.to_string())?;
+    let orientation = decoder.orientation().map_err(|e| e.to_string())?;
+    let mut image = DynamicImage::from_decoder(decoder).map_err(|e| e.to_string())?;
+    image.apply_orientation(orientation);
+    Ok((format, image))
+}
+
+pub fn validate(bytes: &[u8]) -> Result<(ImageFormat, u32, u32), String> {
+    let (format, image) = decode(bytes)?;
+    Ok((format, image.width(), image.height()))
+}
+
+pub fn clipboard_rgba(bytes: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
+    let (_, image) = decode(bytes)?;
+    let (width, height) = (image.width(), image.height());
+    Ok((image.into_rgba8().into_raw(), width, height))
+}
+
+pub struct PreparedImage {
+    pub media_type: &'static str,
+    pub width: u32,
+    pub height: u32,
+    pub preview: Vec<u8>,
+}
+pub fn prepare(bytes: &[u8]) -> Result<PreparedImage, String> {
+    let (format, image) = decode(bytes)?;
+    let media_type = match format {
+        ImageFormat::Png => "image/png",
+        ImageFormat::Jpeg => "image/jpeg",
+        ImageFormat::WebP => "image/webp",
+        _ => unreachable!(),
+    };
+    let mut preview = Cursor::new(Vec::new());
+    image
+        .thumbnail(image.width().min(1024), image.height().min(1024))
+        .write_to(&mut preview, ImageFormat::Png)
+        .map_err(|e| e.to_string())?;
+    Ok(PreparedImage {
+        media_type,
+        width: image.width(),
+        height: image.height(),
+        preview: preview.into_inner(),
+    })
 }
 
 #[cfg(test)]
@@ -73,5 +114,26 @@ mod tests {
         assert!(validate(&vec![0; MAX_BYTES + 1]).is_err());
         assert!(validate(include_bytes!("../fixtures/oversize.png")).is_err());
         assert!(validate(include_bytes!("../fixtures/overpixels.png")).is_err());
+    }
+}
+
+#[cfg(test)]
+mod preview_tests {
+    use super::*;
+    #[test]
+    fn preview_applies_exif_orientation_without_changing_original_bytes() {
+        let bytes = include_bytes!("../fixtures/oriented.jpg");
+        let (rgba, width, height) = clipboard_rgba(bytes).unwrap();
+        assert_eq!((width, height, rgba.len()), (6, 8, 6 * 8 * 4));
+        let prepared = prepare(bytes).unwrap();
+        assert_eq!((prepared.width, prepared.height), (6, 8));
+        let preview = image::load_from_memory(&prepared.preview).unwrap();
+        assert_eq!((preview.width(), preview.height()), (6, 8));
+        let mut decoder = ImageReader::new(Cursor::new(&prepared.preview))
+            .with_guessed_format()
+            .unwrap()
+            .into_decoder()
+            .unwrap();
+        assert!(decoder.exif_metadata().unwrap().is_none());
     }
 }

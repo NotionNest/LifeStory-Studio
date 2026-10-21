@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { Button } from '@/components/ui/button'
 import { desktopAvailable } from '@/shared/runtime'
-import { libraryApi, localDate, errorMessage, type RecordFile, type RecordSummary, type EditingSession, type RecoveryDraft, type RecoverySummary } from './api'
+import { libraryApi, localDate, errorMessage, type RecordFile, type RecordSummary, type EditingSession, type RecoveryDraft, type RecoverySummary, type AttachmentOperation, type ImportReport } from './api'
+import { AttachmentSync } from './ImageImportSync'
 import { HistoryPanel } from './HistoryPanel'
 import { RecoveryPreview } from './RecoveryPreview'
 import { RecordEditor, type EditorHandle } from './RecordEditor'
 
-type Intent = { kind: 'open'; id: string } | { kind: 'create' } | { kind: 'exit' } | { kind: 'history' }
+type Intent = { kind: 'open'; id: string } | { kind: 'create' } | { kind: 'exit' } | { kind: 'history' } | { kind: 'import'; recordId: string; files: File[]; position: number }
 export function LibraryWorkspace() {
   const [records, setRecords] = useState<RecordSummary[]>([])
   const [record, setRecord] = useState<RecordFile | null>(null)
@@ -16,6 +17,9 @@ export function LibraryWorkspace() {
   const [recovery, setRecovery] = useState<{ record: RecordFile; draft: RecoveryDraft } | null>(null)
   const [history, setHistory] = useState<RecordFile | null>(null)
   const historyOpen = useRef(false)
+  const attachmentOpen = useRef(false)
+  const [attachmentSyncError, setAttachmentSyncError] = useState<{ recordId: string; message: string } | null>(null)
+  const [importReport, setImportReport] = useState<ImportReport | null>(null)
   const [opened, setOpened] = useState(0)
   const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(false)
@@ -45,6 +49,10 @@ export function LibraryWorkspace() {
     }).catch(cause => { if (alive) setError(errorMessage(cause)) }).finally(() => { if (alive) setLoading(false) })
     return () => { alive = false }
   }, [refresh])
+  const applyEditing = (editing: EditingSession) => {
+    dirty.current = false; setRecord(editing.record); setSession(editing); setOpened(value => value + 1)
+  }
+  const knownFailure = (cause: unknown) => typeof cause === 'object' && cause !== null && 'code' in cause && ['validation', 'not_found', 'storage_busy', 'storage_full', 'storage_permission', 'storage_corrupt', 'storage_interrupted', 'corrupt_content'].includes(String(cause.code))
   const execute = async (intent: Intent) => {
     if (navigating.current || busy.current) return
     navigating.current = true; setWorking(true); setError('')
@@ -55,6 +63,37 @@ export function LibraryWorkspace() {
         const saved = await libraryApi.read(record.id)
         if (saved.contentVersion !== editor.current.contentVersion()) throw new Error('当前内容已在其他操作中变化，请重新打开记录核对后查看历史')
         historyOpen.current = true; setHistory(saved); setPending(null); return
+      }
+      if (intent.kind === 'import') {
+        if (!record || !session || !editor.current || record.id !== intent.recordId) throw new Error('目标记录已变化，请在原记录中重新选择图片。')
+        const saved = await libraryApi.read(record.id)
+        if (saved.contentVersion !== editor.current.contentVersion()) throw new Error('当前内容已变化，请重新打开记录核对图片。')
+        let editing: EditingSession = { record: saved, sessionId: session.sessionId, recovered: null, recoveredTags: [] }
+        const operation = (): AttachmentOperation => ({ recordId: record.id, expectedContentVersion: editing.record.contentVersion, sessionId: editing.sessionId, requestId: crypto.randomUUID() })
+        setImportReport({recordId:record.id,messages:['正在插入图片…'],retry:[]})
+        const messages: string[] = [], retry: File[] = []
+        let position=intent.position
+        for (let index = 0; index < intent.files.length; index++) {
+          const file = intent.files[index]
+          try {
+            const input=operation()
+            const document=editor.current!.imageDocument(input.requestId,position)
+            const result = await libraryApi.importImage(input, file, document)
+            editing=result.editing
+            position=editor.current!.acceptImage(editing,result.attachmentId,position)
+            setRecord(editing.record);setSession(editing)
+          } catch (cause) {
+            if (knownFailure(cause)) { messages.push(`未成功：${file.name} · ${errorMessage(cause)}`); retry.push(file) }
+            else {
+              messages.push(`结果尚未确认：${file.name} · ${errorMessage(cause)}。请核对正文，避免重复插入。`)
+              try { const current = await libraryApi.read(record.id); editing = await libraryApi.begin(record.id, current.contentVersion); applyEditing(editing) }
+              catch (readError) { attachmentOpen.current = true; setAttachmentSyncError({ recordId: record.id, message: errorMessage(readError) }) }
+              for (const remaining of intent.files.slice(index + 1)) { retry.push(remaining); messages.push(`尚未处理：${remaining.name}`) }
+              break
+            }
+          }
+        }
+        setImportReport({ recordId: record.id, messages, retry }); await refresh(); return
       }
       let next: RecordFile
       if (intent.kind === 'create') {
@@ -72,19 +111,24 @@ export function LibraryWorkspace() {
     finally { navigating.current = false; setWorking(leaving.current); if (!leaving.current && queued.current) { const next = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(next)) } }
   }
   const request = (intent: Intent) => {
-    if (historyOpen.current) return
+    if (historyOpen.current || attachmentOpen.current) return
     if (navigating.current || busy.current || leaving.current) { queued.current = intent; return }
     leaving.current = true; setWorking(true)
     void (async () => {
       try {
         if (editor.current && await editor.current.prepareLeave() !== 'saved') {
-          if (intent.kind === 'history') { setError('当前修改尚未保存，请先完成保存或处理错误后再查看历史。'); return }
+          if (['history', 'import'].includes(intent.kind)) {
+            setError('当前修改尚未保存，请先处理保存错误，再查看历史或插入图片。')
+            if (intent.kind === 'import') setImportReport({ recordId: intent.recordId, messages: ['尚未导入：当前修改保存失败。'], retry: intent.files })
+            return
+          }
           setPending(intent); setExported(false); return
         }
         await execute(intent)
       } catch (cause) { setError(errorMessage(cause)) }
       finally {
-        if (!historyOpen.current) editor.current?.resume()
+        if (!historyOpen.current && !attachmentOpen.current) editor.current?.resume()
+        else if (attachmentOpen.current) { await editor.current?.prepareLeave() }
         leaving.current = false; setWorking(false)
         if (queued.current) { const next = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(next)) }
       }
@@ -96,7 +140,7 @@ export function LibraryWorkspace() {
     let disposed = false
     const subscriptions = [
       listen('exit-requested', () => requestRef.current({ kind: 'exit' })),
-      listen('save-requested', () => { void editor.current?.save() }),
+      listen('save-requested', () => { if (!historyOpen.current && !attachmentOpen.current) void editor.current?.save() }),
       listen('new-record-requested', () => requestRef.current({ kind: 'create' })),
     ]
     for (const subscription of subscriptions) void subscription.then(unlisten => { if (disposed) unlisten() }).catch(cause => setError(`关闭保护不可用：${errorMessage(cause)}`))
@@ -127,6 +171,18 @@ export function LibraryWorkspace() {
     } catch (cause) { setError(errorMessage(cause)) }
     finally { navigating.current = false; setWorking(leaving.current); if (!leaving.current && queued.current) { const next = queued.current; queued.current = null; queueMicrotask(() => requestRef.current(next)) } }
   }
+  const rereadAttachments = async () => {
+    const recordId = attachmentSyncError?.recordId
+    if (!recordId || navigating.current) return
+    navigating.current = true; setWorking(true)
+    try {
+      const current = await libraryApi.read(recordId)
+      const editing = await libraryApi.begin(recordId, current.contentVersion)
+      attachmentOpen.current = false; setAttachmentSyncError(null); applyEditing(editing); setError(''); await refresh().catch(cause => setError(`内容已读取，记录列表刷新失败：${errorMessage(cause)}`))
+    } catch (cause) {
+      setError(errorMessage(cause)); if (attachmentSyncError) setAttachmentSyncError({ recordId, message: errorMessage(cause) })
+    } finally { navigating.current = false; setWorking(false) }
+  }
   const onSaved = useCallback(() => { setError(''); void refresh().catch(cause => setError(errorMessage(cause))) }, [refresh])
   return <main className="flex h-dvh min-h-0 flex-col">
     <header className="flex h-12 shrink-0 items-center justify-between border-b bg-card px-5">
@@ -149,11 +205,12 @@ export function LibraryWorkspace() {
         <p className="border-t p-4 text-[11px] leading-5 text-muted-foreground">文字记录 · 按记录日期排列<br />记录保存在这台电脑上</p>
       </aside>
       <section className="flex min-w-0 flex-1 overflow-y-auto" aria-label="编辑工作区">
-        {record && session ? <RecordEditor key={`${record.id}:${opened}`} ref={editor} record={record} sessionId={session.sessionId} recovered={session.recovered} recoveredTags={session.recoveredTags} onDirty={onDirty} onBusy={onBusy} onSaved={onSaved} onFailure={setError} onHistory={() => request({ kind: 'history' })} /> : <div className="m-auto max-w-sm px-8"><p className="mb-2 text-xs text-muted-foreground">你的生活，逐篇积累</p><h2 className="mb-3 text-xl font-medium">选择记录，或开始书写。</h2><p className="text-sm leading-7 text-muted-foreground">同一天可以留下多条记录。标题和标签都可稍后补充。</p></div>}
+        {record && session ? <RecordEditor key={`${record.id}:${opened}`} ref={editor} record={record} sessionId={session.sessionId} recovered={session.recovered} recoveredTags={session.recoveredTags} onDirty={onDirty} onBusy={onBusy} onSaved={onSaved} onFailure={setError} onHistory={() => request({ kind: 'history' })} onImport={(files, position) => request({ kind: 'import', recordId: record.id, files, position })} importReport={importReport?.recordId === record.id ? importReport : null} /> : <div className="m-auto max-w-sm px-8"><p className="mb-2 text-xs text-muted-foreground">你的生活，逐篇积累</p><h2 className="mb-3 text-xl font-medium">选择记录，或开始书写。</h2><p className="text-sm leading-7 text-muted-foreground">同一天可以留下多条记录。标题和标签都可稍后补充。</p></div>}
       </section>
     </div>}
+    {attachmentSyncError && <AttachmentSync busy={working} error={attachmentSyncError.message} onReread={() => void rereadAttachments()} />}
     {history && session && <HistoryPanel record={history} sessionId={session.sessionId} onClose={() => { historyOpen.current = false; setHistory(null); editor.current?.resume() }} onRestored={editing => {
-      dirty.current = false; historyOpen.current = false; setHistory(null); setRecord(editing.record); setSession(editing); setOpened(value => value + 1); setError(''); onSaved()
+      historyOpen.current = false; setHistory(null); applyEditing(editing); setError(''); onSaved()
     }} />}
     {recovery && <RecoveryPreview record={recovery.record} draft={recovery.draft} busy={working} error={error} onChoose={action => void resolveRecovery(action)} onCancel={() => { setRecovery(null); setError('') }} onRefresh={() => void execute({ kind: 'open', id: recovery.record.id })} />}
     {pending && <dialog ref={dialog} onCancel={event => { event.preventDefault(); if (!working) setPending(null) }} aria-labelledby="leave-title" className="fixed inset-0 z-50 m-auto w-[calc(100%-3rem)] max-w-lg rounded-lg border bg-card p-6 text-foreground shadow-xl backdrop:bg-foreground/25">

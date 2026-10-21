@@ -27,6 +27,8 @@ pub struct Snapshot {
     pub title: Option<String>,
     pub record_date: String,
     pub tags: Vec<Tag>,
+    #[serde(default)]
+    pub attachment_ids: Vec<String>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -87,18 +89,23 @@ fn version(db: &Connection, record_id: &str, revision_id: &str) -> StorageResult
         })
         .optional()?
         .ok_or_else(|| fail("not_found", "历史版本不存在或已清理，请刷新列表"))?;
-    let document = serde_json::from_str(&row.1)?;
-    document_text(&document)?;
-    let snapshot: Option<Snapshot> = row
+    let mut document = serde_json::from_str(&row.1)?;
+    let mut snapshot: Option<Snapshot> = row
         .2
         .map(|json| serde_json::from_str(&json))
         .transpose()
         .map_err(|_| fail("corrupt_content", "历史快照不完整，未改动当前内容"))?;
-    if snapshot.as_ref().is_some_and(|s| s.document != document) {
-        return Err(fail(
-            "corrupt_content",
-            "历史正文与快照不一致，未改动当前内容",
-        ));
+    let ids = snapshot
+        .as_ref()
+        .map(|s| s.attachment_ids.clone())
+        .unwrap_or_default();
+    crate::attachments::normalize_legacy(&mut document, &ids)?;
+    document_text(&document)?;
+    if let Some(snapshot) = snapshot.as_mut() {
+        crate::attachments::normalize_legacy(&mut snapshot.document, &ids)?;
+        if snapshot.document != document {
+            return Err(fail("corrupt_content", "历史快照不一致"));
+        }
     }
     Ok(HistoryVersion {
         summary: row.0,
@@ -198,9 +205,12 @@ impl DatabaseWorker {
                 }
             }
             checkpoint_on_entry(&tx, &current)?;
+            crate::attachments::restore_links(&tx,&input.record_id,&snapshot.attachment_ids)?;
+            crate::attachments::validate_current(&tx,&input.record_id,&snapshot.document,&snapshot.attachment_ids)?;
             let checkpoint = id(&tx)?;
             let timestamp = now()?;
             tx.execute("INSERT INTO record_revisions(id,record_id,document_json,searchable_text,created_at,request_id,snapshot_json,checkpoint_kind,restored_from_id) VALUES(?1,?2,?3,?4,?5,?6,?7,'editing_entry',?8)", params![checkpoint,input.record_id,serde_json::to_string(&snapshot.document)?,text,timestamp,format!("restore:{}",input.request_id),serde_json::to_string(&snapshot)?,input.revision_id])?;
+            crate::attachments::link_snapshot(&tx,&input.record_id,&checkpoint,&snapshot.attachment_ids)?;
             tx.execute("UPDATE records SET current_revision_id=?1,title=?2,record_date=CASE WHEN ?3='' THEN record_date ELSE ?3 END,pending_date=CASE WHEN ?3='' THEN '' ELSE NULL END,working_document=?4,working_text=?5,content_version=content_version+1,updated_at=?6 WHERE id=?7", params![checkpoint,snapshot.title,snapshot.record_date,serde_json::to_string(&snapshot.document)?,text,timestamp,input.record_id])?;
             tx.execute("DELETE FROM record_tags WHERE record_id=?1", [&input.record_id])?;
             for tag in &snapshot.tags { tx.execute("INSERT INTO record_tags VALUES(?1,?2)", params![input.record_id,tag.id])?; }

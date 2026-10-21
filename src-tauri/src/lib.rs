@@ -1,3 +1,4 @@
+pub mod attachments;
 mod commands;
 pub mod history;
 pub mod records;
@@ -11,6 +12,7 @@ pub(crate) struct ExitGate(pub AtomicBool);
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(ExitGate(AtomicBool::new(false)))
         .on_menu_event(|app, event| {
             let name = match event.id().as_ref() {
@@ -95,6 +97,9 @@ pub fn run() {
             commands::history_read,
             commands::history_mark,
             commands::history_restore,
+            commands::attachment_import,
+            commands::attachment_image,
+            commands::attachment_copy,
         ])
         .build(tauri::generate_context!())
         .expect("LifeStory Studio failed to start")

@@ -1,23 +1,28 @@
 import { useEffect, useImperativeHandle, useRef, useState, type Ref, type FormEvent } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
+import { AttachmentSurface } from './AttachmentImage'
+import { AttachmentImageNode } from './attachmentExtensions'
+import { closeHistory } from '@tiptap/pm/history'
+import { imageIds } from './imageDocument'
 import { useRecordPersistence } from './useRecordPersistence'
 import StarterKit from '@tiptap/starter-kit'
 import { Button } from '@/components/ui/button'
-import { libraryApi, errorMessage, type RecordFile, type SaveInput, type Tag } from './api'
-export interface EditorHandle { contentVersion: () => number; prepareLeave: () => Promise<'saved' | 'failed'>; resume: () => void; flush: () => Promise<'saved' | 'failed'>; save: () => Promise<boolean>; export: () => Promise<boolean>; discard: () => Promise<boolean> }
-interface Props { record: RecordFile; sessionId: string; recovered?: SaveInput | null; recoveredTags?: Tag[]; ref: Ref<EditorHandle>; onDirty: (dirty: boolean) => void; onBusy: (busy: boolean) => void; onSaved: () => void; onFailure: (message: string) => void; onHistory?: () => void }
-export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref, onDirty, onBusy, onSaved, onFailure, onHistory }: Props) {
+import { libraryApi, errorMessage, type RecordFile, type SaveInput, type Tag, type ImportReport, type EditingSession } from './api'
+export interface EditorHandle { imageDocument: (id: string, position: number) => object; acceptImage: (editing: EditingSession, id: string, position: number) => number; contentVersion: () => number; prepareLeave: () => Promise<'saved' | 'failed'>; resume: () => void; flush: () => Promise<'saved' | 'failed'>; save: () => Promise<boolean>; export: () => Promise<boolean>; discard: () => Promise<boolean> }
+interface Props { record: RecordFile; sessionId: string; recovered?: SaveInput | null; recoveredTags?: Tag[]; ref: Ref<EditorHandle>; onDirty: (dirty: boolean) => void; onBusy: (busy: boolean) => void; onSaved: () => void; onFailure: (message: string) => void; onHistory?: () => void; onImport?: (files: File[], position: number) => void; importReport?: ImportReport | null }
+export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref, onDirty, onBusy, onSaved, onFailure, onHistory, onImport, importReport }: Props) {
   const [title, setTitle] = useState(recovered ? recovered.title ?? '' : record.title ?? '')
   const [date, setDate] = useState(recovered?.recordDate ?? record.recordDate)
   const [tags, setTags] = useState(recovered ? recoveredTags ?? [] : record.tags)
   const [tagName, setTagName] = useState('')
   const [error, setError] = useState('')
+  const picker = useRef<HTMLInputElement>(null), lastPosition = useRef<number | null>(null)
   const article = useRef<HTMLElement>(null), locked = useRef(false)
   const [readOnly, setReadOnly] = useState(false)
   const [tagBusy, setTagBusy] = useState(false)
   const persistenceRef = useRef<ReturnType<typeof useRecordPersistence> | null>(null)
   const editor = useEditor({
-    extensions: [StarterKit.configure({ link: false })],
+    extensions: [StarterKit.configure({ link: false }), AttachmentImageNode],
     content: recovered?.document ?? record.document,
     onUpdate: () => persistenceRef.current?.changed(),
     editorProps: {
@@ -40,6 +45,15 @@ export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref,
     article.current?.querySelectorAll<HTMLInputElement>('input').forEach(input => { input.readOnly = value })
   }
   useImperativeHandle(ref, () => ({
+    imageDocument: (id, position) => { if (!editor) throw new Error('编辑器尚未准备好'); return editor.state.tr.replaceRangeWith(position, position, editor.schema.nodes.attachmentImage.create({attachmentId:id})).doc.toJSON() },
+    acceptImage: (editing, id, position) => {
+      if (!editor) throw new Error('编辑器尚未准备好')
+      const transaction=editor.state.tr.replaceRangeWith(position,position,editor.schema.nodes.attachmentImage.create({attachmentId:id}))
+      editor.view.dispatch(closeHistory(transaction))
+      editor.view.dispatch(closeHistory(editor.state.tr).setMeta('addToHistory',false))
+      persistence.acceptImage(editing)
+      const next=transaction.mapping.map(position,1);lastPosition.current=next;return next
+    },
     contentVersion: () => persistence.snapshot().baseContentVersion,
     prepareLeave: async () => {
       if (!await persistence.waitForComposition()) return 'failed'
@@ -66,7 +80,8 @@ export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref,
     if (action === 'list') chain.toggleBulletList().run()
   }
   const guardInput = (event: FormEvent) => { if (locked.current) { event.preventDefault(); event.stopPropagation() } }
-  return <article ref={article} aria-busy={readOnly} onBeforeInputCapture={guardInput} onPasteCapture={guardInput} onDropCapture={guardInput} onCompositionStart={persistence.compositionStart} onCompositionEnd={persistence.compositionEnd} className="flex min-w-0 flex-1 flex-col bg-card">
+  const importFiles = (files: File[], position = lastPosition.current ?? editor?.state.doc.content.size ?? 0) => { if (!locked.current && files.length) onImport?.(files, position) }
+  return <AttachmentSurface scope={{ recordId: record.id, revisionId: null, attachments: record.attachments, editable: !readOnly, imageIds: imageIds(editor?.getJSON() ?? record.document) }}><article ref={article} aria-busy={readOnly} onBeforeInputCapture={guardInput} onPasteCapture={event => { guardInput(event); if (!locked.current) { const files = Array.from(event.clipboardData.files); if (files.length) { event.preventDefault(); event.stopPropagation(); importFiles(files, editor?.state.selection.to ?? 0) } } }} onDragOver={event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault() }} onDropCapture={event => { guardInput(event); if (locked.current) return; const files = Array.from(event.dataTransfer.files); if (files.length) { event.preventDefault(); event.stopPropagation(); importFiles(files, editor?.view.posAtCoords({left:event.clientX,top:event.clientY})?.pos ?? editor?.state.doc.content.size ?? 0) } }} onCompositionStart={persistence.compositionStart} onCompositionEnd={persistence.compositionEnd} className="flex min-w-0 flex-1 flex-col bg-card">
     <header className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-3">
       <div><span role="status" className="text-xs text-muted-foreground">{status}</span></div>
       <div className="flex items-center gap-3"><span className="text-xs text-muted-foreground">自动保存</span>{onHistory && <Button variant="outline" size="sm" disabled={readOnly || tagBusy} onClick={onHistory}>查看历史</Button>}</div>
@@ -85,9 +100,12 @@ export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref,
       </div>
       <div className="flex gap-1 border-y py-1" role="toolbar" aria-label="正文格式">
         {([['bold', '粗体'], ['italic', '斜体'], ['heading', '标题'], ['list', '列表']] as const).map(([action, text]) => <Button key={action} variant="ghost" size="sm" disabled={readOnly} onClick={() => format(action)}>{text}</Button>)}
+        {onImport && <><input ref={picker} aria-label="选择图片文件" type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" disabled={readOnly} onChange={event=>{const files=Array.from(event.target.files??[]);event.target.value='';importFiles(files)}}/><Button variant="ghost" size="sm" disabled={readOnly || tagBusy} onClick={()=>picker.current?.click()}>插入图片</Button></>}
+
       </div>
-      <EditorContent className="record-editor flex-1" editor={editor} />
+      <EditorContent className="record-editor flex-1" editor={editor} onFocus={() => { lastPosition.current=editor?.state.selection.to ?? null }} onKeyUp={() => {lastPosition.current=editor?.state.selection.to ?? null}} onMouseUp={() => {lastPosition.current=editor?.state.selection.to ?? null}} />
+      {importReport && <div role="status" className="text-xs leading-6">{importReport.messages.map((line,index)=><p key={index}>{line}</p>)}{importReport.retry.length>0 && <Button size="sm" variant="outline" disabled={readOnly} onClick={()=>importFiles(importReport.retry)}>重试未成功图片</Button>}</div>}
       <footer className="border-t pt-3 text-xs text-muted-foreground">原文 · 内容自动保存在本机</footer>
     </div>
-  </article>
+  </article></AttachmentSurface>
 }

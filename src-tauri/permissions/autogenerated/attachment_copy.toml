@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-attachment-copy"
+description = "Enables the attachment_copy command without any pre-configured scope."
+commands.allow = ["attachment_copy"]
+
+[[permission]]
+identifier = "deny-attachment-copy"
+description = "Denies the attachment_copy command without any pre-configured scope."
+commands.deny = ["attachment_copy"]

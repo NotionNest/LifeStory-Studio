@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from 'react'
 import { Bookmark, ChevronRight, Circle, RotateCcw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { EditorContent, useEditor, type JSONContent } from '@tiptap/react'
+import { AttachmentImageNode } from './attachmentExtensions'
+import { imageIds } from './imageDocument'
+import { AttachmentSurface } from './AttachmentImage'
 import StarterKit from '@tiptap/starter-kit'
 import { libraryApi, errorMessage, type EditingSession, type HistoryCursor, type HistorySummary, type HistoryVersion, type RecordFile, type RestoreHistory } from './api'
 
 function HistoryDocument({ document }: { document: JSONContent }) {
-  const editor = useEditor({ extensions: [StarterKit.configure({ link: false })], content: document, editable: false, editorProps: { attributes: { 'aria-label': '历史正文（只读）' } } })
+  const editor = useEditor({ extensions: [StarterKit.configure({ link: false }), AttachmentImageNode], content: document, editable: false, editorProps: { attributes: { 'aria-label': '历史正文（只读）' } } })
   return <EditorContent className="record-editor history-document mt-7" editor={editor} />
 }
 
@@ -130,7 +133,7 @@ export function HistoryPanel({ record, sessionId, onRestored, onClose }: {
           {previewDocument ? <article className="mx-auto w-full max-w-[960px] px-6 pb-20 pt-12 sm:px-12 sm:pt-16 lg:px-20 lg:pt-20">
             <h3 className="break-words text-2xl font-semibold tracking-tight sm:text-3xl">{preview?.title || (viewingCurrent || selected?.snapshot ? '无标题记录' : '旧版正文')}</h3>
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">{preview ? <><span>{preview.recordDate || '日期待补充'}</span>{preview.tags.map(tag => <span key={tag.id}>#{tag.name}</span>)}</> : <span>旧版历史缺少标题、日期和标签快照，仅可预览正文，不能完整恢复。</span>}</div>
-            <HistoryDocument key={viewingCurrent ? 'current' : selected!.summary.id} document={previewDocument} />
+            <AttachmentSurface scope={{ recordId: record.id, revisionId: viewingCurrent ? null : selected!.summary.id, attachments: viewingCurrent ? record.attachments : undefined, imageIds: imageIds(previewDocument) }}><HistoryDocument key={viewingCurrent ? 'current' : selected!.summary.id} document={previewDocument} /></AttachmentSurface>
           </article> : <p className="px-12 py-16 text-sm text-muted-foreground">选择一个历史版本预览内容。</p>}
         </div>
       </section>
