@@ -1,6 +1,6 @@
 # LIB-05 图片导入、正文编辑与历史复制
 
-更新：2026-10-21。关联 TASK-07、REQ-01/12/14。分支 `feat/library-images`，基线 develop `f818e63`；用户于 2026-10-21 授权提交、推送并创建指向 develop 的 PR；交付结果见 Git 和当前会话，未合并或发布。
+更新：2026-10-21。关联 TASK-07、REQ-01/12/14。分支 `feat/library-images`，基线 develop `f818e63`；用户于 2026-10-21 授权提交、推送并创建指向 develop 的 PR；已由用户于 2026-10-21 squash 合入 develop，PR #16、提交 567bb15；未发布。
 
 ## 当前执行的确认
 
