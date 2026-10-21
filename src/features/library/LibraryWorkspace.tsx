@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { Button } from '@/components/ui/button'
 import { desktopAvailable } from '@/shared/runtime'
-import { libraryApi, localDate, errorMessage, type RecordFile, type ContentPreview, type RecordKind, type EditingSession, type RecoveryDraft, type RecoverySummary, type AttachmentOperation, type ImportReport } from './api'
+import { libraryApi, localDate, errorMessage, type RecordFile, type ContentPreview, type RecordKind, type EditingSession, type RecoveryDraft, type RecoverySummary, type AttachmentOperation, type ImportReport, type DeleteImpact } from './api'
 import { AttachmentSync } from './ImageImportSync'
+import { TrashPanel, DeleteRecordDialog } from './TrashPanel'
 import { HistoryPanel } from './HistoryPanel'
 import { RecoveryPreview } from './RecoveryPreview'
 import { useLibraryQuery } from './useLibraryQuery'
@@ -11,7 +12,7 @@ import { LibraryBrowser } from './LibraryBrowser'
 import { LibraryContentPreview } from './LibraryContentPreview'
 import { RecordEditor, type EditorHandle } from './RecordEditor'
 
-type Intent = { kind: 'open'; id: string; recordKind?:RecordKind } | { kind: 'create' } | { kind: 'exit' } | { kind: 'history' } | { kind: 'import'; recordId: string; files: File[]; position: number }
+type Intent = { kind: 'open'; id: string; recordKind?:RecordKind } | { kind: 'create' } | { kind: 'exit' } | { kind: 'history' } | {kind:'trash'} | {kind:'delete';id:string} | { kind: 'import'; recordId: string; files: File[]; position: number }
 export function LibraryWorkspace() {
   const browser=useLibraryQuery()
   const {refresh}=browser
@@ -20,6 +21,8 @@ export function LibraryWorkspace() {
   const [session, setSession] = useState<EditingSession | null>(null)
   const [recoveries, setRecoveries] = useState<RecoverySummary[]>([])
   const [recovery, setRecovery] = useState<{ record: RecordFile; draft: RecoveryDraft } | null>(null)
+  const [trashOpen,setTrashOpen]=useState(false)
+  const [deleteImpact,setDeleteImpact]=useState<DeleteImpact|null>(null)
   const [history, setHistory] = useState<RecordFile | null>(null)
   const historyOpen = useRef(false)
   const attachmentOpen = useRef(false)
@@ -56,6 +59,8 @@ export function LibraryWorkspace() {
     navigating.current = true; setWorking(true); setError('')
     try {
       if (intent.kind === 'exit') { await libraryApi.exit(); return }
+      if(intent.kind==='trash'){historyOpen.current=true;setTrashOpen(true);setPending(null);return}
+      if(intent.kind==='delete'){const impact=await libraryApi.trashImpact(intent.id);historyOpen.current=true;setDeleteImpact(impact);setPending(null);return}
       if (intent.kind === 'history') {
         if (!record || !editor.current) return
         const saved = await libraryApi.read(record.id)
@@ -119,8 +124,8 @@ export function LibraryWorkspace() {
     void (async () => {
       try {
         if (editor.current && await editor.current.prepareLeave() !== 'saved') {
-          if (['history', 'import'].includes(intent.kind)) {
-            setError('当前修改尚未保存，请先处理保存错误，再查看历史或插入图片。')
+          if (['history', 'import', 'delete'].includes(intent.kind)) {
+            setError('当前修改尚未保存，请先处理保存错误，再查看历史、插入图片或删除记录。')
             if (intent.kind === 'import') setImportReport({ recordId: intent.recordId, messages: ['尚未导入：当前修改保存失败。'], retry: intent.files })
             return
           }
@@ -148,6 +153,8 @@ export function LibraryWorkspace() {
     for (const subscription of subscriptions) void subscription.then(unlisten => { if (disposed) unlisten() }).catch(cause => setError(`关闭保护不可用：${errorMessage(cause)}`))
     return () => { disposed = true; for (const subscription of subscriptions) void subscription.then(unlisten => unlisten()).catch(() => {}) }
   }, [])
+  const refreshBrowser=useCallback(()=>{void refresh()},[refresh])
+  const closeTrash=()=>{historyOpen.current=false;setTrashOpen(false);setDeleteImpact(null);editor.current?.resume()}
   const saveAndContinue = () => { if (pending) request(pending) }
   const onDirty = useCallback((value: boolean) => { dirty.current = value; if (value) setExported(false) }, [])
   const onBusy = useCallback((value: boolean) => {
@@ -189,7 +196,7 @@ export function LibraryWorkspace() {
   return <main className="flex h-dvh min-h-0 flex-col">
     <header className="flex h-12 shrink-0 items-center justify-between border-b bg-card px-5">
       <span className="text-sm font-semibold tracking-tight">LifeStory Studio <span className="ml-3 font-normal text-muted-foreground">/ 资料库</span></span>
-      <span className="text-xs text-muted-foreground">本地保存</span>
+      <div className="flex items-center gap-2">{(record||preview)&&<Button size="sm" variant="ghost" disabled={working} onClick={()=>request({kind:'delete',id:(record?.id??preview!.id)})}>删除记录</Button>}<Button size="sm" variant="outline" disabled={working} onClick={()=>request({kind:'trash'})}>回收站</Button><span className="text-xs text-muted-foreground">本地保存</span></div>
     </header>
     {!desktopAvailable ? <p role="status" className="p-8">请在桌面应用中使用本地资料库。浏览器预览不提供模拟数据。</p> : <div className="flex min-h-0 flex-1">
       <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-r lg:w-[22rem]" aria-label="记录列表">
@@ -206,6 +213,8 @@ export function LibraryWorkspace() {
     {history && session && <HistoryPanel record={history} sessionId={session.sessionId} onClose={() => { historyOpen.current = false; setHistory(null); editor.current?.resume() }} onRestored={editing => {
       historyOpen.current = false; setHistory(null); applyEditing(editing); setError(''); onSaved()
     }} />}
+    {trashOpen&&<TrashPanel onClose={closeTrash} onChanged={refreshBrowser}/>}
+    {deleteImpact&&<DeleteRecordDialog impact={deleteImpact} onClose={closeTrash} onDeleted={()=>{const id=deleteImpact.recordId;setRecord(null);setSession(null);setPreview(null);dirty.current=false;setRecoveries(old=>old.filter(r=>r.recordId!==id));closeTrash();void refresh()}}/>}
     {recovery && <RecoveryPreview record={recovery.record} draft={recovery.draft} busy={working} error={error} onChoose={action => void resolveRecovery(action)} onCancel={() => { setRecovery(null); setError('') }} onRefresh={() => void execute({ kind: 'open', id: recovery.record.id })} />}
     {pending && <dialog ref={dialog} onCancel={event => { event.preventDefault(); if (!working) setPending(null) }} aria-labelledby="leave-title" className="fixed inset-0 z-50 m-auto w-[calc(100%-3rem)] max-w-lg rounded-lg border bg-card p-6 text-foreground shadow-xl backdrop:bg-foreground/25">
       <h2 id="leave-title" className="text-lg font-semibold">有尚未保存的修改</h2><p className="my-3 text-sm leading-6 text-muted-foreground">保存成功后再继续，或主动另存当前编辑内容。放弃修改后，未保存的内容将被丢弃。</p>

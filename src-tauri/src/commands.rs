@@ -324,3 +324,53 @@ pub async fn library_preview(
 ) -> Result<crate::library_query::ContentPreview, RecordError> {
     record_task(&database, move |db| db.preview_library_content(record_id)).await
 }
+
+#[tauri::command]
+pub async fn trash_impact(
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+) -> Result<crate::trash::Impact, RecordError> {
+    record_task(&database, move |db| db.trash_impact(record_id)).await
+}
+
+#[tauri::command]
+pub async fn trash_move(
+    database: State<'_, DatabaseWorker>,
+    input: crate::trash::TrashRequest,
+) -> Result<(), RecordError> {
+    record_task(&database, move |db| db.trash_move(input)).await
+}
+
+#[tauri::command]
+pub async fn trash_list(
+    database: State<'_, DatabaseWorker>,
+    offset: u32,
+) -> Result<crate::trash::TrashPage, RecordError> {
+    record_task(&database, move |db| db.trash_list(offset)).await
+}
+
+#[tauri::command]
+pub async fn trash_restore(
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+    deleted_at: i64,
+) -> Result<(), RecordError> {
+    record_task(&database, move |db| db.trash_restore(record_id, deleted_at)).await
+}
+
+#[tauri::command]
+pub async fn trash_purge(
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+    deleted_at: i64,
+) -> Result<(), RecordError> {
+    record_task(&database, move |db| db.trash_purge(record_id, deleted_at)).await
+}
+
+#[tauri::command]
+pub async fn trash_status(
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+) -> Result<String, RecordError> {
+    record_task(&database, move |db| db.trash_status(record_id)).await
+}

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-trash-move"
+description = "Enables the trash_move command without any pre-configured scope."
+commands.allow = ["trash_move"]
+
+[[permission]]
+identifier = "deny-trash-move"
+description = "Denies the trash_move command without any pre-configured scope."
+commands.deny = ["trash_move"]

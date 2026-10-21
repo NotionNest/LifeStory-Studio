@@ -5,6 +5,7 @@ pub mod library_query;
 pub mod records;
 pub mod recovery;
 pub mod storage;
+pub mod trash;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{Emitter, Manager};
@@ -86,6 +87,12 @@ pub fn run() {
             commands::record_create,
             commands::record_read,
             commands::record_list,
+            commands::trash_status,
+            commands::trash_impact,
+            commands::trash_move,
+            commands::trash_list,
+            commands::trash_restore,
+            commands::trash_purge,
             commands::library_query,
             commands::library_preview,
             commands::record_save,

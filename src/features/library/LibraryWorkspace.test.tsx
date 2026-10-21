@@ -6,7 +6,7 @@ import { LibraryWorkspace } from './LibraryWorkspace'
 import { libraryApi } from './api'
 vi.mock('@/shared/runtime', () => ({ desktopAvailable: true }))
 vi.mock('@tauri-apps/api/event', () => ({ listen: vi.fn().mockResolvedValue(() => {}) }))
-vi.mock('./api', async original => ({ ...await original<typeof import('./api')>(), libraryApi: { history: vi.fn(), version: vi.fn(), mark: vi.fn(), restore: vi.fn(), recoveries: vi.fn().mockResolvedValue([]), recovery: vi.fn().mockResolvedValue(null), begin: vi.fn(), end: vi.fn().mockResolvedValue(undefined), list: vi.fn(), query: vi.fn(async(query:{offset:number})=>{const rows=await libraryApi.list(query.offset);return {items:(rows??[]).map(item=>({...item,kind:'text',tags:[],hasImages:false,matchField:null})),total:rows?.length??0,nextOffset:null,days:[],tags:[]}}), preview:vi.fn(), read: vi.fn(), create: vi.fn(), save: vi.fn(), tag: vi.fn(), exit: vi.fn(), export: vi.fn() } }))
+vi.mock('./api', async original => ({ ...await original<typeof import('./api')>(), libraryApi: { trashImpact:vi.fn(),trashMove:vi.fn(),trashStatus:vi.fn(), history: vi.fn(), version: vi.fn(), mark: vi.fn(), restore: vi.fn(), recoveries: vi.fn().mockResolvedValue([]), recovery: vi.fn().mockResolvedValue(null), begin: vi.fn(), end: vi.fn().mockResolvedValue(undefined), list: vi.fn(), query: vi.fn(async(query:{offset:number})=>{const rows=await libraryApi.list(query.offset);return {items:(rows??[]).map(item=>({...item,kind:'text',tags:[],hasImages:false,matchField:null})),total:rows?.length??0,nextOffset:null,days:[],tags:[]}}), preview:vi.fn(), read: vi.fn(), create: vi.fn(), save: vi.fn(), tag: vi.fn(), exit: vi.fn(), export: vi.fn() } }))
 it('guards navigation on failure and discards only after explicit choice', async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
   HTMLDialogElement.prototype.showModal = function () { this.open = true }
@@ -163,7 +163,7 @@ it('keeps an unsaved editor when filters hide its record and still guards openin
  try{
   await act(async()=>root.render(<LibraryWorkspace/>));await act(async()=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes('筛选原记录'))!.click())
   const set=(label:string,value:string)=>{const node=host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(node,value);node.dispatchEvent(new Event('input',{bubbles:true}))}
-  await act(async()=>set('记录标题','筛选后仍保留的修改'));await act(async()=>set('搜索记录','其他'));await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})))
+  await act(async()=>set('记录标题','筛选后仍保留的修改'));await act(async()=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='删除记录')!.click());expect(libraryApi.trashImpact).not.toHaveBeenCalled();expect(host.textContent).toContain('当前修改尚未保存');await act(async()=>set('搜索记录','其他'));await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})))
   expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.value).toBe('筛选后仍保留的修改');expect(libraryApi.end).not.toHaveBeenCalled()
   await act(async()=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes('新的搜索结果'))!.click())
   expect(host.querySelector('dialog')!.textContent).toContain('有尚未保存');expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.value).toBe('筛选后仍保留的修改')

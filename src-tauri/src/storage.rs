@@ -11,7 +11,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 
 pub type StorageResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
-const SCHEMA_VERSION: i64 = 9;
+const SCHEMA_VERSION: i64 = 10;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -69,14 +69,13 @@ impl DatabaseWorker {
                     if std::time::Instant::now() >= next_cleanup {
                         if crate::records::now()
                             .and_then(|time| {
+                                crate::trash::cleanup(&mut connection, &root, time)?;
                                 crate::history::prune(&mut connection, time)?;
                                 crate::attachments::cleanup(&mut connection, &root, time)
                             })
                             .is_err()
                         {
-                            eprintln!(
-                                "历史保留清理未完成；历史面板将重试并显示失败，未绕过保护规则"
-                            );
+                            eprintln!("资料保留清理未完成；回收站及历史面板可重试，未绕过保护规则");
                         }
                         next_cleanup = std::time::Instant::now() + Duration::from_secs(3600);
                     }
@@ -169,6 +168,7 @@ fn initialize(root: &Path) -> StorageResult<Connection> {
             7 => include_str!("../migrations/007_attachments.sql"),
             8 => include_str!("../migrations/008_inline_images.sql"),
             9 => include_str!("../migrations/009_library_query.sql"),
+            10 => include_str!("../migrations/010_record_trash.sql"),
             _ => unreachable!(),
         };
         let transaction = connection.transaction()?;

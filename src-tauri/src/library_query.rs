@@ -55,6 +55,14 @@ pub struct ContentPreview {
     pub kind: String,
     pub document: Option<Value>,
     pub messages: Vec<String>,
+    pub sources: Vec<SourceStatus>,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SourceStatus {
+    pub id: String,
+    pub title: Option<String>,
+    pub unavailable: bool,
 }
 const BASE:&str="WITH base AS (SELECT r.*,COALESCE(r.working_text,v.searchable_text,'') AS body,
 COALESCE((SELECT group_concat(j.atom,char(10)) FROM conversation_messages m,json_tree(m.content_json) j WHERE m.record_id=r.id AND j.key='text' AND j.type='text'),'') AS messages,
@@ -162,7 +170,9 @@ impl DatabaseWorker {
       let json=stmt.query_map([&id],|r|r.get::<_,String>(0))?.collect::<Result<Vec<_>,_>>()?;
       fn text(v:&Value,out:&mut Vec<String>){if let Some(t)=v.get("text").and_then(Value::as_str){out.push(t.into());}match v {Value::Array(a)=>for v in a{text(v,out)},Value::Object(o)=>for (k,v) in o{if k!="text"{text(v,out)}},_=>{}}}
       let messages=json.iter().map(|s|{let v:Value=serde_json::from_str(s)?;let mut out=vec![];text(&v,&mut out);Ok(out.join("\n"))}).collect::<StorageResult<Vec<_>>>()?;
-      Ok(ContentPreview{id,title:row.0,record_date:row.1,kind:row.2,document:row.3.map(|s|serde_json::from_str(&s)).transpose()?,messages})
+      let mut stmt=db.prepare("SELECT COALESCE(x.source_id,x.unavailable_source_id,x.id),CASE WHEN r.deleted_at IS NULL THEN r.title ELSE NULL END,(x.source_deleted=1 OR r.id IS NULL OR r.deleted_at IS NOT NULL) FROM record_relations x LEFT JOIN records r ON r.id=x.source_id WHERE x.owner_id=?1 ORDER BY x.id")?;
+      let sources=stmt.query_map([&id],|r|Ok(SourceStatus{id:r.get(0)?,title:r.get(1)?,unavailable:r.get(2)?}))?.collect::<Result<Vec<_>,_>>()?;
+      Ok(ContentPreview{id,title:row.0,record_date:row.1,kind:row.2,document:row.3.map(|s|serde_json::from_str(&s)).transpose()?,messages,sources})
     })
     }
 }
