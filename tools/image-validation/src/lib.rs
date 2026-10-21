@@ -56,9 +56,9 @@ pub fn validate(bytes: &[u8]) -> Result<(ImageFormat, u32, u32), String> {
 }
 
 pub fn clipboard_rgba(bytes: &[u8]) -> Result<(Vec<u8>, u32, u32), String> {
-    let (_, image)=decode(bytes)?;
-    let (width,height)=(image.width(),image.height());
-    Ok((image.into_rgba8().into_raw(),width,height))
+    let (_, image) = decode(bytes)?;
+    let (width, height) = (image.width(), image.height());
+    Ok((image.into_rgba8().into_raw(), width, height))
 }
 
 pub struct PreparedImage {
@@ -123,8 +123,8 @@ mod preview_tests {
     #[test]
     fn preview_applies_exif_orientation_without_changing_original_bytes() {
         let bytes = include_bytes!("../fixtures/oriented.jpg");
-        let (rgba,width,height)=clipboard_rgba(bytes).unwrap();
-        assert_eq!((width,height,rgba.len()),(6,8,6*8*4));
+        let (rgba, width, height) = clipboard_rgba(bytes).unwrap();
+        assert_eq!((width, height, rgba.len()), (6, 8, 6 * 8 * 4));
         let prepared = prepare(bytes).unwrap();
         assert_eq!((prepared.width, prepared.height), (6, 8));
         let preview = image::load_from_memory(&prepared.preview).unwrap();
