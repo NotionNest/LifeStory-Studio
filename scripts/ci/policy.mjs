@@ -6,7 +6,7 @@ const skip = /\[(?:skip ci|ci skip|no ci|skip actions|actions skip)\]/i
 
 export function route(base, head) {
   if (base === 'main') return /^(release\/\d+\.\d+\.\d+|hotfix\/.+)$/.test(head)
-  if (base === 'develop') return head === 'main' || /^(feat|fix|docs|chore)\/.+/.test(head)
+  if (base === 'develop') return head === 'main' || /^(feat|fix|docs|chore|codex)\/.+/.test(head)
   return /^release\/\d+\.\d+\.\d+$/.test(base) && (head === 'main' || /^(fix|chore)\/.+/.test(head))
 }
 
