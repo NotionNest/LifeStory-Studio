@@ -1,9 +1,12 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { JSONContent } from '@tiptap/react'
 export interface Tag { id: string; name: string }
+export interface Attachment { id: string; name: string; mediaType: string; byteLength: number; width: number; height: number }
+export interface AttachmentOperation { recordId: string; sessionId: string; expectedContentVersion: number; requestId: string }
+export interface ImportReport { recordId: string; messages: string[]; retry: File[] }
 export interface RecordFile {
   id: string; title: string | null; recordDate: string; createdTimezone: string
-  createdAt: number; updatedAt: number; contentVersion: number; checkpointId: string; document: JSONContent; tags: Tag[]
+  createdAt: number; updatedAt: number; contentVersion: number; checkpointId: string; document: JSONContent; tags: Tag[]; attachments?: Attachment[]
 }
 export interface RecordSummary { id: string; title: string | null; recordDate: string; excerpt: string }
 export interface SaveInput {
@@ -26,7 +29,19 @@ export interface HistorySnapshot { document: JSONContent; title: string | null; 
 export interface HistoryVersion { summary: HistorySummary; document: JSONContent; snapshot: HistorySnapshot | null }
 export interface HistoryPage { items: HistorySummary[]; nextBefore: HistoryCursor | null }
 export interface RestoreHistory { recordId: string; revisionId: string; expectedContentVersion: number; sessionId: string; requestId: string }
+export const MAX_IMAGE_BYTES = 25 * 1024 * 1024
 export const libraryApi = {
+  importImage: async (operation: AttachmentOperation, file: File, document: object) => {
+    if (file.size > MAX_IMAGE_BYTES) throw { code: 'validation', message: '图片超过 25 MiB' }
+    const bytes = new Uint8Array(await file.slice(0, MAX_IMAGE_BYTES + 1).arrayBuffer())
+    const metadata = new TextEncoder().encode(JSON.stringify({operation,name:file.name,document}))
+    if(metadata.length>3*1024*1024) throw {code:'validation',message:'正文超过支持范围'}
+    const packet=new Uint8Array(4+metadata.length+bytes.length)
+    new DataView(packet.buffer).setUint32(0,metadata.length,true);packet.set(metadata,4);packet.set(bytes,4+metadata.length)
+    return invoke<{ editing: EditingSession; attachmentId: string }>('attachment_import', packet)
+  },
+  image: (recordId: string, attachmentId: string, revisionId: string | null = null, original = false) => invoke<ArrayBuffer>('attachment_image', { recordId, attachmentId, revisionId, original }),
+  copyImage: (recordId: string, attachmentId: string, revisionId: string | null) => invoke<void>('attachment_copy', {recordId,attachmentId,revisionId}),
   history: (recordId: string, before: HistoryCursor | null = null) => invoke<HistoryPage>('history_list', { recordId, before }),
   version: (recordId: string, revisionId: string) => invoke<HistoryVersion>('history_read', { recordId, revisionId }),
   mark: (recordId: string, revisionId: string, important: boolean) => invoke<void>('history_mark', { recordId, revisionId, important }),

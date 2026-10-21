@@ -121,10 +121,15 @@ fn validate(db: &Connection, input: &SaveRecord) -> StorageResult<()> {
         .is_some_and(|s| s.chars().count() > 240)
         || input.record_date.len() > 10
         || input.tag_ids.len() > 50
-        || !input.attachment_ids.is_empty()
     {
         return Err(fail("validation", "恢复草稿的字段超过支持范围"));
     }
+    crate::attachments::validate_current(
+        db,
+        &input.record_id,
+        &input.document,
+        &input.attachment_ids,
+    )?;
     for tag in &input.tag_ids {
         if db
             .query_row("SELECT 1 FROM tags WHERE id=?1", [tag], |r| {
@@ -146,14 +151,20 @@ fn put_draft(db: &Connection, input: &SaveRecord) -> StorageResult<()> {
 }
 // A history snapshot is made only when entering an editing session, never by autosave.
 pub(crate) fn checkpoint_on_entry(db: &Connection, record: &Record) -> StorageResult<()> {
-    let snapshot = serde_json::json!({"document":record.document,"title":record.title,"recordDate":record.record_date,"tags":record.tags});
+    let snapshot = serde_json::json!({"document":record.document,"title":record.title,"recordDate":record.record_date,"tags":record.tags,"attachmentIds":record.attachments.iter().map(|a|a.id.as_str()).collect::<Vec<_>>()});
     let previous: Option<String> = db.query_row(
         "SELECT snapshot_json FROM record_revisions WHERE id=?1",
         [&record.revision_id],
         |r| r.get(0),
     )?;
     if let Some(previous) = previous {
-        if serde_json::from_str::<serde_json::Value>(&previous)? == snapshot {
+        let mut previous: serde_json::Value = serde_json::from_str(&previous)?;
+        if let Some(object) = previous.as_object_mut() {
+            object
+                .entry("attachmentIds")
+                .or_insert(serde_json::json!([]));
+        }
+        if previous == snapshot {
             return Ok(());
         }
     } else {
@@ -166,6 +177,7 @@ pub(crate) fn checkpoint_on_entry(db: &Connection, record: &Record) -> StorageRe
             && record.content_version == 0
             && record.title.is_none()
             && record.tags.is_empty()
+            && record.attachments.is_empty()
             && document_text(&record.document)?.is_empty()
         {
             return Ok(());
@@ -173,6 +185,16 @@ pub(crate) fn checkpoint_on_entry(db: &Connection, record: &Record) -> StorageRe
     }
     let checkpoint = id(db)?;
     db.execute("INSERT INTO record_revisions(id,record_id,document_json,searchable_text,created_at,request_id,snapshot_json,checkpoint_kind) VALUES(?1,?2,?3,?4,?5,?6,?7,'editing_entry')",params![checkpoint,record.id,serde_json::to_string(&record.document)?,document_text(&record.document)?,now()?,format!("checkpoint:{checkpoint}"),serde_json::to_string(&snapshot)?])?;
+    crate::attachments::link_snapshot(
+        db,
+        &record.id,
+        &checkpoint,
+        &record
+            .attachments
+            .iter()
+            .map(|a| a.id.clone())
+            .collect::<Vec<_>>(),
+    )?;
     db.execute(
         "UPDATE records SET current_revision_id=?1 WHERE id=?2",
         params![checkpoint, record.id],

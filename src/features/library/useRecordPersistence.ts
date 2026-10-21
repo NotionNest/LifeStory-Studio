@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Editor } from '@tiptap/react'
-import { libraryApi, errorMessage, type RecordFile, type SaveInput } from './api'
+import { libraryApi, errorMessage, type RecordFile, type SaveInput, type EditingSession } from './api'
+import { imageIds } from './imageDocument'
 export type FlushResult = 'saved' | 'failed'
 interface Options {
   record: RecordFile; sessionId: string; recovered?: SaveInput | null; editor: Editor | null
@@ -12,6 +13,7 @@ export function useRecordPersistence(options: Options) {
   const [status, setStatus] = useState(options.recovered ? '正在保存恢复内容…' : options.record.recordDate ? '已保存到本机' : '已保存到本机 · 日期待补充')
   const [error, setError] = useState(''), [busy, setBusy] = useState(false)
   const sequence = useRef(options.recovered ? 1 : 0), saved = useRef(0)
+  const session = useRef(options.sessionId)
   const version = useRef(options.record.contentVersion), checkpoint = useRef(options.record.checkpointId)
   const pending = useRef<SaveInput | null>(null), inFlight = useRef<Promise<boolean> | null>(null)
   const mounted = useRef(true), composing = useRef(false), failed = useRef(false)
@@ -21,9 +23,9 @@ export function useRecordPersistence(options: Options) {
   const actions = useRef({ save: async () => false })
   const clear = () => { clearTimeout(idle.current); clearTimeout(maximum.current); idle.current = undefined; maximum.current = undefined }
   const snapshot = (): SaveInput => ({
-    ...latest.current.content(), recordId: options.record.id, sessionId: options.sessionId,
+    ...latest.current.content(), recordId: options.record.id, sessionId: session.current,
     baseContentVersion: version.current, baseCheckpointId: checkpoint.current,
-    editSequence: sequence.current, requestId: crypto.randomUUID(), attachmentIds: [],
+    editSequence: sequence.current, requestId: crypto.randomUUID(), attachmentIds: imageIds(latest.current.content().document),
   })
   const clearRetry = () => { clearTimeout(retry.current); retry.current = undefined }
   const schedule = () => {
@@ -111,7 +113,7 @@ export function useRecordPersistence(options: Options) {
   }
   const discard = async () => {
     clear(); clearRetry(); failed.current = true
-    try { await libraryApi.end(options.record.id, options.sessionId); return true }
+    try { await libraryApi.end(options.record.id, session.current); return true }
     catch (cause) { setError(errorMessage(cause)); latest.current.onFailure(errorMessage(cause)); return false }
   }
   const compositionStart = () => { composing.current = true; clear() }
@@ -123,5 +125,11 @@ export function useRecordPersistence(options: Options) {
     return () => { mounted.current = false; clear(); clearRetry(); window.removeEventListener('keydown', key) }
   }, [])
   useEffect(() => { if (options.editor && options.recovered) { latest.current.onDirty(true); schedule() } }, [options.editor])
-  return { waitForComposition, status, error, busy, changed, save, flush, discard, snapshot, compositionStart, compositionEnd }
+  const acceptImage = (editing: EditingSession) => {
+    clear(); clearRetry(); pending.current=null;
+    session.current=editing.sessionId; version.current=editing.record.contentVersion; checkpoint.current=editing.record.checkpointId;
+    saved.current=sequence.current; failed.current=false; failureKind.current=''; retryAt.current=0;
+    setStatus('已保存到本机'); latest.current.onDirty(false); latest.current.onSaved();
+  }
+  return { acceptImage, waitForComposition, status, error, busy, changed, save, flush, discard, snapshot, compositionStart, compositionEnd }
 }

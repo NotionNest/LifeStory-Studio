@@ -243,3 +243,69 @@ pub async fn history_restore(
 ) -> Result<EditingSession, RecordError> {
     record_task(&database, move |db| db.history_restore(input)).await
 }
+
+use crate::attachments::{ImportImage, ImportedAttachment};
+#[tauri::command]
+pub async fn attachment_import(
+    database: State<'_, DatabaseWorker>,
+    request: tauri::ipc::Request<'_>,
+) -> Result<ImportedAttachment, RecordError> {
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err(RecordError {
+            code: "validation",
+            message: "图片必须使用二进制传输".into(),
+        });
+    };
+    let invalid = || RecordError {
+        code: "validation",
+        message: "图片导入数据无效或超过限制".into(),
+    };
+    if bytes.len() < 4 || bytes.len() > lifestory_image_validation::MAX_BYTES + 3 * 1024 * 1024 + 4
+    {
+        return Err(invalid());
+    }
+    let length = u32::from_le_bytes(bytes[..4].try_into().map_err(|_| invalid())?) as usize;
+    if length > 3 * 1024 * 1024 || length > bytes.len() - 4 {
+        return Err(invalid());
+    }
+    let input: ImportImage =
+        serde_json::from_slice(&bytes[4..4 + length]).map_err(|_| invalid())?;
+    let bytes = bytes[4 + length..].to_vec();
+    record_task(&database, move |db| db.import_image(input, bytes)).await
+}
+#[tauri::command]
+pub async fn attachment_image(
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+    attachment_id: String,
+    revision_id: Option<String>,
+    original: bool,
+) -> Result<tauri::ipc::Response, RecordError> {
+    record_task(&database, move |db| {
+        db.attachment_bytes(record_id, attachment_id, revision_id, original)
+    })
+    .await
+    .map(tauri::ipc::Response::new)
+}
+#[tauri::command]
+pub async fn attachment_copy(
+    app: tauri::AppHandle,
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+    attachment_id: String,
+    revision_id: Option<String>,
+) -> Result<(), RecordError> {
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+    let (rgba, width, height) = record_task(&database, move |db| {
+        let bytes = db.attachment_bytes(record_id, attachment_id, revision_id, true)?;
+        lifestory_image_validation::clipboard_rgba(&bytes)
+            .map_err(|message| crate::records::fail("corrupt_content", &message))
+    })
+    .await?;
+    app.clipboard()
+        .write_image(&tauri::image::Image::new_owned(rgba, width, height))
+        .map_err(|e| RecordError {
+            code: "clipboard",
+            message: format!("图片复制失败：{e}"),
+        })
+}

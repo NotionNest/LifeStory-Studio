@@ -136,6 +136,8 @@ pub struct Record {
     pub content_version: i64,
     pub document: Value,
     pub tags: Vec<Tag>,
+    #[serde(default)]
+    pub attachments: Vec<crate::attachments::Attachment>,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -189,6 +191,7 @@ pub(crate) fn load(db: &Connection, record_id: &str) -> StorageResult<Record> {
         updated_at,
         revision_id,
         content_version,
+        attachments: crate::attachments::list(db, record_id)?,
         document: serde_json::from_str(&json)
             .map_err(|_| fail("corrupt_content", "记录正文无法读取，未改动资料"))?,
         tags,
@@ -229,6 +232,7 @@ pub(crate) fn document_text(document: &Value) -> StorageResult<String> {
                 | "orderedList"
                 | "codeBlock"
                 | "horizontalRule"
+                | "attachmentImage"
         );
         let allowed = match parent {
             "" => kind == "doc",
@@ -255,7 +259,9 @@ pub(crate) fn document_text(document: &Value) -> StorageResult<String> {
         {
             return Err(fail("validation", "列表项必须以段落开始"));
         }
-        if matches!(kind, "hardBreak" | "horizontalRule") && obj.contains_key("content") {
+        if matches!(kind, "hardBreak" | "horizontalRule" | "attachmentImage")
+            && obj.contains_key("content")
+        {
             return Err(fail("validation", "叶节点不能有子内容"));
         }
         if !allowed
@@ -271,6 +277,9 @@ pub(crate) fn document_text(document: &Value) -> StorageResult<String> {
                 .ok_or_else(|| fail("validation", "正文属性无效"))?;
             for (key, v) in attrs {
                 let valid = match (kind, key.as_str()) {
+                    ("attachmentImage", "attachmentId") => {
+                        v.as_str().is_some_and(|s| identifier(s).is_ok())
+                    }
                     ("heading", "level") => v.as_i64().is_some_and(|n| (1..=6).contains(&n)),
                     ("orderedList", "type") => {
                         v.is_null()
@@ -299,10 +308,9 @@ pub(crate) fn document_text(document: &Value) -> StorageResult<String> {
                     .as_object()
                     .ok_or_else(|| fail("validation", "正文标记无效"))?;
                 let ty = m.get("type").and_then(Value::as_str).unwrap_or("");
-                if !matches!(ty, "bold" | "italic" | "strike" | "code" | "underline")
-                    || m.keys().any(|k| k != "type")
-                    || kind != "text"
-                {
+                let formatting = matches!(ty, "bold" | "italic" | "strike" | "code" | "underline")
+                    && m.keys().all(|k| k == "type");
+                if kind != "text" || !formatting {
                     return Err(fail("validation", "正文含不支持的文本标记"));
                 }
             }
@@ -411,11 +419,11 @@ impl DatabaseWorker {
         self.call(move|db,_| {
             identifier(&input.record_id)?; identifier(&input.request_id)?; identifier(&input.session_id)?; if !input.record_date.is_empty() { date(&input.record_date)?; }
             if input.title.as_ref().is_some_and(|s|s.chars().count()>240||s.contains(['\n','\r'])) || input.tag_ids.len()>50 {return Err(fail("validation","标题或标签数量超过限制"));}
-            if !input.attachment_ids.is_empty() {return Err(fail("validation","附件写入尚未开放"));}
             let text=document_text(&input.document)?;
             let request_json=serde_json::to_string(&input)?;
             let tx=db.transaction()?;
             let current=load(&tx,&input.record_id)?;
+            crate::attachments::validate_current(&tx,&input.record_id,&input.document,&input.attachment_ids)?;
             let active: Option<(String,u32)> = tx.query_row("SELECT session_id,saved_sequence FROM edit_sessions WHERE record_id=?1",[&input.record_id],|r|Ok((r.get(0)?,r.get(1)?))).optional()?;
             let Some((active_session,saved_sequence)) = active else { return Err(fail("conflict","编辑会话已结束，请重新打开记录")); };
             if active_session != input.session_id { return Err(fail("conflict","记录已在其他会话中打开，当前修改仍保留")); }
@@ -435,7 +443,11 @@ impl DatabaseWorker {
             let document_changed=current.document!=input.document;
             let unchanged=!document_changed && current.title.as_deref()==title && current.record_date==input.record_date && old_tags==tags;
             let timestamp=if unchanged {current.updated_at} else {now()?};
-            let revision=current.revision_id;
+            if current.attachments.iter().any(|a|!input.attachment_ids.contains(&a.id)) {
+                crate::recovery::checkpoint_on_entry(&tx,&current)?;
+            }
+            let revision=load(&tx,&input.record_id)?.revision_id;
+            crate::attachments::restore_links(&tx,&input.record_id,&input.attachment_ids)?;
             let content_version=current.content_version+i64::from(!unchanged);
             if !unchanged {
                 tx.execute("UPDATE records SET title=?1,record_date=CASE WHEN ?2='' THEN record_date ELSE ?2 END,pending_date=CASE WHEN ?2='' THEN '' ELSE NULL END,updated_at=?3,content_version=?4 WHERE id=?5",params![title,input.record_date,timestamp,content_version,input.record_id])?;
@@ -454,6 +466,7 @@ impl DatabaseWorker {
             let result=SaveResult{record_id:input.record_id.clone(),revision_id:revision.clone(),content_version,request_id:input.request_id.clone(),session_id:input.session_id.clone(),edit_sequence:input.edit_sequence,saved_at:timestamp};
             // Only the newest request can be uncertain in this serialized editor pipeline.
             tx.execute("DELETE FROM record_save_receipts WHERE record_id=?1",[&input.record_id])?;
+            tx.execute("DELETE FROM attachment_receipts WHERE record_id=?1",[&input.record_id])?;
             tx.execute("INSERT INTO record_save_receipts VALUES (?1,?2,?3,?4,?5)",params![input.request_id,input.record_id,revision,request_json,serde_json::to_string(&result)?])?;
             tx.execute("UPDATE edit_sessions SET saved_sequence=?1 WHERE record_id=?2 AND session_id=?3",params![input.edit_sequence,input.record_id,input.session_id])?;
             tx.execute("DELETE FROM recovery_drafts WHERE record_id=?1 AND session_id=?2 AND edit_sequence<=?3",params![input.record_id,input.session_id,input.edit_sequence])?;
