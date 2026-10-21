@@ -13,7 +13,7 @@ export type RecordKind = 'text' | 'conversation' | 'draft'
 export interface LibraryQuery { keyword: string; dateFrom: string | null; dateTo: string | null; kinds: RecordKind[]; tagIds: string[]; tagMode: 'all' | 'any'; hasImages: boolean | null; month: string | null; offset: number }
 export interface SearchItem extends RecordSummary {kind:RecordKind; tags:Tag[];hasImages:boolean;matchField:'title'|'body'|'message'|null}
 export interface QueryPage {items:SearchItem[];total:number;nextOffset:number|null;days:{date:string;count:number}[];tags:Tag[]}
-export interface ContentPreview {id:string;title:string|null;recordDate:string;kind:RecordKind;document:JSONContent|null;messages:string[]}
+export interface ContentPreview {id:string;title:string|null;recordDate:string;kind:RecordKind;document:JSONContent|null;messages:string[];sources?:{id:string;title:string|null;unavailable:boolean}[]}
 export interface SaveInput {
   recordId: string; baseCheckpointId: string; baseContentVersion: number; requestId: string; sessionId: string; editSequence: number
   title: string | null; recordDate: string; tagIds: string[]; document: JSONContent; attachmentIds: string[]
@@ -34,8 +34,17 @@ export interface HistorySnapshot { document: JSONContent; title: string | null; 
 export interface HistoryVersion { summary: HistorySummary; document: JSONContent; snapshot: HistorySnapshot | null }
 export interface HistoryPage { items: HistorySummary[]; nextBefore: HistoryCursor | null }
 export interface RestoreHistory { recordId: string; revisionId: string; expectedContentVersion: number; sessionId: string; requestId: string }
+export interface DeleteImpact {recordId:string;title:string|null;contentVersion:number;impactToken:string;references:{id:string;title:string|null;kind:RecordKind}[]}
+export interface TrashItem {id:string;title:string|null;kind:RecordKind;recordDate:string;deletedAt:number;purgeAt:number}
+export interface TrashPage {items:TrashItem[];nextOffset:number|null;cleanupError:string|null}
 export const MAX_IMAGE_BYTES = 25 * 1024 * 1024
 export const libraryApi = {
+  trashStatus:(recordId:string)=>invoke<'active'|'trash'|'missing'>('trash_status',{recordId}),
+  trashImpact:(recordId:string)=>invoke<DeleteImpact>('trash_impact',{recordId}),
+  trashMove:(impact:DeleteImpact)=>invoke<void>('trash_move',{input:{recordId:impact.recordId,expectedContentVersion:impact.contentVersion,expectedImpact:impact.impactToken}}),
+  trashList:(offset=0)=>invoke<TrashPage>('trash_list',{offset}),
+  trashRestore:(item:TrashItem)=>invoke<void>('trash_restore',{recordId:item.id,deletedAt:item.deletedAt}),
+  trashPurge:(item:TrashItem)=>invoke<void>('trash_purge',{recordId:item.id,deletedAt:item.deletedAt}),
   query: (query: LibraryQuery) => invoke<QueryPage>('library_query', {query}),
   preview: (recordId:string) => invoke<ContentPreview>('library_preview',{recordId}),
   importImage: async (operation: AttachmentOperation, file: File, document: object) => {

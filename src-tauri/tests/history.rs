@@ -235,7 +235,7 @@ fn ordinary_expiry_protects_current_important_references_drafts_and_cascades_rec
         [],
     )
     .unwrap();
-    sql.execute("INSERT INTO record_relations VALUES('entry','entry','related','draft_source','relation',0)",[]).unwrap();
+    sql.execute("INSERT INTO record_relations(owner_id,source_id,source_revision_id,relation_kind,id,source_deleted) VALUES('entry','entry','related','draft_source','relation',0)",[]).unwrap();
     sql.execute(
         "INSERT INTO recovery_drafts VALUES('entry','draft','session',1,'{}',0)",
         [],
