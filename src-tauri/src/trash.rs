@@ -32,7 +32,7 @@ pub struct Reference {
     pub title: Option<String>,
     pub kind: String,
 }
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct TrashRequest {
     pub record_id: String,
@@ -47,7 +47,7 @@ pub struct TrashPage {
     pub cleanup_error: Option<String>,
 }
 fn impact_token(db: &Connection, id: &str) -> StorageResult<String> {
-    let mut stmt=db.prepare("SELECT x.id,r.id,r.title,r.kind FROM record_relations x JOIN records r ON r.id=x.owner_id WHERE x.source_id=?1 ORDER BY x.id")?;
+    let mut stmt=db.prepare("SELECT x.id,r.id,r.title,r.kind FROM record_relations x JOIN records r ON r.id=x.owner_id WHERE x.source_id=?1 UNION ALL SELECT 'task:'||t.id,r.id,r.title,r.kind FROM ai_task_sources x JOIN ai_tasks t ON t.id=x.task_id JOIN records r ON r.id=t.record_id WHERE x.source_id=?1 ORDER BY 1")?;
     let rows = stmt
         .query_map([id], |r| {
             Ok((
@@ -62,6 +62,7 @@ fn impact_token(db: &Connection, id: &str) -> StorageResult<String> {
     Ok(format!("{:x}", Sha256::digest(serde_json::to_vec(&rows)?)))
 }
 fn purge_record(db: &Connection, id: &str) -> StorageResult<()> {
+    crate::ai::invalidate_source(db, id)?;
     db.execute("UPDATE record_relations SET unavailable_source_id=source_id,source_id=NULL,source_revision_id=NULL,source_deleted=1 WHERE source_id=?1",[id])?;
     // Remove reverse references before versions/links: some legacy foreign keys do not cascade.
     db.execute("DELETE FROM record_relations WHERE owner_id=?1", [id])?;
@@ -90,6 +91,23 @@ pub(crate) fn cleanup(db: &mut Connection, root: &Path, time: i64) -> StorageRes
     crate::attachments::cleanup(db, root, time)
 }
 impl DatabaseWorker {
+    pub fn trash_fence(
+        &self,
+        mut input: TrashRequest,
+    ) -> StorageResult<(TrashRequest, Vec<String>)> {
+        identifier(&input.record_id)?;
+        self.call(move|db,_|{
+        let tx=db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let version:Option<i64>=tx.query_row("SELECT content_version FROM records WHERE id=?1 AND deleted_at IS NULL",[&input.record_id],|r|r.get(0)).optional()?;
+        if version!=Some(input.expected_content_version)||impact_token(&tx,&input.record_id)?!=input.expected_impact{return Err(fail("conflict","内容或引用影响已变化，请重新核对删除影响"))}
+        let tasks={let mut stmt=tx.prepare("SELECT id FROM ai_tasks WHERE record_id=?1 OR id IN(SELECT task_id FROM ai_task_sources WHERE source_id=?1)")?;stmt.query_map([&input.record_id],|r|r.get::<_,String>(0))?.collect::<Result<Vec<_>,_>>()?};
+        tx.execute("INSERT OR IGNORE INTO ai_source_blocks VALUES(?1)",[&input.record_id])?;
+        crate::ai::invalidate_source(&tx,&input.record_id)?;
+        input.expected_impact=impact_token(&tx,&input.record_id)?;
+        tx.commit()?;Ok((input,tasks))
+    })
+    }
+
     pub fn trash_status(&self, id: String) -> StorageResult<String> {
         identifier(&id)?;
         self.call(move |db, _| {
@@ -112,7 +130,7 @@ impl DatabaseWorker {
         self.call(move|db,_|{
   let tx=db.transaction()?;
   let (title,content_version)=tx.query_row("SELECT title,content_version FROM records WHERE id=?1 AND deleted_at IS NULL",[&id],|r|Ok((r.get(0)?,r.get(1)?))).optional()?.ok_or_else(||fail("not_found","记录不存在或已移入回收站"))?;
-  let mut stmt=tx.prepare("SELECT DISTINCT r.id,r.title,r.kind FROM record_relations x JOIN records r ON r.id=x.owner_id WHERE x.source_id=?1 ORDER BY r.id")?;
+  let mut stmt=tx.prepare("SELECT DISTINCT r.id,r.title,r.kind FROM record_relations x JOIN records r ON r.id=x.owner_id WHERE x.source_id=?1 UNION SELECT r.id,r.title,r.kind FROM ai_task_sources x JOIN ai_tasks t ON t.id=x.task_id JOIN records r ON r.id=t.record_id WHERE x.source_id=?1 ORDER BY 1")?;
   let references=stmt.query_map([&id],|r|Ok(Reference{id:r.get(0)?,title:r.get(1)?,kind:r.get(2)?}))?.collect::<Result<Vec<_>,_>>()?;
   let impact_token=impact_token(&tx,&id)?;
   Ok(Impact{record_id:id,title,content_version,references,impact_token})
@@ -125,6 +143,8 @@ impl DatabaseWorker {
   if impact_token(&tx,&input.record_id)?!=input.expected_impact{return Err(fail("conflict","引用影响已变化，请重新核对后删除"));}
   let changed=tx.execute("UPDATE records SET deleted_at=?1,purge_at=?2,content_version=content_version+1,updated_at=?1 WHERE id=?3 AND deleted_at IS NULL AND content_version=?4",params![time,time+RETENTION_MS,input.record_id,input.expected_content_version])?;
   if changed!=1{return Err(fail("conflict","内容或删除状态已变化，请重新核对删除影响"));}
+  crate::ai::invalidate_source(&tx,&input.record_id)?;
+  tx.execute("DELETE FROM ai_source_blocks WHERE source_id=?1",[&input.record_id])?;
   tx.execute("DELETE FROM edit_sessions WHERE record_id=?1",[&input.record_id])?;
   // An old uncertain save/import/restore cannot replay a stale success after deletion.
   for table in ["record_save_receipts","history_restore_receipts","attachment_receipts"]{tx.execute(&format!("DELETE FROM {table} WHERE record_id=?1"),[&input.record_id])?;}
@@ -132,10 +152,16 @@ impl DatabaseWorker {
  })
     }
     pub fn trash_list(&self, offset: u32) -> StorageResult<TrashPage> {
+        self.trash_list_domain(offset, "diary".into())
+    }
+    pub fn trash_list_domain(&self, offset: u32, domain: String) -> StorageResult<TrashPage> {
+        if !["diary", "chat"].contains(&domain.as_str()) {
+            return Err(fail("validation", "回收站领域无效"));
+        }
         self.call(move|db,root|{
   let cleanup_error=cleanup(db,root,now()?).err().map(|_|"清理尚未完成，部分记录或图片仍待处理，请刷新重试。待清理图片保留重试状态。".to_owned());
-  let mut stmt=db.prepare("SELECT id,title,kind,record_date,deleted_at,purge_at FROM records WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC,id LIMIT 101 OFFSET ?1")?;
-  let mut items=stmt.query_map([offset],|r|Ok(TrashItem{id:r.get(0)?,title:r.get(1)?,kind:r.get(2)?,record_date:r.get(3)?,deleted_at:r.get(4)?,purge_at:r.get(5)?}))?.collect::<Result<Vec<_>,_>>()?;
+  let mut stmt=db.prepare("SELECT id,title,kind,record_date,deleted_at,purge_at FROM records WHERE deleted_at IS NOT NULL AND kind=CASE WHEN ?2='chat' THEN 'conversation' ELSE 'text' END ORDER BY deleted_at DESC,id LIMIT 101 OFFSET ?1")?;
+  let mut items=stmt.query_map(params![offset,domain],|r|Ok(TrashItem{id:r.get(0)?,title:r.get(1)?,kind:r.get(2)?,record_date:r.get(3)?,deleted_at:r.get(4)?,purge_at:r.get(5)?}))?.collect::<Result<Vec<_>,_>>()?;
   let next_offset=if items.len()>100{items.pop();Some(offset.saturating_add(100))}else{None};Ok(TrashPage{items,next_offset,cleanup_error})
  })
     }

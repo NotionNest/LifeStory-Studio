@@ -419,7 +419,7 @@ fn schema7_preserves_attachment_only_reference_and_recycled_images() {
         [&third.attachment_id],
     )
     .unwrap();
-    sql.execute_batch("DROP INDEX records_trash_due; ALTER TABLE record_relations DROP COLUMN unavailable_source_id; DROP TRIGGER library_search_insert; DROP TRIGGER library_search_update; DROP TRIGGER library_search_delete; ALTER TABLE attachment_links DROP COLUMN in_body; PRAGMA user_version=7;")
+    sql.execute_batch("DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; DROP TABLE ai_source_blocks; DROP TABLE ai_provider_checks; DROP TABLE ai_task_sources; DROP TABLE ai_tasks; DROP TABLE ai_profiles; DROP INDEX records_trash_due; ALTER TABLE record_relations DROP COLUMN unavailable_source_id; DROP TRIGGER library_search_insert; DROP TRIGGER library_search_update; DROP TRIGGER library_search_delete; ALTER TABLE attachment_links DROP COLUMN in_body; PRAGMA user_version=7;")
         .unwrap();
     drop(sql);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();

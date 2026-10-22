@@ -115,7 +115,7 @@ fn literal_search_tracks_only_current_content_and_deleted_records() {
     );
 }
 #[test]
-fn combined_filters_calendar_and_messages_have_the_same_scope() {
+fn diary_filters_calendar_and_chat_search_keep_separate_scopes() {
     let root = Workspace::new();
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
     add(&db, &root, "a", "2026-10-20", "旅行甲", "旅行记录");
@@ -130,7 +130,7 @@ fn combined_filters_calendar_and_messages_have_the_same_scope() {
     query.date_to = query.date_from.clone();
     let page = db.query_library(query.clone()).unwrap();
     assert_eq!(page.total, 1);
-    assert_eq!(page.days.iter().map(|d| d.count).sum::<u32>(), 3);
+    assert_eq!(page.days.iter().map(|d| d.count).sum::<u32>(), 2);
     query.date_from = None;
     query.date_to = None;
     query.tag_ids = vec!["t1".into(), "t2".into()];
@@ -143,23 +143,25 @@ fn combined_filters_calendar_and_messages_have_the_same_scope() {
     query.has_images = None;
     query.kinds = vec!["conversation".into()];
     let page = db.query_library(query).unwrap();
-    assert_eq!(page.total, 1);
-    assert_eq!(page.items[0].match_field.as_deref(), Some("message"));
-    assert!(page.items[0].excerpt.contains("旅行消息"));
-    assert_eq!(db.query_library(q("不应搜索的身份")).unwrap().total, 0);
-    let preview = db.preview_library_content("c".into()).unwrap();
-    assert_eq!(preview.messages, vec!["旅行消息 命中这段对话"]);
-    sql.execute("UPDATE records SET kind='draft' WHERE id='b'", [])
+    assert_eq!(page.total, 0);
+    assert!(db.preview_library_content("c".into()).is_err());
+    let chats = db
+        .ai_chat_list(lifestory_studio_lib::ai_experience::ChatQuery {
+            keyword: "旅行消息".into(),
+            offset: 0,
+        })
         .unwrap();
-    assert_eq!(
-        db.query_library(LibraryQuery {
-            kinds: vec!["draft".into()],
-            ..Default::default()
+    assert_eq!(chats.items.len(), 1);
+    assert_eq!(chats.items[0].id, "c");
+    assert_eq!(db.query_library(q("不应搜索的身份")).unwrap().total, 0);
+    assert!(
+        db.ai_chat_list(lifestory_studio_lib::ai_experience::ChatQuery {
+            keyword: "不应搜索的身份".into(),
+            offset: 0
         })
         .unwrap()
-        .items[0]
-            .id,
-        "b"
+        .items
+        .is_empty()
     );
 }
 #[test]
@@ -214,7 +216,7 @@ fn paging_validation_and_index_upgrade_do_not_lose_or_repeat_records() {
         assert!(db.query_library(query).is_err());
     }
     drop(db);
-    sql.execute_batch("DROP INDEX records_trash_due; ALTER TABLE record_relations DROP COLUMN unavailable_source_id; DROP TRIGGER library_search_insert;DROP TRIGGER library_search_update;DROP TRIGGER library_search_delete;DELETE FROM record_search;INSERT INTO record_search VALUES('r-000','过期残留');PRAGMA user_version=8;").unwrap();
+    sql.execute_batch("DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; DROP TABLE ai_source_blocks; DROP TABLE ai_provider_checks; DROP TABLE ai_task_sources; DROP TABLE ai_tasks; DROP TABLE ai_profiles; DROP INDEX records_trash_due; ALTER TABLE record_relations DROP COLUMN unavailable_source_id; DROP TRIGGER library_search_insert;DROP TRIGGER library_search_update;DROP TRIGGER library_search_delete;DELETE FROM record_search;INSERT INTO record_search VALUES('r-000','过期残留');PRAGMA user_version=8;").unwrap();
     drop(sql);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
     assert_eq!(db.query_library(q("过期残留")).unwrap().total, 0);

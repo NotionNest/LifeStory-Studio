@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ai-create-conversation"
+description = "Enables the ai_create_conversation command without any pre-configured scope."
+commands.allow = ["ai_create_conversation"]
+
+[[permission]]
+identifier = "deny-ai-create-conversation"
+description = "Denies the ai_create_conversation command without any pre-configured scope."
+commands.deny = ["ai_create_conversation"]

@@ -114,7 +114,7 @@ fn purge_clears_private_rows_and_preserves_independent_draft_with_unavailable_so
     add(&db, "source");
     add(&db, "draft");
     let sql = root.sql();
-    sql.execute("UPDATE records SET title='独立稿件',kind='draft',working_text='独立创作内容' WHERE id='draft'",[]).unwrap();
+    sql.execute("UPDATE records SET title='独立稿件',kind='text',working_text='独立创作内容' WHERE id='draft'",[]).unwrap();
     sql.execute(
         "UPDATE records SET title='原文秘密',working_text='被删除的私密原文' WHERE id='source'",
         [],
@@ -192,7 +192,7 @@ fn purge_clears_private_rows_and_preserves_independent_draft_with_unavailable_so
     let status:(Option<String>,Option<String>,String,i64)=sql.query_row("SELECT source_id,source_revision_id,unavailable_source_id,source_deleted FROM record_relations WHERE id='relation'",[],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).unwrap();
     assert_eq!(status, (None, None, "source".into(), 1));
     assert!(db.preview_library_content("draft".into()).unwrap().sources[0].unavailable);
-    assert!(db.read_record("draft".into()).is_err()); // draft stays readable through its own preview, not the text editor.
+    assert!(db.read_record("draft".into()).is_ok()); // Independent drafts remain editable through the same protected editor.
     assert_eq!(
         db.preview_library_content("draft".into())
             .unwrap()

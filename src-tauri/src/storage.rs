@@ -11,7 +11,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 
 pub type StorageResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
-const SCHEMA_VERSION: i64 = 10;
+const SCHEMA_VERSION: i64 = 15;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -169,6 +169,11 @@ fn initialize(root: &Path) -> StorageResult<Connection> {
             8 => include_str!("../migrations/008_inline_images.sql"),
             9 => include_str!("../migrations/009_library_query.sql"),
             10 => include_str!("../migrations/010_record_trash.sql"),
+            11 => include_str!("../migrations/011_ai_conversations.sql"),
+            12 => include_str!("../migrations/012_ai_source_blocks.sql"),
+            13 => include_str!("../migrations/013_chat_diary_domains.sql"),
+            14 => include_str!("../migrations/014_chat_context.sql"),
+            15 => include_str!("../migrations/015_cli_effective_profiles.sql"),
             _ => unreachable!(),
         };
         let transaction = connection.transaction()?;
@@ -179,6 +184,8 @@ fn initialize(root: &Path) -> StorageResult<Connection> {
         transaction.pragma_update(None, "user_version", target)?;
         transaction.commit()?;
     }
+    connection.execute("DELETE FROM ai_source_blocks", [])?;
+    connection.execute("UPDATE ai_tasks SET status='interrupted',error='应用已退出，任务中断；请核对后主动重试' WHERE status='running'", [])?;
     connection.pragma_update(None, "journal_mode", "WAL")?;
     connection.pragma_update(None, "synchronous", "FULL")?;
     // A temporary table checks the bundled engine without changing user data.

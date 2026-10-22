@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ai-chat-rename"
+description = "Enables the ai_chat_rename command without any pre-configured scope."
+commands.allow = ["ai_chat_rename"]
+
+[[permission]]
+identifier = "deny-ai-chat-rename"
+description = "Denies the ai_chat_rename command without any pre-configured scope."
+commands.deny = ["ai_chat_rename"]

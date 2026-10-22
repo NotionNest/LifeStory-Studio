@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ai-task"
+description = "Enables the ai_task command without any pre-configured scope."
+commands.allow = ["ai_task"]
+
+[[permission]]
+identifier = "deny-ai-task"
+description = "Denies the ai_task command without any pre-configured scope."
+commands.deny = ["ai_task"]

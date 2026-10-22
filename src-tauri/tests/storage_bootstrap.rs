@@ -31,7 +31,7 @@ fn initializes_and_reopens_real_database_without_losing_metadata() {
     let root = Workspace::new();
     let worker = DatabaseWorker::start(root.0.clone()).unwrap();
     let info = worker.inspect().unwrap();
-    assert_eq!(info.schema_version, 10);
+    assert_eq!(info.schema_version, 15);
     assert!(info.fts5_available);
     drop(worker);
 
@@ -45,7 +45,7 @@ fn initializes_and_reopens_real_database_without_losing_metadata() {
     drop(connection);
 
     let reopened = DatabaseWorker::start(root.0.clone()).unwrap();
-    assert_eq!(reopened.inspect().unwrap().schema_version, 10);
+    assert_eq!(reopened.inspect().unwrap().schema_version, 15);
     drop(reopened);
     let connection = Connection::open(root.0.join("lifestory.db")).unwrap();
     let value: String = connection
@@ -94,4 +94,50 @@ fn failed_migration_keeps_version_and_existing_content() {
         .query_row("SELECT value FROM workspace_metadata", [], |row| row.get(0))
         .unwrap();
     assert_eq!(value, "keep");
+}
+
+#[test]
+fn schema_eleven_without_deletion_fence_upgrades_and_preserves_existing_data() {
+    let root = Workspace::new();
+    drop(DatabaseWorker::start(root.0.clone()).unwrap());
+    let db = Connection::open(root.0.join("lifestory.db")).unwrap();
+    db.execute_batch("ALTER TABLE ai_tasks DROP COLUMN effective_profile_json; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; DROP TABLE ai_source_blocks; PRAGMA user_version=11; INSERT INTO workspace_metadata VALUES ('upgrade-probe','合成旧资料');").unwrap();
+    drop(db);
+    let worker = DatabaseWorker::start(root.0.clone()).unwrap();
+    assert_eq!(worker.inspect().unwrap().schema_version, 15);
+    drop(worker);
+    let db = Connection::open(root.0.join("lifestory.db")).unwrap();
+    assert_eq!(
+        db.query_row(
+            "SELECT value FROM workspace_metadata WHERE key='upgrade-probe'",
+            [],
+            |r| r.get::<_, String>(0)
+        )
+        .unwrap(),
+        "合成旧资料"
+    );
+    assert_eq!(
+        db.query_row("SELECT count(*) FROM ai_source_blocks", [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        0
+    );
+}
+
+#[test]
+fn schema_fourteen_upgrade_preserves_existing_configuration() {
+    let root = Workspace::new();
+    drop(DatabaseWorker::start(root.0.clone()).unwrap());
+    let db = Connection::open(root.0.join("lifestory.db")).unwrap();
+    db.execute_batch("ALTER TABLE ai_tasks DROP COLUMN effective_profile_json; ALTER TABLE ai_conversations DROP COLUMN cli_profile_json; PRAGMA user_version=14;").unwrap();
+    let raw = r#"{"id":"old-cli","label":"合成旧配置","service":"codex","protocol":"codex","baseUrl":"","model":"fixed-model","contextChars":32000,"maxOutputTokens":4096,"downstream":null,"codexPath":"/synthetic/codex"}"#;
+    db.execute("INSERT INTO ai_profiles VALUES('old-cli',?1,0)", [raw])
+        .unwrap();
+    drop(db);
+    let worker = DatabaseWorker::start(root.0.clone()).unwrap();
+    assert_eq!(worker.inspect().unwrap().schema_version, 15);
+    let profile = worker.ai_profiles().unwrap().remove(0);
+    assert_eq!(profile.model, "fixed-model");
+    assert!(profile.cli_model_mode.is_none());
+    assert!(profile.reasoning_effort.is_none());
 }
