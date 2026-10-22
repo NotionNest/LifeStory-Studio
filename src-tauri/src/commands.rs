@@ -336,17 +336,23 @@ pub async fn trash_impact(
 #[tauri::command]
 pub async fn trash_move(
     database: State<'_, DatabaseWorker>,
+    runner: State<'_, crate::ai::AiRunner>,
     input: crate::trash::TrashRequest,
 ) -> Result<(), RecordError> {
-    record_task(&database, move |db| db.trash_move(input)).await
+    let runner = runner.inner().clone();
+    record_task(&database, move |db| runner.move_to_trash(&db, input)).await
 }
 
 #[tauri::command]
 pub async fn trash_list(
     database: State<'_, DatabaseWorker>,
     offset: u32,
+    domain: Option<String>,
 ) -> Result<crate::trash::TrashPage, RecordError> {
-    record_task(&database, move |db| db.trash_list(offset)).await
+    record_task(&database, move |db| {
+        db.trash_list_domain(offset, domain.unwrap_or_else(|| "diary".into()))
+    })
+    .await
 }
 
 #[tauri::command]
@@ -373,4 +379,377 @@ pub async fn trash_status(
     record_id: String,
 ) -> Result<String, RecordError> {
     record_task(&database, move |db| db.trash_status(record_id)).await
+}
+
+#[tauri::command]
+pub async fn ai_profiles(
+    database: State<'_, DatabaseWorker>,
+) -> Result<Vec<crate::ai_providers::Profile>, RecordError> {
+    record_task(&database, |db| db.ai_profiles()).await
+}
+#[tauri::command]
+pub async fn ai_configure(
+    database: State<'_, DatabaseWorker>,
+    profile: crate::ai_providers::Profile,
+    key: String,
+) -> Result<crate::ai_providers::Profile, RecordError> {
+    record_task(&database, move |db| db.ai_configure(profile, key)).await
+}
+#[tauri::command]
+pub async fn ai_delete_profile(
+    database: State<'_, DatabaseWorker>,
+    profile_id: String,
+) -> Result<(), RecordError> {
+    record_task(&database, move |db| db.ai_delete_profile(profile_id)).await
+}
+#[tauri::command]
+pub async fn ai_create_conversation(
+    database: State<'_, DatabaseWorker>,
+    record_date: String,
+    timezone: String,
+) -> Result<String, RecordError> {
+    record_task(&database, move |db| {
+        db.ai_create_conversation(record_date, timezone)
+    })
+    .await
+}
+#[tauri::command]
+pub async fn ai_workspace(
+    database: State<'_, DatabaseWorker>,
+    runner: State<'_, crate::ai::AiRunner>,
+    record_id: String,
+) -> Result<crate::ai::Workspace, RecordError> {
+    let mut workspace = record_task(&database, move |db| db.ai_workspace(record_id)).await?;
+    if let Some(task) = workspace.task.as_mut() {
+        runner.decorate(task)
+    }
+    Ok(workspace)
+}
+#[tauri::command]
+pub async fn ai_task(
+    database: State<'_, DatabaseWorker>,
+    task_id: String,
+) -> Result<crate::ai::Task, RecordError> {
+    record_task(&database, move |db| db.ai_task(task_id)).await
+}
+#[tauri::command]
+pub async fn ai_start(
+    database: State<'_, DatabaseWorker>,
+    runner: State<'_, crate::ai::AiRunner>,
+    input: crate::ai::StartInput,
+) -> Result<crate::ai::Task, RecordError> {
+    let runner = runner.inner().clone();
+    record_task(&database, move |db| runner.start(db, input)).await
+}
+#[tauri::command]
+pub async fn ai_cancel(
+    database: State<'_, DatabaseWorker>,
+    runner: State<'_, crate::ai::AiRunner>,
+    task_id: String,
+) -> Result<(), RecordError> {
+    let runner = runner.inner().clone();
+    record_task(&database, move |db| runner.cancel(&db, task_id)).await
+}
+#[tauri::command]
+pub async fn ai_test(
+    runner: State<'_, crate::ai::AiRunner>,
+    database: State<'_, DatabaseWorker>,
+    profile_id: String,
+    request_id: String,
+) -> Result<(), RecordError> {
+    let profiles = record_task(&database, |db| db.ai_profiles()).await?;
+    let profile = profiles
+        .into_iter()
+        .find(|p| p.id == profile_id && !p.label.starts_with("[已停用]"))
+        .ok_or_else(|| RecordError {
+            code: "not_found",
+            message: "服务不存在或已停用".into(),
+        })?;
+    let test = runner
+        .connection_test(request_id)
+        .map_err(|e| RecordError {
+            code: "conflict",
+            message: e.to_string(),
+        })?;
+    let work = async {
+        let profile = if profile.protocol == "codex" {
+            crate::ai_providers::resolve_cli_profile(profile).await?
+        } else {
+            profile
+        };
+        crate::ai_providers::generate(
+            &profile,
+            vec![crate::ai_providers::Message {
+                role: "user".into(),
+                text: "这是一条合成连接测试，不包含私人资料。请仅回复：连接成功。".into(),
+            }],
+            test.cancelled.clone(),
+            |_| {},
+        )
+        .await
+        .map(|_| ())
+    };
+    let result = tokio::select! {
+        result=work=>result,
+        _=async{while !test.cancelled.load(std::sync::atomic::Ordering::SeqCst){tokio::time::sleep(std::time::Duration::from_millis(25)).await;}}=>Err("连接测试已取消".into()),
+    };
+    let check = result.clone();
+    let pid = profile_id.clone();
+    record_task(&database, move |db| db.ai_record_check(pid, check)).await?;
+    result.map_err(|message| RecordError {
+        code: "provider_error",
+        message,
+    })
+}
+
+#[tauri::command]
+pub async fn ai_compare(
+    database: State<'_, DatabaseWorker>,
+    owner_id: String,
+    source_id: String,
+    revision_id: String,
+) -> Result<String, RecordError> {
+    record_task(&database, move |db| {
+        db.ai_compare(owner_id, source_id, revision_id)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn ai_models(
+    database: State<'_, DatabaseWorker>,
+    profile_id: String,
+) -> Result<Vec<String>, RecordError> {
+    let profiles = record_task(&database, |db| db.ai_profiles()).await?;
+    let profile = profiles
+        .into_iter()
+        .find(|p| p.id == profile_id && !p.label.starts_with("[已停用]"))
+        .ok_or_else(|| RecordError {
+            code: "not_found",
+            message: "服务配置不存在".into(),
+        })?;
+    crate::ai_providers::models(&profile)
+        .await
+        .map_err(|message| RecordError {
+            code: "provider_error",
+            message,
+        })
+}
+
+#[tauri::command]
+pub async fn ai_retry_save(
+    database: State<'_, DatabaseWorker>,
+    runner: State<'_, crate::ai::AiRunner>,
+    task_id: String,
+) -> Result<(), RecordError> {
+    let runner = runner.inner().clone();
+    record_task(&database, move |db| runner.retry_save(&db, task_id)).await
+}
+
+#[tauri::command]
+pub async fn ai_import_image(
+    database: State<'_, DatabaseWorker>,
+    request: tauri::ipc::Request<'_>,
+) -> Result<(), RecordError> {
+    let invalid = || RecordError {
+        code: "validation",
+        message: "对话图片传输无效或超过限制".into(),
+    };
+    let tauri::ipc::InvokeBody::Raw(bytes) = request.body() else {
+        return Err(invalid());
+    };
+    if bytes.len() < 4 || bytes.len() > lifestory_image_validation::MAX_BYTES + 4100 {
+        return Err(invalid());
+    }
+    let n = u32::from_le_bytes(bytes[..4].try_into().map_err(|_| invalid())?) as usize;
+    if n > 4096 || bytes.len() < 4 + n {
+        return Err(invalid());
+    }
+    let input: crate::attachments::ConversationImage =
+        serde_json::from_slice(&bytes[4..4 + n]).map_err(|_| invalid())?;
+    let data = bytes[4 + n..].to_vec();
+    record_task(&database, move |db| {
+        db.import_conversation_image(input, data)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn ai_preferences(
+    database: State<'_, DatabaseWorker>,
+) -> Result<crate::ai_experience::Preferences, RecordError> {
+    record_task(&database, |db| db.ai_preferences()).await
+}
+#[tauri::command]
+pub async fn ai_set_default(
+    database: State<'_, DatabaseWorker>,
+    profile_id: Option<String>,
+) -> Result<(), RecordError> {
+    record_task(&database, move |db| db.ai_set_default(profile_id)).await
+}
+#[tauri::command]
+pub async fn ai_chat_list(
+    database: State<'_, DatabaseWorker>,
+    keyword: String,
+    offset: u32,
+) -> Result<crate::ai_experience::ChatPage, RecordError> {
+    record_task(&database, move |db| {
+        db.ai_chat_list(crate::ai_experience::ChatQuery { keyword, offset })
+    })
+    .await
+}
+#[tauri::command]
+pub async fn ai_chat_rename(
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+    title: String,
+) -> Result<(), RecordError> {
+    record_task(&database, move |db| db.ai_chat_rename(record_id, title)).await
+}
+#[tauri::command]
+pub async fn ai_chat_send(
+    database: State<'_, DatabaseWorker>,
+    runner: State<'_, crate::ai::AiRunner>,
+    input: crate::ai_experience::ChatSend,
+) -> Result<crate::ai::Task, RecordError> {
+    let runner = runner.inner().clone();
+    record_task(&database, move |db| runner.start(db, input.into_start())).await
+}
+#[tauri::command]
+pub async fn ai_preview_generate(
+    database: State<'_, DatabaseWorker>,
+    runner: State<'_, crate::ai::AiRunner>,
+    input: crate::ai_experience::PreviewGenerate,
+) -> Result<crate::ai::Task, RecordError> {
+    let runner = runner.inner().clone();
+    record_task(&database, move |db| runner.start(db, input.into_start())).await
+}
+#[tauri::command]
+pub async fn ai_preview(
+    database: State<'_, DatabaseWorker>,
+    task_id: String,
+) -> Result<crate::ai_experience::Preview, RecordError> {
+    record_task(&database, move |db| db.ai_preview(task_id)).await
+}
+#[tauri::command]
+pub async fn ai_adopt(
+    database: State<'_, DatabaseWorker>,
+    input: crate::ai_experience::Adopt,
+) -> Result<crate::ai_experience::Adopted, RecordError> {
+    record_task(&database, move |db| db.ai_adopt(input)).await
+}
+#[tauri::command]
+pub async fn ai_update_profile(
+    database: State<'_, DatabaseWorker>,
+    profile: crate::ai_providers::Profile,
+    key: String,
+) -> Result<crate::ai_providers::Profile, RecordError> {
+    record_task(&database, move |db| db.ai_update_profile(profile, key)).await
+}
+#[tauri::command]
+pub async fn ai_undo_adoption(
+    database: State<'_, DatabaseWorker>,
+    task_id: String,
+) -> Result<crate::ai_experience::Adopted, RecordError> {
+    record_task(&database, move |db| db.ai_undo_adoption(task_id)).await
+}
+
+#[tauri::command]
+pub async fn ai_codex_inspect(
+    path: Option<String>,
+) -> Result<Vec<crate::ai_providers::CliInspection>, String> {
+    crate::ai_providers::inspect_codex(path).await
+}
+
+#[tauri::command]
+pub async fn ai_codex_models(path: String) -> Result<Vec<String>, String> {
+    let profile = crate::ai_providers::Profile {
+        id: "catalog".into(),
+        label: "Codex".into(),
+        service: "codex".into(),
+        protocol: "codex".into(),
+        base_url: String::new(),
+        model: String::new(),
+        context_chars: 32000,
+        max_output_tokens: 4096,
+        downstream: None,
+        codex_path: Some(path),
+        output_token_parameter: None,
+        cli_model_mode: None,
+        reasoning_effort: None,
+        cli_version: None,
+    };
+    crate::ai_providers::codex_models(&profile).await
+}
+
+#[tauri::command]
+pub async fn ai_cli_scan() -> Vec<crate::ai_cli::Installation> {
+    crate::ai_cli::scan().await
+}
+#[tauri::command]
+pub async fn ai_codex_catalog(path: String) -> Result<crate::ai_providers::CliCatalog, String> {
+    crate::ai_providers::codex_catalog(&codex_profile(path)).await
+}
+
+#[tauri::command]
+pub async fn ai_cancel_test(
+    runner: State<'_, crate::ai::AiRunner>,
+    request_id: String,
+) -> Result<(), RecordError> {
+    runner
+        .cancel_connection_test(&request_id)
+        .map_err(|e| RecordError {
+            code: "provider_error",
+            message: e.to_string(),
+        })
+}
+
+#[tauri::command]
+pub async fn ai_codex_probe(
+    runner: State<'_, crate::ai::AiRunner>,
+    path: String,
+    request_id: String,
+) -> Result<String, String> {
+    let test = runner
+        .connection_test(request_id)
+        .map_err(|e| e.to_string())?;
+    let profile = codex_profile(path);
+    tokio::select! {
+        result=crate::ai_providers::codex_connection(&profile)=>result,
+        _=async{while !test.cancelled.load(std::sync::atomic::Ordering::SeqCst){tokio::time::sleep(std::time::Duration::from_millis(25)).await;}}=>Err("CLI 连接测试已取消".into()),
+    }
+}
+
+fn codex_profile(path: String) -> crate::ai_providers::Profile {
+    crate::ai_providers::Profile {
+        id: "catalog".into(),
+        label: "Codex".into(),
+        service: "codex".into(),
+        protocol: "codex".into(),
+        base_url: String::new(),
+        model: String::new(),
+        context_chars: 32000,
+        max_output_tokens: 4096,
+        downstream: None,
+        codex_path: Some(path),
+        output_token_parameter: None,
+        cli_model_mode: Some("inherit".into()),
+        reasoning_effort: None,
+        cli_version: None,
+    }
+}
+
+#[tauri::command]
+pub async fn ai_test_cli(
+    runner: State<'_, crate::ai::AiRunner>,
+    profile: crate::ai_providers::Profile,
+    request_id: String,
+) -> Result<crate::ai_providers::CliConnectionReport, String> {
+    let test = runner
+        .connection_test(request_id)
+        .map_err(|e| e.to_string())?;
+    tokio::select! {
+        result=crate::ai_providers::test_cli(profile,test.cancelled.clone())=>result,
+        _=async{while !test.cancelled.load(std::sync::atomic::Ordering::SeqCst){tokio::time::sleep(std::time::Duration::from_millis(25)).await;}}=>Err("连接测试已取消".into()),
+    }
 }

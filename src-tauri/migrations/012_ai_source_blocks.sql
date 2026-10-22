@@ -1,0 +1,3 @@
+CREATE TABLE IF NOT EXISTS ai_source_blocks (
+ source_id TEXT PRIMARY KEY NOT NULL REFERENCES records(id) ON DELETE CASCADE
+);

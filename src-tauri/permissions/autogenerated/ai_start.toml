@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ai-start"
+description = "Enables the ai_start command without any pre-configured scope."
+commands.allow = ["ai_start"]
+
+[[permission]]
+identifier = "deny-ai-start"
+description = "Denies the ai_start command without any pre-configured scope."
+commands.deny = ["ai_start"]

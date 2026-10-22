@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ai-cli-scan"
+description = "Enables the ai_cli_scan command without any pre-configured scope."
+commands.allow = ["ai_cli_scan"]
+
+[[permission]]
+identifier = "deny-ai-cli-scan"
+description = "Denies the ai_cli_scan command without any pre-configured scope."
+commands.deny = ["ai_cli_scan"]

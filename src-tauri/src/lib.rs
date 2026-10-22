@@ -1,3 +1,7 @@
+pub mod ai;
+pub mod ai_cli;
+pub mod ai_experience;
+pub mod ai_providers;
 pub mod attachments;
 mod commands;
 pub mod history;
@@ -16,6 +20,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(ExitGate(AtomicBool::new(false)))
+        .manage(ai::AiRunner::default())
         .on_menu_event(|app, event| {
             let name = match event.id().as_ref() {
                 "request-exit" | "request-close" => "exit-requested",
@@ -93,6 +98,36 @@ pub fn run() {
             commands::trash_list,
             commands::trash_restore,
             commands::trash_purge,
+            commands::ai_compare,
+            commands::ai_models,
+            commands::ai_codex_inspect,
+            commands::ai_codex_models,
+            commands::ai_cli_scan,
+            commands::ai_codex_catalog,
+            commands::ai_codex_probe,
+            commands::ai_test_cli,
+            commands::ai_cancel_test,
+            commands::ai_retry_save,
+            commands::ai_import_image,
+            commands::ai_profiles,
+            commands::ai_preferences,
+            commands::ai_set_default,
+            commands::ai_chat_list,
+            commands::ai_chat_rename,
+            commands::ai_chat_send,
+            commands::ai_preview_generate,
+            commands::ai_preview,
+            commands::ai_adopt,
+            commands::ai_undo_adoption,
+            commands::ai_update_profile,
+            commands::ai_configure,
+            commands::ai_delete_profile,
+            commands::ai_create_conversation,
+            commands::ai_workspace,
+            commands::ai_task,
+            commands::ai_start,
+            commands::ai_cancel,
+            commands::ai_test,
             commands::library_query,
             commands::library_preview,
             commands::record_save,

@@ -67,7 +67,7 @@ pub struct SourceStatus {
 const BASE:&str="WITH base AS (SELECT r.*,COALESCE(r.working_text,v.searchable_text,'') AS body,
 COALESCE((SELECT group_concat(j.atom,char(10)) FROM conversation_messages m,json_tree(m.content_json) j WHERE m.record_id=r.id AND j.key='text' AND j.type='text'),'') AS messages,
 (EXISTS(SELECT 1 FROM attachment_links l WHERE l.record_id=r.id AND l.in_body=1) OR EXISTS(SELECT 1 FROM message_attachments a WHERE a.record_id=r.id)) AS images
-FROM records r LEFT JOIN record_revisions v ON v.id=r.current_revision_id WHERE r.deleted_at IS NULL) ";
+FROM records r LEFT JOIN record_revisions v ON v.id=r.current_revision_id WHERE r.deleted_at IS NULL AND r.kind='text') ";
 fn validate(q: &LibraryQuery) -> StorageResult<()> {
     if q.keyword.chars().count() > 200
         || q.kinds.len() > 3
@@ -157,7 +157,7 @@ impl DatabaseWorker {
         items.push(SearchItem{id,title,record_date,kind,excerpt:excerpt(text,keyword),has_images,tags,match_field});
       }
       let next=query.offset.saturating_add(items.len() as u32);let next_offset=(next<total).then_some(next);
-      let mut stmt=db.prepare("SELECT t.id,t.display_name FROM tags t WHERE EXISTS(SELECT 1 FROM record_tags a JOIN records r ON r.id=a.record_id WHERE a.tag_id=t.id AND r.deleted_at IS NULL) ORDER BY t.normalized_key")?;
+      let mut stmt=db.prepare("SELECT t.id,t.display_name FROM tags t WHERE EXISTS(SELECT 1 FROM record_tags a JOIN records r ON r.id=a.record_id WHERE a.tag_id=t.id AND r.deleted_at IS NULL AND r.kind='text') ORDER BY t.normalized_key")?;
       let tags=stmt.query_map([],|r|Ok(Tag{id:r.get(0)?,name:r.get(1)?}))?.collect::<Result<Vec<_>,_>>()?;
       Ok(QueryPage{items,total,next_offset,days,tags})
     })
@@ -165,7 +165,7 @@ impl DatabaseWorker {
     pub fn preview_library_content(&self, id: String) -> StorageResult<ContentPreview> {
         identifier(&id)?;
         self.call(move|db,_|{
-      let row=db.query_row("SELECT r.title,COALESCE(r.pending_date,r.record_date),r.kind,COALESCE(r.working_document,v.document_json) FROM records r LEFT JOIN record_revisions v ON v.id=r.current_revision_id WHERE r.id=?1 AND r.deleted_at IS NULL",[&id],|r|Ok((r.get::<_,Option<String>>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,Option<String>>(3)?))).optional()?.ok_or_else(||fail("not_found","内容不存在或已删除"))?;
+      let row=db.query_row("SELECT r.title,COALESCE(r.pending_date,r.record_date),r.kind,COALESCE(r.working_document,v.document_json) FROM records r LEFT JOIN record_revisions v ON v.id=r.current_revision_id WHERE r.id=?1 AND r.deleted_at IS NULL AND r.kind='text'",[&id],|r|Ok((r.get::<_,Option<String>>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,Option<String>>(3)?))).optional()?.ok_or_else(||fail("not_found","内容不存在或已删除"))?;
       let mut stmt=db.prepare("SELECT content_json FROM conversation_messages WHERE record_id=?1 ORDER BY sequence,id")?;
       let json=stmt.query_map([&id],|r|r.get::<_,String>(0))?.collect::<Result<Vec<_>,_>>()?;
       fn text(v:&Value,out:&mut Vec<String>){if let Some(t)=v.get("text").and_then(Value::as_str){out.push(t.into());}match v {Value::Array(a)=>for v in a{text(v,out)},Value::Object(o)=>for (k,v) in o{if k!="text"{text(v,out)}},_=>{}}}

@@ -509,8 +509,8 @@ impl DatabaseWorker {
         original: bool,
     ) -> StorageResult<Vec<u8>> {
         self.call(move|db,root| {
-            load(db,&record_id)?;
-            let hash:Option<String>=db.query_row("SELECT o.sha256 FROM attachment_links l JOIN image_objects o ON o.id=l.object_id WHERE l.record_id=?1 AND l.id=?2 AND o.state='ready' AND ((?3 IS NULL AND (l.in_body=1 OR EXISTS(SELECT 1 FROM revision_attachments h WHERE h.record_id=l.record_id AND h.attachment_id=l.id))) OR EXISTS(SELECT 1 FROM revision_attachments v WHERE v.record_id=?1 AND v.attachment_id=l.id AND v.revision_id=?3))",params![record_id,attachment_id,revision_id],|r|r.get(0)).optional()?;
+            let exists:bool=db.query_row("SELECT EXISTS(SELECT 1 FROM records WHERE id=?1 AND deleted_at IS NULL)",[&record_id],|r|r.get(0))?;if !exists{return Err(fail("not_found","记录不存在或已删除"))}
+            let hash:Option<String>=db.query_row("SELECT o.sha256 FROM attachment_links l JOIN image_objects o ON o.id=l.object_id WHERE l.record_id=?1 AND l.id=?2 AND o.state='ready' AND ((?3 IS NULL AND (l.in_body=1 OR EXISTS(SELECT 1 FROM message_attachments m WHERE m.record_id=l.record_id AND m.attachment_id=l.id) OR EXISTS(SELECT 1 FROM revision_attachments h WHERE h.record_id=l.record_id AND h.attachment_id=l.id))) OR EXISTS(SELECT 1 FROM revision_attachments v WHERE v.record_id=?1 AND v.attachment_id=l.id AND v.revision_id=?3))",params![record_id,attachment_id,revision_id],|r|r.get(0)).optional()?;
             let hash=hash.ok_or_else(||fail("not_found","图片不属于当前记录或指定历史版本"))?;
             let bytes=read_bounded(&object_path(root,&hash,!original)?,MAX_BYTES)?;
             if original && format!("{:x}",Sha256::digest(&bytes))!=hash {return Err(fail("corrupt_content","原图校验失败，请保留资料并检查文件"));}Ok(bytes)
@@ -555,4 +555,48 @@ pub(crate) fn cleanup(db: &mut Connection, root: &Path, _timestamp: i64) -> Stor
         tx.commit()?;
     }
     Ok(())
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ConversationImage {
+    pub record_id: String,
+    pub request_id: String,
+    pub name: String,
+}
+impl DatabaseWorker {
+    pub fn import_conversation_image(
+        &self,
+        input: ConversationImage,
+        bytes: Vec<u8>,
+    ) -> StorageResult<()> {
+        crate::records::identifier(&input.record_id)?;
+        crate::records::identifier(&input.request_id)?;
+        if bytes.len() > MAX_BYTES
+            || input.name.is_empty()
+            || input.name.chars().count() > 255
+            || input.name.contains(['/', '\\'])
+            || input.name.chars().any(char::is_control)
+        {
+            return Err(fail("validation", "图片或文件名无效"));
+        }
+        self.call(move|db,root|{
+   let hash=format!("{:x}",Sha256::digest(&bytes));
+   let active=|db:&Connection|->StorageResult<()>{let ok:bool=db.query_row("SELECT EXISTS(SELECT 1 FROM records WHERE id=?1 AND kind='conversation' AND deleted_at IS NULL AND NOT EXISTS(SELECT 1 FROM ai_source_blocks b WHERE b.source_id=records.id))",[&input.record_id],|r|r.get(0))?;if !ok{return Err(fail("not_found","对话不存在、已删除或正准备删除"))}Ok(())};active(db)?;
+   let old:Option<(String,String)>=db.query_row("SELECT record_id,content_json FROM conversation_messages WHERE request_id=?1",[&input.request_id],|r|Ok((r.get(0)?,r.get(1)?))).optional()?;
+   if let Some((record,raw))=old{let v:Value=serde_json::from_str(&raw)?;if record!=input.record_id||v["imageRequest"]["sha256"]!=hash||v["imageRequest"]["name"]!=input.name{return Err(fail("conflict","图片请求标识已用于其他内容"))}return Ok(())}
+   let prepared=prepare(&bytes).map_err(|e|fail("validation",&format!("无法导入图片：{e}")))?;
+   db.execute("INSERT INTO image_objects(id,sha256,relative_path,media_type,byte_length,width,height,state) VALUES(?1,?2,?3,?4,?5,?6,?7,'staged') ON CONFLICT(sha256) DO NOTHING",params![id(db)?,hash,format!("objects/{hash}.original"),prepared.media_type,bytes.len() as i64,prepared.width,prepared.height])?;
+   let tx=db.transaction_with_behavior(TransactionBehavior::Immediate)?;active(&tx)?;
+   let object:String=tx.query_row("SELECT id FROM image_objects WHERE sha256=?1",[&hash],|r|r.get(0))?;
+   write_object(root,&hash,false,&bytes)?;write_object(root,&hash,true,&prepared.preview)?;
+   tx.execute("UPDATE image_objects SET state='ready' WHERE id=?1",[&object])?;
+   let existing:Option<String>=tx.query_row("SELECT id FROM attachment_links WHERE record_id=?1 AND object_id=?2",params![input.record_id,object],|r|r.get(0)).optional()?;
+   let attachment=match existing{Some(link)=>link,None=>{let link=id(&tx)?;tx.execute("INSERT INTO attachment_links(id,record_id,object_id,original_name,created_at) VALUES(?1,?2,?3,?4,?5)",params![link,input.record_id,object,input.name,now()?])?;link}};
+   let message=id(&tx)?;let seq:i64=tx.query_row("SELECT COALESCE(max(sequence),-1)+1 FROM conversation_messages WHERE record_id=?1",[&input.record_id],|r|r.get(0))?;
+   tx.execute("INSERT INTO conversation_messages VALUES(?1,?2,?3,'user',?4,?5,?6)",params![message,input.record_id,seq,serde_json::json!({"text":"","images":[attachment],"imageRequest":{"sha256":hash,"name":input.name}}).to_string(),input.request_id,now()?])?;
+   tx.execute("INSERT INTO message_attachments VALUES(?1,?2,?3)",params![input.record_id,message,attachment])?;
+   tx.execute("UPDATE records SET content_version=content_version+1,updated_at=?2 WHERE id=?1",params![input.record_id,now()?])?;tx.commit()?;Ok(())
+  })
+    }
 }

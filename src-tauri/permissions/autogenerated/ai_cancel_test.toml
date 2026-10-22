@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ai-cancel-test"
+description = "Enables the ai_cancel_test command without any pre-configured scope."
+commands.allow = ["ai_cancel_test"]
+
+[[permission]]
+identifier = "deny-ai-cancel-test"
+description = "Denies the ai_cancel_test command without any pre-configured scope."
+commands.deny = ["ai_cancel_test"]

@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ai-adopt"
+description = "Enables the ai_adopt command without any pre-configured scope."
+commands.allow = ["ai_adopt"]
+
+[[permission]]
+identifier = "deny-ai-adopt"
+description = "Denies the ai_adopt command without any pre-configured scope."
+commands.deny = ["ai_adopt"]

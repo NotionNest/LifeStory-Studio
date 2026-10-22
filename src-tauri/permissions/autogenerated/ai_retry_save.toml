@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ai-retry-save"
+description = "Enables the ai_retry_save command without any pre-configured scope."
+commands.allow = ["ai_retry_save"]
+
+[[permission]]
+identifier = "deny-ai-retry-save"
+description = "Denies the ai_retry_save command without any pre-configured scope."
+commands.deny = ["ai_retry_save"]
