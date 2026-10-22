@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { listen } from '@tauri-apps/api/event'
 import { Button } from '@/components/ui/button'
 import { desktopAvailable } from '@/shared/runtime'
@@ -12,8 +12,9 @@ import { LibraryBrowser } from './LibraryBrowser'
 import { LibraryContentPreview } from './LibraryContentPreview'
 import { RecordEditor, type EditorHandle } from './RecordEditor'
 
-type Intent = { kind: 'open'; id: string; recordKind?:RecordKind } | { kind: 'create' } | { kind: 'exit' } | { kind: 'history' } | {kind:'trash'} | {kind:'delete';id:string} | { kind: 'import'; recordId: string; files: File[]; position: number }
-export function LibraryWorkspace() {
+type Intent = { kind: 'open'; id: string; recordKind?:RecordKind } | { kind: 'create' } | { kind: 'exit' } | { kind: 'history' } | {kind:'navigate';page:'diary'|'chat'|'settings'} | {kind:'chat';id:string} | {kind:'trash'} | {kind:'delete';id:string} | { kind: 'import'; recordId: string; files: File[]; position: number }
+export interface LibraryHandle {navigate:(page:'diary'|'chat'|'settings')=>void;openDiary:(id:string)=>void;exit:()=>void}
+export const LibraryWorkspace=forwardRef<LibraryHandle,{active?:boolean;onNavigate?:(page:'diary'|'chat'|'settings')=>void;onChat?:(id:string)=>void;managedExit?:boolean}>(function LibraryWorkspace({active=true,onNavigate,onChat,managedExit=false},ref) {
   const browser=useLibraryQuery()
   const {refresh}=browser
   const [preview,setPreview]=useState<ContentPreview|null>(null)
@@ -59,6 +60,8 @@ export function LibraryWorkspace() {
     navigating.current = true; setWorking(true); setError('')
     try {
       if (intent.kind === 'exit') { await libraryApi.exit(); return }
+      if(intent.kind==='navigate'){setPending(null);onNavigate?.(intent.page);return}
+      if(intent.kind==='chat'){setPending(null);onChat?.(intent.id);return}
       if(intent.kind==='trash'){historyOpen.current=true;setTrashOpen(true);setPending(null);return}
       if(intent.kind==='delete'){const impact=await libraryApi.trashImpact(intent.id);historyOpen.current=true;setDeleteImpact(impact);setPending(null);return}
       if (intent.kind === 'history') {
@@ -98,7 +101,7 @@ export function LibraryWorkspace() {
         }
         setImportReport({ recordId: record.id, messages, retry }); await refresh(); return
       }
-      if(intent.kind==='open' && intent.recordKind && intent.recordKind!=='text'){
+      if(intent.kind==='open' && intent.recordKind && intent.recordKind==='conversation'){
         const content=await libraryApi.preview(intent.id)
         setPreview(content);setRecord(null);setSession(null);setPending(null);dirty.current=false;return
       }
@@ -143,16 +146,18 @@ export function LibraryWorkspace() {
   }
   const requestRef = useRef(request); requestRef.current = request
   useEffect(() => {
-    if (!desktopAvailable) return
+    if (!desktopAvailable || !active) return
     let disposed = false
     const subscriptions = [
-      listen('exit-requested', () => requestRef.current({ kind: 'exit' })),
+      ...(!managedExit?[listen('exit-requested', () => requestRef.current({ kind: 'exit' }))]:[]),
       listen('save-requested', () => { if (!historyOpen.current && !attachmentOpen.current) void editor.current?.save() }),
       listen('new-record-requested', () => requestRef.current({ kind: 'create' })),
     ]
     for (const subscription of subscriptions) void subscription.then(unlisten => { if (disposed) unlisten() }).catch(cause => setError(`关闭保护不可用：${errorMessage(cause)}`))
     return () => { disposed = true; for (const subscription of subscriptions) void subscription.then(unlisten => unlisten()).catch(() => {}) }
-  }, [])
+  }, [active,managedExit])
+  useImperativeHandle(ref,()=>({navigate:page=>requestRef.current({kind:'navigate',page}),openDiary:id=>requestRef.current({kind:'open',id,recordKind:'text'}),exit:()=>requestRef.current({kind:'exit'})}),[])
+  useEffect(()=>{if(!active)return;void refresh();let valid=true;if(record&&editor.current)void libraryApi.read(record.id).then(current=>{if(valid&&editor.current&&current.contentVersion!==editor.current.contentVersion())requestRef.current({kind:'open',id:record.id,recordKind:'text'})}).catch(cause=>{if(valid)setError(errorMessage(cause))});return()=>{valid=false}},[active,record?.id,refresh])
   const refreshBrowser=useCallback(()=>{void refresh()},[refresh])
   const closeTrash=()=>{historyOpen.current=false;setTrashOpen(false);setDeleteImpact(null);editor.current?.resume()}
   const saveAndContinue = () => { if (pending) request(pending) }
@@ -193,10 +198,10 @@ export function LibraryWorkspace() {
     } finally { navigating.current = false; setWorking(false) }
   }
   const onSaved = useCallback(() => { setError(''); void refresh().catch(cause => setError(errorMessage(cause))) }, [refresh])
-  return <main className="flex h-dvh min-h-0 flex-col">
-    <header className="flex h-12 shrink-0 items-center justify-between border-b bg-card px-5">
-      <span className="text-sm font-semibold tracking-tight">LifeStory Studio <span className="ml-3 font-normal text-muted-foreground">/ 资料库</span></span>
-      <div className="flex items-center gap-2">{(record||preview)&&<Button size="sm" variant="ghost" disabled={working} onClick={()=>request({kind:'delete',id:(record?.id??preview!.id)})}>删除记录</Button>}<Button size="sm" variant="outline" disabled={working} onClick={()=>request({kind:'trash'})}>回收站</Button><span className="text-xs text-muted-foreground">本地保存</span></div>
+  return <main className="flex h-full min-h-0 flex-col">
+    <header className="flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-card px-5 py-2">
+      <span className="text-sm font-semibold tracking-tight">日记</span>
+      <div className="flex flex-wrap items-center gap-2">{record&&<Button variant="outline" size="sm" disabled={working} onClick={()=>request({kind:'chat',id:record.id})}>聊聊这篇日记</Button>}{(record||preview)&&<Button size="sm" variant="ghost" disabled={working} onClick={()=>request({kind:'delete',id:(record?.id??preview!.id)})}>删除日记</Button>}<Button size="sm" variant="outline" disabled={working} onClick={()=>request({kind:'trash'})}>日记回收站</Button><span className="text-xs text-muted-foreground">本地保存</span></div>
     </header>
     {!desktopAvailable ? <p role="status" className="p-8">请在桌面应用中使用本地资料库。浏览器预览不提供模拟数据。</p> : <div className="flex min-h-0 flex-1">
       <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-r lg:w-[22rem]" aria-label="记录列表">
@@ -213,6 +218,7 @@ export function LibraryWorkspace() {
     {history && session && <HistoryPanel record={history} sessionId={session.sessionId} onClose={() => { historyOpen.current = false; setHistory(null); editor.current?.resume() }} onRestored={editing => {
       historyOpen.current = false; setHistory(null); applyEditing(editing); setError(''); onSaved()
     }} />}
+
     {trashOpen&&<TrashPanel onClose={closeTrash} onChanged={refreshBrowser}/>}
     {deleteImpact&&<DeleteRecordDialog impact={deleteImpact} onClose={closeTrash} onDeleted={()=>{const id=deleteImpact.recordId;setRecord(null);setSession(null);setPreview(null);dirty.current=false;setRecoveries(old=>old.filter(r=>r.recordId!==id));closeTrash();void refresh()}}/>}
     {recovery && <RecoveryPreview record={recovery.record} draft={recovery.draft} busy={working} error={error} onChoose={action => void resolveRecovery(action)} onCancel={() => { setRecovery(null); setError('') }} onRefresh={() => void execute({ kind: 'open', id: recovery.record.id })} />}
@@ -223,4 +229,4 @@ export function LibraryWorkspace() {
       <div className="flex flex-wrap gap-2"><Button disabled={working} onClick={() => void saveAndContinue()}>保存并继续</Button><Button variant="secondary" disabled={working} onClick={() => { setWorking(true); void editor.current?.export().then(result => { setExported(result) }).finally(() => setWorking(false)) }}>主动另存</Button><Button variant="outline" disabled={working} onClick={() => setPending(null)}>继续编辑</Button><Button variant="ghost" disabled={working} onClick={() => void discardAndContinue()}>放弃修改并继续</Button></div>
     </dialog>}
   </main>
-}
+})

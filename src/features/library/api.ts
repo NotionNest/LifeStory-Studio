@@ -42,7 +42,7 @@ export const libraryApi = {
   trashStatus:(recordId:string)=>invoke<'active'|'trash'|'missing'>('trash_status',{recordId}),
   trashImpact:(recordId:string)=>invoke<DeleteImpact>('trash_impact',{recordId}),
   trashMove:(impact:DeleteImpact)=>invoke<void>('trash_move',{input:{recordId:impact.recordId,expectedContentVersion:impact.contentVersion,expectedImpact:impact.impactToken}}),
-  trashList:(offset=0)=>invoke<TrashPage>('trash_list',{offset}),
+  trashList:(offset=0,domain:'diary'|'chat'='diary')=>invoke<TrashPage>('trash_list',{offset,domain}),
   trashRestore:(item:TrashItem)=>invoke<void>('trash_restore',{recordId:item.id,deletedAt:item.deletedAt}),
   trashPurge:(item:TrashItem)=>invoke<void>('trash_purge',{recordId:item.id,deletedAt:item.deletedAt}),
   query: (query: LibraryQuery) => invoke<QueryPage>('library_query', {query}),

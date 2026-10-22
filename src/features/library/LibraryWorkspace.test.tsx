@@ -163,7 +163,7 @@ it('keeps an unsaved editor when filters hide its record and still guards openin
  try{
   await act(async()=>root.render(<LibraryWorkspace/>));await act(async()=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes('筛选原记录'))!.click())
   const set=(label:string,value:string)=>{const node=host.querySelector<HTMLInputElement>(`[aria-label="${label}"]`)!;Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(node,value);node.dispatchEvent(new Event('input',{bubbles:true}))}
-  await act(async()=>set('记录标题','筛选后仍保留的修改'));await act(async()=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='删除记录')!.click());expect(libraryApi.trashImpact).not.toHaveBeenCalled();expect(host.textContent).toContain('当前修改尚未保存');await act(async()=>set('搜索记录','其他'));await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})))
+  await act(async()=>set('记录标题','筛选后仍保留的修改'));await act(async()=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent==='删除日记')!.click());expect(libraryApi.trashImpact).not.toHaveBeenCalled();expect(host.textContent).toContain('当前修改尚未保存');await act(async()=>set('搜索记录','其他'));await act(async()=>host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})))
   expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.value).toBe('筛选后仍保留的修改');expect(libraryApi.end).not.toHaveBeenCalled()
   await act(async()=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes('新的搜索结果'))!.click())
   expect(host.querySelector('dialog')!.textContent).toContain('有尚未保存');expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.value).toBe('筛选后仍保留的修改')
@@ -182,4 +182,12 @@ it('opens the text editor after resolving recovery from a conversation preview',
  const click=(text:string)=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes(text))!.click()
  try{await act(async()=>root.render(<LibraryWorkspace/>));await act(async()=>click('合成对话'));expect(host.textContent).toContain('合成预览正文');await act(async()=>click('待恢复文字'));await act(async()=>click('丢弃此草稿'));expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.value).toBe('待恢复文字');expect(host.textContent).not.toContain('合成预览正文')}
  finally{await act(async()=>root.unmount());host.remove()}
+})
+
+it('reloads an adopted diary when returning from chat through the main navigation',async()=>{
+ vi.clearAllMocks();Object.assign(globalThis,{IS_REACT_ACT_ENVIRONMENT:true});
+ let latest={id:'navigation-diary',title:'原来的日记',recordDate:'2026-10-22',createdTimezone:'Asia/Shanghai',createdAt:1,updatedAt:1,contentVersion:0,checkpointId:'base',document:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'原文'}]}]},tags:[]};
+ vi.mocked(libraryApi.recoveries).mockResolvedValue([]);vi.mocked(libraryApi.recovery).mockResolvedValue(null);vi.mocked(libraryApi.read).mockImplementation(async()=>latest);vi.mocked(libraryApi.begin).mockImplementation(async()=>({record:latest,sessionId:'navigation-session',recovered:null,recoveredTags:[]}));vi.mocked(libraryApi.query).mockResolvedValue({items:[{id:latest.id,title:latest.title,recordDate:latest.recordDate,excerpt:'原文',kind:'text',tags:[],hasImages:false,matchField:null}],total:1,nextOffset:null,days:[],tags:[]});
+ const host=document.createElement('div');document.body.append(host);const root=createRoot(host);
+ try{await act(async()=>root.render(<LibraryWorkspace active/>));await act(async()=>[...host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes('原来的日记'))!.click());await act(async()=>root.render(<LibraryWorkspace active={false}/>));latest={...latest,title:'采用补充后的日记',contentVersion:1,document:{type:'doc',content:[{type:'paragraph',content:[{type:'text',text:'原文与新补充'}]}]}};await act(async()=>root.render(<LibraryWorkspace active/>));expect(host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!.value).toBe('采用补充后的日记');expect(host.textContent).toContain('原文与新补充')}finally{await act(async()=>root.unmount());host.remove()}
 })

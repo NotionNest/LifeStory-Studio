@@ -14,7 +14,7 @@ function setup(){const host=document.createElement('div');document.body.append(h
 it('keeps keyword and other filters when choosing calendar days and switching views',async()=>{
  const t=setup();try{
   await act(async()=>t.root.render(<t.Harness/>));await act(async()=>t.input('[aria-label="搜索记录"]','旅行'));await act(async()=>t.host.querySelector('form')!.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true})))
-  await act(async()=>t.click('组合筛选'));await act(async()=>{const check=t.host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')[3];check.click()})
+  await act(async()=>t.click('组合筛选'));await act(async()=>{const check=[...t.host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].find(input=>input.closest('label')?.textContent==='生活')!;check.click()})
   await act(async()=>t.click('日历'));await act(async()=>t.input('[aria-label="日历月份"]','2026-10'))
   await act(async()=>t.click('2026-10-20，1 条记录'))
   expect(libraryApi.query).toHaveBeenLastCalledWith(expect.objectContaining({keyword:'旅行',tagIds:['t1'],dateFrom:'2026-10-20',dateTo:'2026-10-20',month:'2026-10'}))
@@ -35,10 +35,10 @@ it('ignores late query results and can retry a failed current query',async()=>{
   expect(t.host.textContent).toContain('合成查询失败');await act(async()=>t.click('重试查询'));expect(t.host.textContent).not.toContain('合成查询失败')
  }finally{await act(async()=>t.root.unmount());t.host.remove()}
 })
-it('opens corresponding kinds, highlights literal hits and deduplicates paged results',async()=>{
+it('opens diary records, highlights literal hits and deduplicates paged results',async()=>{
  const t=setup();try{
-  vi.mocked(libraryApi.query).mockResolvedValueOnce({...page,items:[{...item,kind:'conversation',matchField:'message'}],total:2,nextOffset:1})
-  await act(async()=>t.root.render(<t.Harness/>));const entry=[...t.host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes(item.title))!;await act(async()=>entry.click());expect(t.open).toHaveBeenCalledWith(expect.objectContaining({kind:'conversation'}))
+  vi.mocked(libraryApi.query).mockResolvedValueOnce({...page,items:[{...item,kind:'text',matchField:'body'}],total:2,nextOffset:1})
+  await act(async()=>t.root.render(<t.Harness/>));const entry=[...t.host.querySelectorAll<HTMLButtonElement>('button')].find(b=>b.textContent?.includes(item.title))!;await act(async()=>entry.click());expect(t.open).toHaveBeenCalledWith(expect.objectContaining({kind:'text'}))
   vi.mocked(libraryApi.query).mockResolvedValueOnce({...page,items:[item,{...item,id:'second',title:'第二条'}],total:2});await act(async()=>t.click('加载更多'));expect([...t.host.querySelectorAll('button')].filter(b=>b.textContent?.includes(item.title))).toHaveLength(1);expect(t.host.textContent).toContain('第二条')
  }finally{await act(async()=>t.root.unmount());t.host.remove()}
 })
