@@ -10,6 +10,7 @@ commands.allow = ["record_create", "record_read", "record_list", "trash_status",
   "ai_preferences",
   "ai_set_default",
   "ai_chat_list",
+  "ai_chat_search",
   "ai_chat_rename",
   "ai_chat_send",
   "ai_preview_generate",
@@ -17,4 +18,4 @@ commands.allow = ["record_create", "record_read", "record_list", "trash_status",
   "ai_adopt",
             "ai_undo_adoption",
             "ai_update_profile",
- "ai_configure", "ai_delete_profile", "ai_create_conversation", "ai_workspace", "ai_task", "ai_start", "ai_cancel", "ai_test", "library_query", "library_preview", "record_save", "tag_create", "record_export", "record_exit", "recovery_list", "recovery_read", "record_begin_edit", "record_end_edit", "history_list", "history_read", "history_mark", "history_restore", "attachment_import", "attachment_image", "attachment_copy"]
+ "ai_configure", "ai_delete_profile", "ai_create_conversation", "ai_workspace", "ai_task", "ai_start", "ai_cancel", "ai_test", "library_calendar", "library_query", "library_preview", "record_save", "tag_create", "tag_catalog", "record_export", "record_exit", "recovery_list", "recovery_read", "record_begin_edit", "record_end_edit", "history_list", "history_read", "history_mark", "history_restore", "attachment_import", "attachment_image", "attachment_copy"]

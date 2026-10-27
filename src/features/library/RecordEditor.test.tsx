@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RecordEditor, type EditorHandle } from './RecordEditor'
 import { libraryApi, type RecordFile, type SaveResult } from './api'
-vi.mock('./api', async importOriginal => ({ ...await importOriginal<typeof import('./api')>(), libraryApi: { save: vi.fn(), end: vi.fn().mockResolvedValue(undefined), tag: vi.fn(), export: vi.fn() } }))
+vi.mock('./api', async importOriginal => ({ ...await importOriginal<typeof import('./api')>(), libraryApi: { save: vi.fn(), end: vi.fn().mockResolvedValue(undefined), tag: vi.fn(), tagCatalog:vi.fn().mockResolvedValue([]), export: vi.fn() } }))
 const record: RecordFile = { id: 'entry', title: null, recordDate: '2026-10-15', createdTimezone: 'Asia/Shanghai', createdAt: 0, updatedAt: 0, contentVersion: 0, checkpointId: 'revision-one', document: { type: 'doc', content: [{ type: 'paragraph' }] }, tags: [] }
 let root: Root, host: HTMLDivElement
 const dirty = vi.fn()
@@ -165,4 +165,33 @@ it('finishes composition before locking all editing and flushing on leave', asyn
   expect(vi.mocked(libraryApi.save).mock.calls[0][0].title).toBe('最终文字')
   await act(async()=>{ref.current!.resume()})
   expect(input.readOnly).toBe(false)
+})
+
+it('uses the shared calendar for fixed record dates and keeps tag manager selection in the save pipeline',async()=>{
+  class Observer{observe(){}unobserve(){}disconnect(){}}
+  vi.stubGlobal('ResizeObserver',Observer)
+  vi.mocked(libraryApi.save).mockResolvedValue(result())
+  vi.mocked(libraryApi.tag).mockResolvedValue({id:'life',name:'生活'})
+  try{
+    expect(host.querySelector('[aria-label="管理标签"]')).not.toBeNull()
+    await act(()=>host.querySelector<HTMLButtonElement>('button[aria-label="记录日期"]')!.click())
+    expect(document.querySelector('[data-slot="calendar"]')).not.toBeNull()
+    expect(document.querySelector('[aria-label="日期条件"]')).toBeNull()
+    expect(document.querySelector('[aria-label="快捷日期"]')).toBeNull()
+    const selectedDay=new Date('2026-10-20T12:00:00').toLocaleDateString('zh-CN')
+    await act(()=>document.querySelector<HTMLButtonElement>(`button[data-day="${selectedDay}"]`)!.click())
+    await act(()=>ref.current!.save())
+    expect(libraryApi.save).toHaveBeenLastCalledWith(expect.objectContaining({recordDate:'2026-10-20'}))
+    await act(()=>[...document.querySelectorAll<HTMLButtonElement>('[data-slot="popover-content"] button')].find(button=>button.textContent==='清除日期')!.click())
+    await act(()=>ref.current!.prepareLeave())
+    expect(libraryApi.save).toHaveBeenLastCalledWith(expect.objectContaining({recordDate:''}))
+    expect(host.querySelector<HTMLButtonElement>('button[aria-label="记录日期"]')!.disabled).toBe(true)
+    await act(()=>{ref.current!.resume()})
+    await act(()=>host.querySelector<HTMLButtonElement>('[aria-label="管理标签"]')!.click())
+    const input=document.querySelector<HTMLInputElement>('[aria-label="搜索或创建标签"]')!
+    await act(()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value')!.set!.call(input,'生活');input.dispatchEvent(new Event('input',{bubbles:true}))})
+    await act(()=>[...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] button')].find(button=>button.textContent==='创建“生活”')!.click())
+    await act(()=>ref.current!.save())
+    expect(libraryApi.save).toHaveBeenLastCalledWith(expect.objectContaining({recordDate:'',tagIds:['life']}))
+  }finally{vi.unstubAllGlobals()}
 })

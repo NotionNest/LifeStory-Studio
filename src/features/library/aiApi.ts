@@ -1,12 +1,14 @@
 import { invoke } from '@tauri-apps/api/core'
 export interface AiProfile {id:string;label:string;service:string;protocol:string;baseUrl:string;model:string;contextChars:number;maxOutputTokens:number;downstream:string|null;codexPath:string|null;outputTokenParameter?:string|null;cliModelMode?:'inherit'|'selected'|'custom'|null;reasoningEffort?:string|null;cliVersion?:string|null}
-export interface AiTask {id:string;recordId:string;status:string;partial:string;error:string|null;resultId:string|null}
+export interface ModelSelection {model:string|null;reasoningEffort:string|null}
+export interface AiTask {id:string;recordId:string;status:string;partial:string;reasoningSummary?:string;startedAt?:number;updatedAt?:number;error:string|null;resultId:string|null}
 export interface AiRelated {id:string;title:string|null;kind:'text'|'conversation'|'draft';unavailable:boolean;revisionId:string|null}
-export interface AiWorkspace {id:string;title:string|null;kind:string;messages:{id:string;role:string;text:string;images?:string[];sequence:number}[];sources:AiRelated[];related:AiRelated[];task:AiTask|null;profileId?:string|null;linkedDiaryId?:string|null;adoptedSequence?:number;previewTaskId?:string|null;contextIds?:string[];effectiveModel?:string|null;effectiveEffort?:string|null}
+export interface AiWorkspace {id:string;title:string|null;kind:string;messages:{id:string;role:string;text:string;images?:string[];sequence:number;createdAt?:number;reasoningSummary?:string|null;durationMs?:number|null}[];sources:AiRelated[];related:AiRelated[];task:AiTask|null;profileId?:string|null;linkedDiaryId?:string|null;adoptedSequence?:number;previewTaskId?:string|null;contextIds?:string[];effectiveModel?:string|null;effectiveEffort?:string|null}
 export interface AiPreferences {defaultProfileId:string|null;checks?:{profileId:string;testedAt:number;textStreaming:boolean;error:string|null}[]}
+export interface ChatSearchItem {chatId:string;title:string|null;messageId:string|null;role:string|null;excerpt:string}
 export interface ChatSummary {id:string;title:string|null;updatedAt:number;profileId:string|null}
 export interface DiaryPreview {taskId:string;text:string;title:string;recordDate:string;mode:'create'|'append'|'rewrite';targetId:string|null;targetVersion:number|null;adoptedId:string|null;targetText?:string|null;canUndo?:boolean}
-export interface CliInstallation {kind:string;name:string;path:string;version:string;generationSupported:boolean;error:string|null;preferred?:boolean}
+export interface CliInstallation {kind:string;name:string;path:string;version:string;error:string|null;preferred?:boolean}
 export interface CliModel {model:string;displayName:string;supportedReasoningEfforts:{reasoningEffort:string;description:string}[];defaultReasoningEffort:string|null;isDefault:boolean}
 export interface CliCatalog {version?:string;models:CliModel[];currentModel:string|null;currentEffort:string|null}
 export interface CliConnectionReport {version:string;modelReply:boolean;model:string|null;detail:string}
@@ -17,21 +19,23 @@ export const aiApi={
  scanCli:()=>invoke<CliInstallation[]>('ai_cli_scan'),
  codexCatalog:(path:string)=>invoke<CliCatalog>('ai_codex_catalog',{path}),
  codexModels:(path:string)=>invoke<string[]>('ai_codex_models',{path}),
- inspectCodex:(path?:string)=>invoke<{path:string;version:string;compatible:boolean}[]>('ai_codex_inspect',{path:path||null}),
- updateProfile:(profile:AiProfile,key:string)=>invoke<AiProfile>('ai_update_profile',{profile,key}),
+ inspectCodex:(path?:string)=>invoke<{path:string;version:string}[]>('ai_codex_inspect',{path:path||null}),
+ updateProfile:(profile:AiProfile,key:string,useForNewChat?:boolean)=>invoke<AiProfile>('ai_update_profile',{profile,key,...(useForNewChat===undefined?{}:{useForNewChat})}),
  preferences:()=>invoke<AiPreferences>('ai_preferences'),
  setDefault:(profileId:string|null)=>invoke<void>('ai_set_default',{profileId}),
+ searchChats:(keyword:string,offset=0)=>invoke<{items:ChatSearchItem[];nextOffset:number|null}>('ai_chat_search',{keyword,offset}),
  chats:(keyword:string,offset=0)=>invoke<{items:ChatSummary[];nextOffset:number|null}>('ai_chat_list',{keyword,offset}),
  rename:(recordId:string,title:string)=>invoke<void>('ai_chat_rename',{recordId,title}),
- send:(input:{requestId:string;conversationId:string|null;profileId:string;text:string;sourceIds:string[];recordDate:string;timezone:string})=>invoke<AiTask>('ai_chat_send',{input}),
- generatePreview:(input:{requestId:string;recordId:string;profileId:string;mode:'create'|'append'|'rewrite';targetId:string|null;sourceIds:string[]})=>invoke<AiTask>('ai_preview_generate',{input}),
+ send:(input:{selection?:ModelSelection;requestId:string;conversationId:string|null;profileId:string;text:string;sourceIds:string[];recordDate:string;timezone:string})=>invoke<AiTask>('ai_chat_send',{input}),
+ generatePreview:(input:{selection?:ModelSelection;requestId:string;recordId:string;profileId:string;mode:'create'|'append'|'rewrite';targetId:string|null;sourceIds:string[]})=>invoke<AiTask>('ai_preview_generate',{input}),
  preview:(taskId:string)=>invoke<DiaryPreview>('ai_preview',{taskId}),
  undoAdoption:(taskId:string)=>invoke<{recordId:string}>('ai_undo_adoption',{taskId}),
  adopt:(input:{taskId:string;requestId:string;title:string;recordDate:string;text:string})=>invoke<{recordId:string}>('ai_adopt',{input}),
  importImage:async(recordId:string,file:File)=>{if(file.size>25*1024*1024)throw new Error('图片超过 25 MiB');const bytes=new Uint8Array(await file.arrayBuffer());const metadata=new TextEncoder().encode(JSON.stringify({recordId,requestId:crypto.randomUUID(),name:file.name}));const packet=new Uint8Array(4+metadata.length+bytes.length);new DataView(packet.buffer).setUint32(0,metadata.length,true);packet.set(metadata,4);packet.set(bytes,4+metadata.length);return invoke<void>('ai_import_image',packet)},
  models:(profileId:string)=>invoke<string[]>('ai_models',{profileId}),
+ modelsDraft:(profile:AiProfile,key:string)=>invoke<string[]>('ai_models',{profile,key}),
  profiles:()=>invoke<AiProfile[]>('ai_profiles'),
- configure:(profile:AiProfile,key:string)=>invoke<AiProfile>('ai_configure',{profile,key}),
+ configure:(profile:AiProfile,key:string,useForNewChat?:boolean)=>invoke<AiProfile>('ai_configure',{profile,key,...(useForNewChat===undefined?{}:{useForNewChat})}),
  removeProfile:(profileId:string)=>invoke<void>('ai_delete_profile',{profileId}),
  test:(profileId:string,requestId=crypto.randomUUID())=>invoke<void>('ai_test',{profileId,requestId}),
  create:(recordDate:string,timezone:string)=>invoke<string>('ai_create_conversation',{recordDate,timezone}),

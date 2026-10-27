@@ -70,6 +70,7 @@ fn setup() -> (Workspace, DatabaseWorker, String) {
 }
 fn input(record: &str, request: &str, kind: &str) -> StartInput {
     StartInput {
+        selection: None,
         request_id: request.into(),
         record_id: record.into(),
         profile_id: "test-profile".into(),
@@ -331,6 +332,7 @@ fn lazy_chat_and_validation_are_atomic_and_never_create_diaries() {
     let (root, db, _) = setup();
     let make = |request: &str| {
         lifestory_studio_lib::ai_experience::ChatSend {
+            selection: None,
             request_id: request.into(),
             conversation_id: None,
             profile_id: "test-profile".into(),
@@ -526,7 +528,7 @@ fn schema_twelve_upgrade_preserves_drafts_chats_and_preferences_persist() {
     let sql = root.sql();
     sql.execute("UPDATE records SET kind='draft' WHERE id='source'", [])
         .unwrap();
-    sql.execute_batch("ALTER TABLE ai_tasks DROP COLUMN effective_profile_json; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; PRAGMA user_version=12;").unwrap();
+    sql.execute_batch("ALTER TABLE ai_tasks DROP COLUMN reasoning_summary; ALTER TABLE ai_tasks DROP COLUMN effective_profile_json; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; PRAGMA user_version=12;").unwrap();
     drop(sql);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
     assert!(db.read_record("source".into()).is_ok());
@@ -736,9 +738,321 @@ fn cli_effective_model_is_frozen_per_conversation_and_survives_restart() {
         Some("first-model")
     );
     let (snapshot, frozen) = db
-        .ai_cli_profile(chat, "test-profile".into(), "resolved-first".into())
+        .ai_cli_profile(chat, "test-profile".into(), "resolved-first".into(), None)
         .unwrap();
     assert!(frozen);
     assert_eq!(snapshot.model, "first-model");
     assert_eq!(snapshot.cli_version.as_deref(), Some("codex-cli 0.163.0"));
+}
+
+fn synthetic_cli(db: &DatabaseWorker) -> Profile {
+    let mut p = db.ai_profiles().unwrap().remove(0);
+    p.id = "new".into();
+    p.label = "Codex CLI".into();
+    p.service = "codex".into();
+    p.protocol = "codex".into();
+    p.codex_path = Some("/synthetic/codex".into());
+    p.cli_model_mode = Some("inherit".into());
+    p.model.clear();
+    p
+}
+
+#[test]
+fn cli_combined_save_updates_default_and_preserves_other_defaults() {
+    let (_root, db, _) = setup();
+    let p = db
+        .ai_configure_with_default(synthetic_cli(&db), "".into(), Some(true))
+        .unwrap();
+    assert_eq!(
+        db.ai_preferences().unwrap().default_profile_id.as_deref(),
+        Some(p.id.as_str())
+    );
+    let p = db
+        .ai_update_profile_with_default(p, "".into(), Some(true))
+        .unwrap();
+    assert_eq!(
+        db.ai_preferences().unwrap().default_profile_id.as_deref(),
+        Some(p.id.as_str())
+    );
+    let p = db
+        .ai_update_profile_with_default(p, "".into(), Some(false))
+        .unwrap();
+    assert_eq!(db.ai_preferences().unwrap().default_profile_id, None);
+    db.ai_set_default(Some("test-profile".into())).unwrap();
+    db.ai_update_profile_with_default(p, "".into(), Some(false))
+        .unwrap();
+    assert_eq!(
+        db.ai_preferences().unwrap().default_profile_id.as_deref(),
+        Some("test-profile")
+    );
+}
+
+#[test]
+fn cli_combined_save_rolls_back_profile_and_default_on_failure() {
+    let (root, db, _) = setup();
+    let p = db
+        .ai_configure_with_default(synthetic_cli(&db), "".into(), Some(true))
+        .unwrap();
+    let sql = root.sql();
+    let count: i64 = sql
+        .query_row("SELECT count(*) FROM ai_profiles", [], |r| r.get(0))
+        .unwrap();
+    sql.execute_batch("CREATE TRIGGER reject_default BEFORE UPDATE ON ai_preferences BEGIN SELECT RAISE(ABORT,'synthetic failure'); END;").unwrap();
+    assert!(
+        db.ai_configure_with_default(synthetic_cli(&db), "".into(), Some(true))
+            .is_err()
+    );
+    assert!(
+        db.ai_update_profile_with_default(p.clone(), "".into(), Some(false))
+            .is_err()
+    );
+    assert_eq!(
+        sql.query_row("SELECT count(*) FROM ai_profiles", [], |r| r
+            .get::<_, i64>(0))
+            .unwrap(),
+        count
+    );
+    let original: String = sql
+        .query_row(
+            "SELECT profile_json FROM ai_profiles WHERE id=?1",
+            [&p.id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Profile>(&original).unwrap().label,
+        "Codex CLI"
+    );
+    assert_eq!(db.ai_preferences().unwrap().default_profile_id, Some(p.id));
+}
+
+#[test]
+fn cli_combined_save_keeps_legacy_default_behavior_and_rejects_api_flags() {
+    let (_root, db, _) = setup();
+    let p = db.ai_configure(synthetic_cli(&db), "".into()).unwrap();
+    assert_eq!(db.ai_preferences().unwrap().default_profile_id, None);
+    db.ai_set_default(Some(p.id.clone())).unwrap();
+    let p = db.ai_update_profile(p, "".into()).unwrap();
+    assert_eq!(db.ai_preferences().unwrap().default_profile_id, Some(p.id));
+    let api = db
+        .ai_profiles()
+        .unwrap()
+        .into_iter()
+        .find(|p| p.id == "test-profile")
+        .unwrap();
+    assert!(
+        db.ai_configure_with_default(api.clone(), "".into(), Some(true))
+            .is_err()
+    );
+    assert!(
+        db.ai_update_profile_with_default(api, "".into(), Some(false))
+            .is_err()
+    );
+}
+
+#[test]
+fn chat_model_override_is_per_turn_and_does_not_change_defaults_or_history() {
+    use lifestory_studio_lib::ai::ModelSelection;
+    let (root, db, chat) = setup();
+    db.ai_set_default(Some("test-profile".into())).unwrap();
+    let (first, _, _) = db
+        .ai_prepare(input(&chat, "original-model", "chat"))
+        .unwrap();
+    db.ai_finish(first.id.clone(), Ok("第一段合成回应".into()))
+        .unwrap();
+    let mut next = input(&chat, "override-model", "chat");
+    next.selection = Some(ModelSelection {
+        model: Some("another-model".into()),
+        reasoning_effort: None,
+    });
+    let (resolved, frozen) = db
+        .ai_cli_profile(
+            chat.clone(),
+            "test-profile".into(),
+            next.request_id.clone(),
+            next.selection.clone(),
+        )
+        .unwrap();
+    assert!(!frozen);
+    assert_eq!(resolved.model, "another-model");
+    let (task, used, _) = db
+        .ai_prepare_resolved(next.clone(), Some(resolved))
+        .unwrap();
+    assert_eq!(used.model, "another-model");
+    db.ai_finish(task.id.clone(), Ok("第二段合成回应".into()))
+        .unwrap();
+    let sql = root.sql();
+    let raw: String = sql
+        .query_row(
+            "SELECT effective_profile_json FROM ai_tasks WHERE id=?1",
+            [&first.id],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(
+        serde_json::from_str::<Profile>(&raw).unwrap().model,
+        "synthetic-model"
+    );
+    assert_eq!(db.ai_profiles().unwrap().remove(0).model, "synthetic-model");
+    assert_eq!(
+        db.ai_preferences().unwrap().default_profile_id.as_deref(),
+        Some("test-profile")
+    );
+    assert_eq!(
+        db.ai_workspace(chat.clone())
+            .unwrap()
+            .effective_model
+            .as_deref(),
+        Some("another-model")
+    );
+    let (replay, _) = db
+        .ai_cli_profile(
+            chat.clone(),
+            "test-profile".into(),
+            next.request_id.clone(),
+            next.selection.clone(),
+        )
+        .unwrap();
+    assert_eq!(
+        db.ai_prepare_resolved(next.clone(), Some(replay))
+            .unwrap()
+            .0
+            .id,
+        task.id
+    );
+    next.selection.as_mut().unwrap().model = Some("changed-again".into());
+    assert!(db.ai_prepare_resolved(next, None).is_err());
+    let invalid = Some(ModelSelection {
+        model: Some("bad model".into()),
+        reasoning_effort: None,
+    });
+    assert!(
+        db.ai_cli_profile(
+            chat.clone(),
+            "test-profile".into(),
+            "invalid-choice".into(),
+            invalid
+        )
+        .is_err()
+    );
+    let invalid = Some(ModelSelection {
+        model: None,
+        reasoning_effort: Some("high".into()),
+    });
+    assert!(
+        db.ai_cli_profile(
+            chat.clone(),
+            "test-profile".into(),
+            "invalid-effort".into(),
+            invalid
+        )
+        .is_err()
+    );
+    drop(sql);
+    drop(db);
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    assert_eq!(
+        db.ai_workspace(chat).unwrap().effective_model.as_deref(),
+        Some("another-model")
+    );
+}
+
+#[test]
+fn cli_chat_override_replaces_only_future_snapshots_and_keeps_custom_configuration() {
+    use lifestory_studio_lib::ai::ModelSelection;
+    let (root, db, chat) = setup();
+    let mut p = synthetic_cli(&db);
+    p.id = "test-profile".into();
+    p.model = "custom-model".into();
+    p.cli_model_mode = Some("custom".into());
+    root.sql()
+        .execute(
+            "UPDATE ai_profiles SET profile_json=?1 WHERE id='test-profile'",
+            [serde_json::to_string(&p).unwrap()],
+        )
+        .unwrap();
+    let mut request = input(&chat, "cli-custom-choice", "chat");
+    request.selection = Some(ModelSelection {
+        model: Some("custom-model".into()),
+        reasoning_effort: Some("high".into()),
+    });
+    let (resolved, _) = db
+        .ai_cli_profile(
+            chat.clone(),
+            "test-profile".into(),
+            request.request_id.clone(),
+            request.selection.clone(),
+        )
+        .unwrap();
+    assert_eq!(resolved.cli_model_mode.as_deref(), Some("custom"));
+    let (task, _, _) = db.ai_prepare_resolved(request, Some(resolved)).unwrap();
+    db.ai_finish(task.id, Ok("合成回应".into())).unwrap();
+    let mut request = input(&chat, "cli-next-choice", "chat");
+    request.selection = Some(ModelSelection {
+        model: Some("directory-model".into()),
+        reasoning_effort: Some("medium".into()),
+    });
+    let (resolved, frozen) = db
+        .ai_cli_profile(
+            chat.clone(),
+            "test-profile".into(),
+            request.request_id.clone(),
+            request.selection.clone(),
+        )
+        .unwrap();
+    assert!(!frozen);
+    assert_eq!(resolved.model, "directory-model");
+    assert_eq!(resolved.cli_model_mode.as_deref(), Some("selected"));
+    let (task, _, _) = db.ai_prepare_resolved(request, Some(resolved)).unwrap();
+    db.ai_finish(task.id, Ok("新的合成回应".into())).unwrap();
+    assert_eq!(
+        db.ai_workspace(chat).unwrap().effective_effort.as_deref(),
+        Some("medium")
+    );
+    assert_eq!(db.ai_profiles().unwrap().remove(0).model, "custom-model");
+}
+
+#[test]
+fn message_observations_persist_without_entering_the_prompt_and_are_cleared_with_sources() {
+    let (root, db, conversation) = setup();
+    let (task, _, _) = db
+        .ai_prepare(input(&conversation, "observed-turn", "chat"))
+        .unwrap();
+    assert!(
+        db.ai_reasoning_summary(task.id.clone(), "合成公开摘要".into())
+            .unwrap()
+    );
+    assert!(
+        db.ai_reasoning_summary(task.id.clone(), "x".repeat(200_001))
+            .is_err()
+    );
+    db.ai_finish(task.id.clone(), Ok("合成正文".into()))
+        .unwrap();
+    assert!(!db.ai_reasoning_summary(task.id, "迟到内容".into()).unwrap());
+    let messages = db.ai_workspace(conversation.clone()).unwrap().messages;
+    assert!(messages[0]["createdAt"].as_i64().unwrap() > 0);
+    assert_eq!(messages[1]["reasoningSummary"], "合成公开摘要");
+    assert!(messages[1]["durationMs"].as_i64().unwrap() >= 0);
+    let (_, _, prompt) = db
+        .ai_prepare(input(&conversation, "next-observed-turn", "chat"))
+        .unwrap();
+    assert!(prompt.iter().any(|m| m.text == "合成正文"));
+    assert!(!prompt.iter().any(|m| m.text.contains("合成公开摘要")));
+    drop(db);
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    assert_eq!(
+        db.ai_workspace(conversation.clone()).unwrap().messages[1]["reasoningSummary"],
+        "合成公开摘要"
+    );
+    let impact = db.trash_impact("source".into()).unwrap();
+    db.trash_move(TrashRequest {
+        record_id: "source".into(),
+        expected_content_version: impact.content_version,
+        expected_impact: impact.impact_token,
+    })
+    .unwrap();
+    assert_eq!(
+        db.ai_workspace(conversation).unwrap().messages[1]["reasoningSummary"],
+        ""
+    );
 }

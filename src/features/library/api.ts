@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { JSONContent } from '@tiptap/react'
 export interface Tag { id: string; name: string }
+export interface TagUsage extends Tag { count:number;current:boolean }
 export interface Attachment { id: string; name: string; mediaType: string; byteLength: number; width: number; height: number }
 export interface AttachmentOperation { recordId: string; sessionId: string; expectedContentVersion: number; requestId: string }
 export interface ImportReport { recordId: string; messages: string[]; retry: File[] }
@@ -13,6 +14,8 @@ export type RecordKind = 'text' | 'conversation' | 'draft'
 export interface LibraryQuery { keyword: string; dateFrom: string | null; dateTo: string | null; kinds: RecordKind[]; tagIds: string[]; tagMode: 'all' | 'any'; hasImages: boolean | null; month: string | null; offset: number }
 export interface SearchItem extends RecordSummary {kind:RecordKind; tags:Tag[];hasImages:boolean;matchField:'title'|'body'|'message'|null}
 export interface QueryPage {items:SearchItem[];total:number;nextOffset:number|null;days:{date:string;count:number}[];tags:Tag[]}
+export interface CalendarDay { date: string; count: number; items: SearchItem[] }
+export interface CalendarPage { days: CalendarDay[]; tags: Tag[] }
 export interface ContentPreview {id:string;title:string|null;recordDate:string;kind:RecordKind;document:JSONContent|null;messages:string[];sources?:{id:string;title:string|null;unavailable:boolean}[]}
 export interface SaveInput {
   recordId: string; baseCheckpointId: string; baseContentVersion: number; requestId: string; sessionId: string; editSequence: number
@@ -46,6 +49,7 @@ export const libraryApi = {
   trashRestore:(item:TrashItem)=>invoke<void>('trash_restore',{recordId:item.id,deletedAt:item.deletedAt}),
   trashPurge:(item:TrashItem)=>invoke<void>('trash_purge',{recordId:item.id,deletedAt:item.deletedAt}),
   query: (query: LibraryQuery) => invoke<QueryPage>('library_query', {query}),
+  calendar: (query: { filters: LibraryQuery; from: string; to: string }) => invoke<CalendarPage>('library_calendar', { query }),
   preview: (recordId:string) => invoke<ContentPreview>('library_preview',{recordId}),
   importImage: async (operation: AttachmentOperation, file: File, document: object) => {
     if (file.size > MAX_IMAGE_BYTES) throw { code: 'validation', message: '图片超过 25 MiB' }
@@ -70,6 +74,7 @@ export const libraryApi = {
   read: (recordId: string) => invoke<RecordFile>('record_read', { recordId }),
   list: (offset = 0) => invoke<RecordSummary[]>('record_list', { offset }),
   save: (input: SaveInput) => invoke<SaveResult>('record_save', { input }),
+  tagCatalog:(recordId:string)=>invoke<TagUsage[]>('tag_catalog',{recordId}),
   tag: (name: string) => invoke<Tag>('tag_create', { name }),
   export: (input: SaveInput) => invoke<boolean>('record_export', { input }),
   exit: () => invoke<void>('record_exit'),

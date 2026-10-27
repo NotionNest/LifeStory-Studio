@@ -11,7 +11,6 @@ pub struct Installation {
     pub name: String,
     pub path: String,
     pub version: String,
-    pub generation_supported: bool,
     pub preferred: bool,
     pub error: Option<String>,
 }
@@ -171,7 +170,6 @@ async fn scan_in(dirs: Vec<PathBuf>) -> Vec<Installation> {
                     name,
                     path: path.to_string_lossy().into_owned(),
                     version: "未运行（其他安装）".into(),
-                    generation_supported: false,
                     preferred,
                     error: None,
                 });
@@ -190,14 +188,10 @@ async fn scan_in(dirs: Vec<PathBuf>) -> Vec<Installation> {
                     _ => return None,
                 }
             }
-            let generation_supported = kind == "codex"
-                && crate::ai_providers::codex_generation_supported(&version)
-                && error.is_none();
             Some(Installation {
                 kind,
                 name,
                 path: path.to_string_lossy().into_owned(),
-                generation_supported,
                 preferred,
                 version,
                 error,
@@ -276,7 +270,7 @@ mod tests {
         assert_eq!(result.len(), 2);
         let codex = result.iter().find(|i| i.kind == "codex").unwrap();
         assert!(codex.error.is_none());
-        assert!(codex.generation_supported);
+        assert_eq!(codex.kind, "codex");
         assert!(
             result
                 .iter()

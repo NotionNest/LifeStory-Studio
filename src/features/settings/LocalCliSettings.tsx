@@ -1,3 +1,9 @@
+import claudeLogo from '@/assets/cli-logos/claudecode-color.svg'
+import codexLogo from '@/assets/cli-logos/codex-color.svg'
+import cursorLogo from '@/assets/cli-logos/cursor.svg'
+import geminiLogo from '@/assets/cli-logos/geminicli-color.svg'
+import kimiLogo from '@/assets/cli-logos/kimi-color.svg'
+import { RefreshCwIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
@@ -8,26 +14,32 @@ import { aiApi, type AiPreferences, type AiProfile, type CliCatalog, type CliIns
 import { errorMessage } from '@/features/library/api'
 
 const emptyProfile = (path: string): AiProfile => ({id:'new',label:'Codex CLI',service:'codex',protocol:'codex',baseUrl:'',model:'',cliModelMode:'inherit',reasoningEffort:null,codexPath:path,contextChars:32000,maxOutputTokens:4096,downstream:null})
-type Props = {profiles:AiProfile[];preferences?:AiPreferences;onChange:(profile?:AiProfile)=>void;onDirty:(value:boolean)=>void;onBusy:(value:boolean)=>void}
+type Props = {active?:boolean;profiles:AiProfile[];preferences?:AiPreferences;onChange:(profile?:AiProfile)=>void;onDirty:(value:boolean)=>void;onBusy:(value:boolean)=>void}
 
-export function LocalCliSettings({profiles,preferences,onChange,onDirty,onBusy}:Props) {
+const cliLogos: Record<string, string> = { claude: claudeLogo, codex: codexLogo, cursor: cursorLogo, gemini: geminiLogo, kimi: kimiLogo }
+
+export function LocalCliSettings({active=true,profiles,preferences,onChange,onDirty,onBusy}:Props) {
   const [installations,setInstallations] = useState<CliInstallation[]>([])
   const [scanned,setScanned] = useState(false)
   const [open,setOpen] = useState('')
   const [profile,setProfile] = useState<AiProfile>(emptyProfile(''))
   const [editing,setEditing] = useState<string|null>(null)
   const [dirty,setDirty] = useState(false)
+  const [useForNewChat,setUseForNewChat] = useState(false)
   const [busy,setBusy] = useState(false)
+  const [reading,setReading] = useState(false)
+  const [scanning,setScanning] = useState(false)
+  const scanPending = useRef(false)
+  const working = busy||scanning||reading
   const [catalog,setCatalog] = useState<CliCatalog|null>(null)
-  const [updated,setUpdated] = useState<number|null>(null)
   const [message,setMessage] = useState('')
   const [testing,setTesting] = useState<string|null>(null)
   const epoch = useRef(0)
+  const initialScan = useRef(false)
   useEffect(()=>{onDirty(dirty)},[dirty,onDirty])
   useEffect(()=>{onBusy(busy)},[busy,onBusy])
 
-  const active = profiles.filter(p=>p.protocol==='codex'&&!p.label.startsWith('[已停用]'))
-  const saved = active.find(p=>p.id===editing)
+  const activeProfiles = profiles.filter(p=>p.protocol==='codex'&&!p.label.startsWith('[已停用]'))
   const current = installations.filter(i=>i.preferred!==false)
   const installation = current.find(i=>i.kind==='codex')
   const mode = profile.cliModelMode??'selected'
@@ -41,29 +53,43 @@ export function LocalCliSettings({profiles,preferences,onChange,onDirty,onBusy}:
     setBusy(true);setMessage('')
     try { await action() } catch(e) { setMessage(errorMessage(e)) } finally { setBusy(false) }
   }
+  const read = async(action:()=>Promise<void>) => {
+    setReading(true);setMessage('')
+    try { await action() } catch(e) { setMessage(errorMessage(e)) } finally { setReading(false) }
+  }
   const refreshCatalog = async(path:string) => {
     const request=++epoch.current
-    setCatalog(null);setUpdated(null)
+    setCatalog(null)
     const next=await aiApi.codexCatalog(path)
     if(request!==epoch.current)return
-    setCatalog(next);setUpdated(Date.now())
+    setCatalog(next)
     if(next.version)setInstallations(items=>items.map(i=>i.path===path?{...i,version:next.version!}:i))
   }
   const load = async(item:CliInstallation) => {
-    const previous=active.find(p=>p.id===preferences?.defaultProfileId)??active[active.length-1]
+    const previous=activeProfiles.find(p=>p.id===preferences?.defaultProfileId)??activeProfiles[activeProfiles.length-1]
     const next=previous?{...previous,label:'Codex CLI',codexPath:item.path,cliModelMode:previous.cliModelMode??'selected' as const}:emptyProfile(item.path)
-    setProfile(next);setEditing(previous?.id??null)
+    setProfile(next);setEditing(previous?.id??null);setUseForNewChat(!!previous&&preferences?.defaultProfileId===previous.id)
     setDirty(!!previous&&(previous.codexPath!==item.path||previous.label!=='Codex CLI'))
     await refreshCatalog(item.path)
   }
   const field = (name:keyof AiProfile,value:string|number|null) => {
     setProfile(p=>({...p,[name]:value}));setDirty(true);setMessage('')
   }
-  const scan = () => run(async()=>{
-    const result=await aiApi.scanCli()
-    setInstallations(result);setScanned(true);setOpen('');setCatalog(null);setUpdated(null);++epoch.current
-    if(!result.length)setMessage('未找到当前可用的 CLI。已有配置和聊天保留，请检查终端中的安装后重新扫描。')
-  })
+  const scan = async() => {
+    if(scanPending.current||busy||dirty)return
+    scanPending.current=true;setScanning(true);setMessage('');setOpen('')
+    try {
+      const result=await aiApi.scanCli()
+      setInstallations(result);setScanned(true);setOpen('');setCatalog(null);++epoch.current
+      if(!result.length)setMessage('未找到当前可用的 CLI。已有配置和聊天保留，请检查终端中的安装后重新扫描。')
+    } catch(e) { setMessage(errorMessage(e)) }
+    finally { scanPending.current=false;setScanning(false) }
+  }
+  useEffect(()=>{
+    if(!active||initialScan.current)return
+    initialScan.current=true
+    void scan()
+  },[active])
   const test = () => run(async()=>{
     const requestId=crypto.randomUUID();setTesting(requestId)
     try {
@@ -74,32 +100,34 @@ export function LocalCliSettings({profiles,preferences,onChange,onDirty,onBusy}:
 
   return <section aria-label="本机 CLI 设置" className="flex flex-col gap-5">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-sm text-muted-foreground">选择已安装的 CLI。</p>
-      <Button variant="outline" disabled={busy||dirty} onClick={()=>void scan()}>{scanned?'重新扫描':'扫描本机 CLI'}</Button>
+      <h2 className="text-sm font-medium">本机 CLI</h2>
+      <Button variant="outline" disabled={working||dirty} onClick={()=>void scan()}><RefreshCwIcon data-icon="inline-start" aria-hidden="true"/>{scanned?'重新扫描':'扫描本机 CLI'}</Button>
     </div>
-    {!scanned&&<p className="py-4 text-sm text-muted-foreground">扫描本机已安装的 CLI。</p>}
-    <Accordion type="single" collapsible value={open} onValueChange={value=>{
-      if(busy||dirty)return
+    <Accordion className="gap-3" type="single" collapsible value={open} onValueChange={value=>{
+      if(working||dirty)return
       setOpen(value);setMessage('')
-      if(value==='codex'&&installation)void run(()=>load(installation))
+      if(value==='codex'&&installation)void read(()=>load(installation))
     }}>
-      {current.map(item=><AccordionItem key={item.kind} value={item.kind}>
-        <AccordionTrigger aria-label={`配置 ${item.name}`} disabled={busy||dirty}>
-          <span className="flex flex-col items-start gap-1"><span>{item.name}</span><span className="text-xs font-normal text-muted-foreground">{item.version||'版本未核实'}{item.kind!=='codex'?' · 暂不支持聊天':''}</span></span>
+      {current.map(item=><AccordionItem key={item.kind} value={item.kind} className="rounded-xl border bg-sidebar px-4 sm:px-5">
+        <div className="flex items-center gap-3 [&>h3]:min-w-0 [&>h3]:flex-1">
+        <AccordionTrigger className="min-w-0 py-5 hover:no-underline **:data-[slot=accordion-trigger-icon]:hidden!" aria-label={`配置 ${item.name}`} disabled={working||dirty}>
+          <span className="flex min-w-0 items-center gap-3"><span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white"><img src={cliLogos[item.kind]} className="size-7 object-contain" alt="" aria-hidden="true"/></span><span className="flex min-w-0 flex-col items-start gap-1"><span className="flex items-center gap-2">{item.name}{item.kind==='codex'&&activeProfiles.some(p=>p.id===preferences?.defaultProfileId)&&<span className="text-xs font-normal text-muted-foreground">默认</span>}</span><span className="text-xs font-normal text-muted-foreground">{item.version||'版本未核实'}{item.kind!=='codex'?' · 暂不支持聊天':''}</span></span></span>
         </AccordionTrigger>
-        <AccordionContent className="flex flex-col gap-5">
+        {item.kind==='codex'&&open==='codex'&&(testing?<Button variant="outline" size="sm" onClick={()=>void aiApi.cancelTest(testing).then(()=>setMessage('正在停止测试…')).catch(e=>setMessage(errorMessage(e)))}>停止测试</Button>:<Button variant="outline" size="sm" disabled={working||invalidEffort||invalidModel} title="测试会发送一条简短消息，可能消耗服务额度。" onClick={()=>void test()}>测试连接</Button>)}
+        </div>
+        <AccordionContent className="flex flex-col gap-5 pb-5">
           {item.kind!=='codex'?<p className="text-sm text-muted-foreground">当前仅支持通过 Codex CLI 聊天。</p>:<>
             {item.error&&<p role="alert" className="text-sm text-destructive">{item.error}</p>}
             <form className="flex flex-col gap-5" onSubmit={e=>{
               e.preventDefault();void run(async()=>{
-                const next=editing?await aiApi.updateProfile(profile,''):await aiApi.configure(profile,'')
+                const next=editing?await aiApi.updateProfile(profile,'',useForNewChat):await aiApi.configure(profile,'',useForNewChat)
                 setProfile(next);setEditing(next.id);setDirty(false);onChange(next);setMessage('设置已保存。')
               })
             }}>
-              <FieldGroup className="grid gap-5 sm:grid-cols-2">
+              <FieldGroup className="flex flex-col gap-5">
                 <Field>
-                  <div className="flex items-center justify-between gap-2"><FieldLabel htmlFor="cli-model">模型</FieldLabel><Button type="button" variant="ghost" size="sm" disabled={busy} onClick={()=>void run(()=>refreshCatalog(item.path))}>刷新列表</Button></div>
-                  <NativeSelect id="cli-model" aria-label="CLI 模型" className="w-full" disabled={busy} value={mode==='selected'?`model:${profile.model}`:mode} onChange={e=>{
+                  <div className="flex items-center justify-between gap-2"><FieldLabel htmlFor="cli-model">模型</FieldLabel><Button type="button" variant="ghost" size="sm" disabled={working} onClick={()=>void read(()=>refreshCatalog(item.path))}>刷新列表</Button></div>
+                  <NativeSelect id="cli-model" aria-label="CLI 模型" className="w-full" disabled={working} value={mode==='selected'?`model:${profile.model}`:mode} onChange={e=>{
                     const value=e.target.value
                     setProfile(p=>({...p,cliModelMode:value==='inherit'?'inherit':value==='custom'?'custom':'selected',model:value==='inherit'||value==='custom'?'':value.slice(6)}))
                     setDirty(true);setMessage('')
@@ -109,42 +137,33 @@ export function LocalCliSettings({profiles,preferences,onChange,onDirty,onBusy}:
                     {catalog?.models.map(m=><NativeSelectOption key={m.model} value={`model:${m.model}`}>{m.displayName} · {m.model}</NativeSelectOption>)}
                     <NativeSelectOption value="custom">自定义模型 ID</NativeSelectOption>
                   </NativeSelect>
-                  {!catalog&&<FieldDescription>未能读取模型列表，请刷新重试。</FieldDescription>}
+                  {!working&&!catalog&&<FieldDescription>未能读取模型列表，请刷新重试。</FieldDescription>}
                 </Field>
                 <Field>
                   <FieldLabel htmlFor="cli-effort">推理强度</FieldLabel>
-                  <NativeSelect id="cli-effort" aria-label="CLI 推理强度" className="w-full" disabled={busy||(!efforts.length&&!profile.reasoningEffort)} value={profile.reasoningEffort??'inherit'} onChange={e=>field('reasoningEffort',e.target.value==='inherit'?null:e.target.value)}>
+                  <NativeSelect id="cli-effort" aria-label="CLI 推理强度" className="w-full" disabled={working||(!efforts.length&&!profile.reasoningEffort)} value={profile.reasoningEffort??'inherit'} onChange={e=>field('reasoningEffort',e.target.value==='inherit'?null:e.target.value)}>
                     <NativeSelectOption value="inherit">跟随 CLI 设置{catalog?.currentEffort?`（当前 ${catalog.currentEffort}）`:''}</NativeSelectOption>
                     {invalidEffort&&<NativeSelectOption value={profile.reasoningEffort!}>原选择：{profile.reasoningEffort}（请重新选择）</NativeSelectOption>}
                     {efforts.map(e=><NativeSelectOption key={e.reasoningEffort} value={e.reasoningEffort}>{e.reasoningEffort}</NativeSelectOption>)}
                   </NativeSelect>
-                  <FieldDescription>{invalidEffort?'原强度未在当前模型能力中核实，请重新选择。':!efforts.length?'CLI 未提供该模型的可选强度，当前沿用 CLI 设置。':''}</FieldDescription>
+                  {invalidEffort&&<FieldDescription>原强度不可用，请重新选择。</FieldDescription>}
                 </Field>
-                {mode==='custom'&&<Field className="sm:col-span-2"><FieldLabel htmlFor="cli-custom">自定义模型 ID</FieldLabel><Input id="cli-custom" aria-label="CLI 自定义模型 ID" disabled={busy} value={profile.model} onChange={e=>field('model',e.target.value)} required/><FieldDescription>自定义 ID 未经模型目录核实。</FieldDescription></Field>}
+                {mode==='custom'&&<Field className="sm:col-span-2"><FieldLabel htmlFor="cli-custom">自定义模型 ID</FieldLabel><Input id="cli-custom" aria-label="CLI 自定义模型 ID" disabled={working} value={profile.model} onChange={e=>field('model',e.target.value)} required/></Field>}
               </FieldGroup>
               {catalog?.models.length===0&&<p role="status" className="text-sm text-muted-foreground">没有可用的模型列表，请检查 CLI 登录状态后刷新。</p>}
-              <details><summary className="cursor-pointer text-sm text-muted-foreground">高级设置与诊断</summary>
-                <div className="mt-3 flex flex-col gap-3 text-xs text-muted-foreground"><p className="break-all">系统默认 CLI：{item.path}</p><p>{updated?`目录更新于 ${new Date(updated).toLocaleTimeString()}`:'目录未更新'} · 版本 {item.version}</p><p>跟随设置在新聊天首次发送时解析；已有聊天保留实际模型。不会修改 CLI 全局设置。</p></div>
-                <FieldGroup className="mt-4 grid gap-4 sm:grid-cols-2">
-                  <Field><FieldLabel htmlFor="cli-context">上下文字符预算</FieldLabel><Input id="cli-context" aria-label="CLI 上下文字符预算" type="number" disabled={busy} value={profile.contextChars} onChange={e=>field('contextChars',Number(e.target.value))}/></Field>
-                  <Field><FieldLabel htmlFor="cli-output">本机输出预算（每单位 16 字节）</FieldLabel><Input id="cli-output" type="number" disabled={busy} value={profile.maxOutputTokens} onChange={e=>field('maxOutputTokens',Number(e.target.value))}/></Field>
-                </FieldGroup>
-              </details>
-              <div className="flex flex-wrap gap-2 border-t pt-4">
-                <Button disabled={busy||invalidEffort||invalidModel}>保存设置</Button>
-                <Button type="button" variant="outline" disabled={busy||invalidEffort||invalidModel} onClick={()=>void test()}>测试连接</Button>
-                {saved&&<Button type="button" variant="ghost" disabled={busy||dirty||preferences?.defaultProfileId===saved.id} onClick={()=>void run(async()=>{await aiApi.setDefault(saved.id);onChange();setMessage('已设为新聊天默认服务。')})}>{preferences?.defaultProfileId===saved.id?'已是聊天默认':'设为聊天默认'}</Button>}
-                {dirty&&<Button type="button" variant="ghost" disabled={busy} onClick={()=>void run(async()=>{await load(item);setDirty(false)})}>放弃修改</Button>}
-              </div>
-              <p className="text-xs text-muted-foreground">测试会发送一条简短消息，可能消耗服务额度。</p>
+              <div className="flex items-center justify-between gap-3"><label id="cli-default-label" htmlFor="cli-default" className="text-sm font-medium">用于新聊天</label><Button id="cli-default" type="button" variant="ghost" size="sm" role="switch" aria-labelledby="cli-default-label" aria-checked={useForNewChat} disabled={working} onClick={()=>{setUseForNewChat(value=>!value);setDirty(true);setMessage('')}} className="h-5 w-9 shrink-0 justify-start rounded-full bg-input p-0.5 hover:bg-input transition-colors aria-checked:bg-primary aria-checked:hover:bg-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="size-4 rounded-full bg-background shadow-sm transition-transform" style={{transform:useForNewChat?'translateX(16px)':'translateX(0)'}}/></Button></div>
+              {(!editing||dirty)&&<div className="flex flex-wrap gap-2 border-t pt-4">
+                <Button disabled={working||invalidEffort||invalidModel}>保存</Button>
+                {dirty&&<Button type="button" variant="ghost" disabled={working} onClick={()=>void read(async()=>{await load(item);setDirty(false)})}>放弃修改</Button>}
+              </div>}
             </form>
+            {(busy||reading)&&<p role="status" className="text-sm">{testing?'正在检查 CLI 和模型连接…':'正在读取 CLI…'}</p>}
+            {message&&<p role="status" aria-live="polite" className="whitespace-pre-wrap text-sm">{message}</p>}
           </>}
         </AccordionContent>
       </AccordionItem>)}
     </Accordion>
-    {dirty&&<p className="text-xs text-muted-foreground">修改尚未保存，请保存或放弃后再切换或重新扫描。</p>}
-    {testing&&<Button variant="outline" onClick={()=>void aiApi.cancelTest(testing).then(()=>setMessage('正在停止测试…')).catch(e=>setMessage(errorMessage(e)))}>停止测试</Button>}
-    {busy&&<p role="status" className="text-sm">{testing?'正在检查 CLI 和模型连接…':'正在读取 CLI…'}</p>}
-    {message&&<p role="status" aria-live="polite" className="whitespace-pre-wrap text-sm">{message}</p>}
+    {scanning&&<p role="status" className="text-sm">正在扫描 CLI…</p>}
+    {open!=='codex'&&message&&<p role="status" aria-live="polite" className="whitespace-pre-wrap text-sm">{message}</p>}
   </section>
 }
