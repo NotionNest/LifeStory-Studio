@@ -113,6 +113,13 @@ pub async fn record_save(
     record_task(&database, move |db| db.save_record(input)).await
 }
 #[tauri::command]
+pub async fn tag_catalog(
+    database: State<'_, DatabaseWorker>,
+    record_id: String,
+) -> Result<Vec<crate::library_query::TagUsage>, RecordError> {
+    record_task(&database, move |db| db.tag_catalog(record_id)).await
+}
+#[tauri::command]
 pub async fn tag_create(
     database: State<'_, DatabaseWorker>,
     name: String,
@@ -311,6 +318,14 @@ pub async fn attachment_copy(
 }
 
 #[tauri::command]
+pub async fn library_calendar(
+    database: State<'_, DatabaseWorker>,
+    query: crate::library_query::CalendarQuery,
+) -> Result<crate::library_query::CalendarPage, RecordError> {
+    record_task(&database, move |db| db.query_calendar(query)).await
+}
+
+#[tauri::command]
 pub async fn library_query(
     database: State<'_, DatabaseWorker>,
     query: crate::library_query::LibraryQuery,
@@ -392,8 +407,12 @@ pub async fn ai_configure(
     database: State<'_, DatabaseWorker>,
     profile: crate::ai_providers::Profile,
     key: String,
+    use_for_new_chat: Option<bool>,
 ) -> Result<crate::ai_providers::Profile, RecordError> {
-    record_task(&database, move |db| db.ai_configure(profile, key)).await
+    record_task(&database, move |db| {
+        db.ai_configure_with_default(profile, key, use_for_new_chat)
+    })
+    .await
 }
 #[tauri::command]
 pub async fn ai_delete_profile(
@@ -518,22 +537,36 @@ pub async fn ai_compare(
 #[tauri::command]
 pub async fn ai_models(
     database: State<'_, DatabaseWorker>,
-    profile_id: String,
+    profile_id: Option<String>,
+    profile: Option<crate::ai_providers::Profile>,
+    key: Option<String>,
 ) -> Result<Vec<String>, RecordError> {
-    let profiles = record_task(&database, |db| db.ai_profiles()).await?;
-    let profile = profiles
-        .into_iter()
-        .find(|p| p.id == profile_id && !p.label.starts_with("[已停用]"))
-        .ok_or_else(|| RecordError {
-            code: "not_found",
-            message: "服务配置不存在".into(),
-        })?;
-    crate::ai_providers::models(&profile)
-        .await
-        .map_err(|message| RecordError {
-            code: "provider_error",
-            message,
-        })
+    let result = match (profile_id, profile, key) {
+        (None, Some(profile), Some(key)) => {
+            crate::ai_providers::models_with_key(&profile, &key).await
+        }
+        (Some(profile_id), None, None) => {
+            let profiles = record_task(&database, |db| db.ai_profiles()).await?;
+            let profile = profiles
+                .into_iter()
+                .find(|p| p.id == profile_id && !p.label.starts_with("[已停用]"))
+                .ok_or_else(|| RecordError {
+                    code: "not_found",
+                    message: "服务配置不存在".into(),
+                })?;
+            crate::ai_providers::models(&profile).await
+        }
+        _ => {
+            return Err(RecordError {
+                code: "validation",
+                message: "请选择已保存配置，或提供当前配置与 API Key".into(),
+            });
+        }
+    };
+    result.map_err(|message| RecordError {
+        code: "provider_error",
+        message,
+    })
 }
 
 #[tauri::command]
@@ -643,8 +676,12 @@ pub async fn ai_update_profile(
     database: State<'_, DatabaseWorker>,
     profile: crate::ai_providers::Profile,
     key: String,
+    use_for_new_chat: Option<bool>,
 ) -> Result<crate::ai_providers::Profile, RecordError> {
-    record_task(&database, move |db| db.ai_update_profile(profile, key)).await
+    record_task(&database, move |db| {
+        db.ai_update_profile_with_default(profile, key, use_for_new_chat)
+    })
+    .await
 }
 #[tauri::command]
 pub async fn ai_undo_adoption(
@@ -752,4 +789,16 @@ pub async fn ai_test_cli(
         result=crate::ai_providers::test_cli(profile,test.cancelled.clone())=>result,
         _=async{while !test.cancelled.load(std::sync::atomic::Ordering::SeqCst){tokio::time::sleep(std::time::Duration::from_millis(25)).await;}}=>Err("连接测试已取消".into()),
     }
+}
+
+#[tauri::command]
+pub async fn ai_chat_search(
+    database: State<'_, DatabaseWorker>,
+    keyword: String,
+    offset: u32,
+) -> Result<crate::ai_experience::ChatSearchPage, RecordError> {
+    record_task(&database, move |db| {
+        db.ai_chat_search(crate::ai_experience::ChatQuery { keyword, offset })
+    })
+    .await
 }

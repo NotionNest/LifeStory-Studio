@@ -23,6 +23,7 @@ pub struct PreviewSpec {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ChatSend {
+    pub selection: Option<crate::ai::ModelSelection>,
     pub request_id: String,
     pub conversation_id: Option<String>,
     pub profile_id: String,
@@ -43,6 +44,7 @@ impl ChatSend {
             },
         });
         StartInput {
+            selection: self.selection,
             request_id: self.request_id,
             record_id: self.conversation_id.unwrap_or_default(),
             profile_id: self.profile_id,
@@ -57,6 +59,7 @@ impl ChatSend {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PreviewGenerate {
+    pub selection: Option<crate::ai::ModelSelection>,
     pub request_id: String,
     pub record_id: String,
     pub profile_id: String,
@@ -66,7 +69,7 @@ pub struct PreviewGenerate {
 }
 impl PreviewGenerate {
     pub fn into_start(self) -> StartInput {
-        StartInput{request_id:self.request_id,record_id:self.record_id,profile_id:self.profile_id,kind:"draft".into(),text:"只输出可采用的日记正文，不输出解释或推理。只写用户明确讲述的事实、感受，不能将 AI 的话当作用户经历。".into(),source_ids:self.source_ids,new_chat:None,preview:Some(PreviewSpec{mode:self.mode,target_id:self.target_id})}
+        StartInput{selection:self.selection,request_id:self.request_id,record_id:self.record_id,profile_id:self.profile_id,kind:"draft".into(),text:"只输出可采用的日记正文，不输出解释或推理。只写用户明确讲述的事实、感受，不能将 AI 的话当作用户经历。".into(),source_ids:self.source_ids,new_chat:None,preview:Some(PreviewSpec{mode:self.mode,target_id:self.target_id})}
     }
 }
 #[derive(Deserialize)]
@@ -358,9 +361,20 @@ impl DatabaseWorker {
     /// Editing creates an immutable profile revision. Existing task provenance is unchanged.
     pub fn ai_update_profile(
         &self,
-        mut profile: crate::ai_providers::Profile,
+        profile: crate::ai_providers::Profile,
         key: String,
     ) -> StorageResult<crate::ai_providers::Profile> {
+        self.ai_update_profile_with_default(profile, key, None)
+    }
+    pub fn ai_update_profile_with_default(
+        &self,
+        mut profile: crate::ai_providers::Profile,
+        key: String,
+        use_for_new_chat: Option<bool>,
+    ) -> StorageResult<crate::ai_providers::Profile> {
+        if use_for_new_chat.is_some() && profile.protocol != "codex" {
+            return Err(fail("validation", "此默认选择仅适用于本机 CLI"));
+        }
         crate::ai_providers::validate(&profile).map_err(|e| fail("validation", &e))?;
         let old = profile.id.clone();
         identifier(&old)?;
@@ -376,7 +390,11 @@ impl DatabaseWorker {
  if previous.label.starts_with("[已停用]"){return Err(fail("conflict","该配置已停用，请添加新服务"))}
  let running:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM ai_tasks WHERE profile_id=?1 AND status='running')",[&old],|r|r.get(0))?;if running{return Err(fail("conflict","请先完成或取消该服务的任务，再修改配置"))}
  profile.id=id(&tx)?;if profile.protocol!="codex"{crate::ai_providers::store_key(&profile.id,&key).map_err(|e|fail("credential_error",&e))?;}
- let saved=(||->StorageResult<()>{tx.execute("INSERT INTO ai_profiles VALUES(?1,?2,?3)",params![profile.id,serde_json::to_string(&profile)?,now()?])?;tx.execute("UPDATE ai_profiles SET profile_json=json_set(profile_json,'$.label',?2) WHERE id=?1",params![old,format!("[已停用] {}",previous.label)])?;tx.execute("UPDATE ai_preferences SET default_profile_id=?2 WHERE default_profile_id=?1",params![old,profile.id])?;tx.commit()?;Ok(())})();
+ let saved=(||->StorageResult<()>{tx.execute("INSERT INTO ai_profiles VALUES(?1,?2,?3)",params![profile.id,serde_json::to_string(&profile)?,now()?])?;tx.execute("UPDATE ai_profiles SET profile_json=json_set(profile_json,'$.label',?2) WHERE id=?1",params![old,format!("[已停用] {}",previous.label)])?;match use_for_new_chat {
+ Some(true)=>{tx.execute("UPDATE ai_preferences SET default_profile_id=?1 WHERE id=1",[&profile.id])?;},
+ Some(false)=>{tx.execute("UPDATE ai_preferences SET default_profile_id=NULL WHERE default_profile_id=?1",[&old])?;},
+ None=>{tx.execute("UPDATE ai_preferences SET default_profile_id=?2 WHERE default_profile_id=?1",params![old,profile.id])?;}
+ }tx.commit()?;Ok(())})();
  if let Err(e)=saved{if profile.protocol!="codex"{let _=crate::ai_providers::delete_key(&profile.id);}return Err(e)}
  if previous.protocol!="codex"{crate::ai_providers::delete_key(&old).map_err(|_|fail("credential_error","新配置已保存并替换旧配置，但旧凭据未能清理，请在系统凭据库中核对清理"))?;}Ok(profile)
  })
@@ -407,5 +425,52 @@ impl DatabaseWorker {
  tx.execute("UPDATE ai_conversations SET adopted_sequence=?3 WHERE record_id=?1 AND linked_diary_id=?2",params![conversation,diary,previous])?;
  tx.commit()?;Ok(Adopted{record_id:diary})
  })
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatSearchItem {
+    pub chat_id: String,
+    pub title: Option<String>,
+    pub message_id: Option<String>,
+    pub role: Option<String>,
+    pub excerpt: String,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatSearchPage {
+    pub items: Vec<ChatSearchItem>,
+    pub next_offset: Option<u32>,
+}
+impl DatabaseWorker {
+    pub fn ai_chat_search(&self, input: ChatQuery) -> StorageResult<ChatSearchPage> {
+        if input.keyword.chars().count() > 200 || input.keyword.trim().is_empty() {
+            return Err(fail("validation", "请输入 1—200 字的搜索内容"));
+        }
+        self.call(move |db, _| {
+            let mut stmt = db.prepare("WITH hits AS (
+                SELECT m.id,m.record_id,m.role,m.content_json,m.sequence FROM conversation_messages m
+                JOIN records r ON r.id=m.record_id AND r.kind='conversation' AND r.deleted_at IS NULL
+                WHERE EXISTS(SELECT 1 FROM json_tree(m.content_json) j WHERE j.key='text' AND j.type='text' AND instr(lower(j.atom),lower(?1))>0)
+            ), results AS (
+                SELECT r.id AS chat_id,r.title,h.id AS message_id,h.role,h.content_json,r.updated_at,h.sequence
+                FROM hits h JOIN records r ON r.id=h.record_id
+                UNION ALL
+                SELECT r.id,r.title,NULL,NULL,NULL,r.updated_at,-1 FROM records r
+                WHERE r.kind='conversation' AND r.deleted_at IS NULL AND instr(lower(COALESCE(r.title,'')),lower(?1))>0
+                AND NOT EXISTS(SELECT 1 FROM hits h WHERE h.record_id=r.id)
+            ) SELECT chat_id,title,message_id,role,content_json FROM results
+              ORDER BY updated_at DESC,chat_id,sequence DESC,message_id LIMIT 101 OFFSET ?2")?;
+            let rows = stmt.query_map(params![input.keyword.trim(),input.offset], |r| Ok((r.get::<_,String>(0)?,r.get::<_,Option<String>>(1)?,r.get::<_,Option<String>>(2)?,r.get::<_,Option<String>>(3)?,r.get::<_,Option<String>>(4)?)))?;
+            let mut items = Vec::new();
+            for row in rows {
+                let (chat_id,title,message_id,role,raw) = row?;
+                let text = match raw { Some(raw) => crate::ai::message_text(&serde_json::from_str(&raw)?), None => title.clone().unwrap_or_default() };
+                items.push(ChatSearchItem { chat_id,title,message_id,role,excerpt:crate::library_query::excerpt(&text,input.keyword.trim()) });
+            }
+            let next_offset = if items.len()>100 {items.pop();Some(input.offset.saturating_add(100))}else{None};
+            Ok(ChatSearchPage {items,next_offset})
+        })
     }
 }

@@ -5,36 +5,45 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #f4f4ef;
-  --foreground: #293831;
-  --card: #fafaf7;
-  --card-foreground: #293831;
+  --workspace-border: rgb(0 0 0 / 15%);
+  --workspace-shadow: 0 1px 5px rgb(0 0 0 / 8%);
+  --background: #ffffff;
+  --foreground: #26272b;
+  --card: #ffffff;
+  --card-foreground: #26272b;
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: #366344;
-  --primary-foreground: #fafaf7;
-  --secondary: #e7ece3;
-  --secondary-foreground: #293831;
-  --muted: #e7ece3;
-  --muted-foreground: #657268;
-  --accent: #e7ece3;
-  --accent-foreground: #293831;
+  --primary: #4c7de9;
+  --primary-foreground: #ffffff;
+  --secondary: #ebedf1;
+  --secondary-foreground: #26272b;
+  --muted: #f1f2f5;
+  --muted-foreground: #70737b;
+  --accent: #ebedf1;
+  --accent-foreground: #26272b;
   --destructive: oklch(0.577 0.245 27.325);
-  --border: #d6dcd2;
-  --input: #d6dcd2;
-  --ring: #52755d;
+  --border: #e7e8ec;
+  --input: #dedfe5;
+  --ring: #4c7de9;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
   --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
+  --overlay: rgb(0 0 0 / 42%);
+  --scrollbar-thumb: rgb(0 0 0 / 18%);
+  --scrollbar-thumb-hover: rgb(0 0 0 / 30%);
+  --scrollbar-thumb-active: rgb(0 0 0 / 42%);
+  --shell: #ececf2;
+  --sidebar: #f7f7f9;
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-hover: rgb(0 0 0 / 6%);
+  --sidebar-accent: rgb(0 0 0 / 12%);
+  --sidebar-accent-hover: rgb(0 0 0 / 16%);
+  --sidebar-accent-foreground: #000000;
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 }
@@ -46,6 +55,8 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-sidebar-accent-hover: var(--sidebar-accent-hover);
   --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
@@ -83,37 +94,40 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --workspace-border: rgb(255 255 255 / 15%);
+  --workspace-shadow: 0 1px 5px rgb(0 0 0 / 30%);
+  --scrollbar-thumb: rgb(255 255 255 / 16%);
+  --scrollbar-thumb-hover: rgb(255 255 255 / 28%);
+  --scrollbar-thumb-active: rgb(255 255 255 / 40%);
+  --shell: #151518;
+  --background: #202023;
+  --foreground: #ececef;
+  --card: #202023;
+  --card-foreground: #ececef;
+  --popover: #29292d;
+  --popover-foreground: #ececef;
+  --primary: #92b3ff;
+  --primary-foreground: #172442;
+  --secondary: #333339;
+  --secondary-foreground: #ececef;
+  --muted: #2a2a30;
+  --muted-foreground: #a5a5b0;
+  --accent: #333339;
+  --accent-foreground: #ececef;
+  --destructive: #ff9299;
+  --border: #35353d;
+  --input: #45454f;
+  --ring: #92b3ff;
+  --sidebar: #1c1c20;
+  --sidebar-foreground: #ececef;
+  --sidebar-primary: #92b3ff;
+  --sidebar-primary-foreground: #172442;
+  --sidebar-hover: rgb(255 255 255 / 8%);
+  --sidebar-accent: rgb(255 255 255 / 14%);
+  --sidebar-accent-hover: rgb(255 255 255 / 18%);
+  --sidebar-accent-foreground: #f5f5f5;
+  --sidebar-border: #35353d;
+  --sidebar-ring: #92b3ff;
 }
 
 @layer base {
@@ -125,6 +139,38 @@
   }
   html {
     @apply font-sans;
+  }
+
+  /* Both desktop webviews support these selectors; keep native scrolling and thumb dragging. */
+  :where(.studio-shell, .studio-shell *, [data-slot="popover-content"], [data-slot="popover-content"] *, [data-slot="dialog-content"], [data-slot="dialog-content"] *)::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+    background: transparent;
+  }
+  :where(.studio-shell, .studio-shell *, [data-slot="popover-content"], [data-slot="popover-content"] *, [data-slot="dialog-content"], [data-slot="dialog-content"] *)::-webkit-scrollbar-track,
+  :where(.studio-shell, .studio-shell *, [data-slot="popover-content"], [data-slot="popover-content"] *, [data-slot="dialog-content"], [data-slot="dialog-content"] *)::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  :where(.studio-shell, .studio-shell *, [data-slot="popover-content"], [data-slot="popover-content"] *, [data-slot="dialog-content"], [data-slot="dialog-content"] *)::-webkit-scrollbar-thumb {
+    min-width: 28px;
+    min-height: 28px;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-color: var(--scrollbar-thumb);
+    background-clip: padding-box;
+  }
+  :where(.studio-shell, .studio-shell *, [data-slot="popover-content"], [data-slot="popover-content"] *, [data-slot="dialog-content"], [data-slot="dialog-content"] *)::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+  :where(.studio-shell, .studio-shell *, [data-slot="popover-content"], [data-slot="popover-content"] *, [data-slot="dialog-content"], [data-slot="dialog-content"] *)::-webkit-scrollbar-thumb:active {
+    background-color: var(--scrollbar-thumb-active);
+  }
+  @media (forced-colors: active) {
+    :where(.studio-shell, .studio-shell *, [data-slot="popover-content"], [data-slot="popover-content"] *, [data-slot="dialog-content"], [data-slot="dialog-content"] *)::-webkit-scrollbar-thumb,
+    :where(.studio-shell, .studio-shell *, [data-slot="popover-content"], [data-slot="popover-content"] *, [data-slot="dialog-content"], [data-slot="dialog-content"] *)::-webkit-scrollbar-thumb:hover,
+    :where(.studio-shell, .studio-shell *, [data-slot="popover-content"], [data-slot="popover-content"] *, [data-slot="dialog-content"], [data-slot="dialog-content"] *)::-webkit-scrollbar-thumb:active {
+      background-color: CanvasText;
+    }
   }
 }
 @layer components {
@@ -151,4 +197,66 @@
 
 @layer components {
   .history-document .tiptap { min-height: 0; }
+}
+
+/* TASK-08: one workspace shell, shared by writing, chats and settings. */
+@layer components {
+  .studio-shell { @apply flex h-dvh min-h-0 flex-col overflow-hidden text-foreground; background: var(--shell); }
+  .studio-titlebar { @apply flex h-10 shrink-0 select-none items-center gap-3 px-4; background: var(--shell); }
+  .studio-titlebar-macos { padding-left: 5.5rem; }
+  .studio-body { @apply flex min-h-0 flex-1 gap-1 px-2 pb-2 pl-1; }
+  .studio-rail { @apply flex w-12 shrink-0 flex-col items-center gap-2 pb-3 pt-2; }
+  .studio-mark { @apply mb-4 flex size-8 items-center justify-center text-foreground; }
+  .studio-mark svg { @apply size-5; }
+  .studio-frame { @apply flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background; border-color: var(--workspace-border); box-shadow: var(--workspace-shadow); }
+  .workspace-sidebar { @apply flex w-64 shrink-0 flex-col overflow-y-auto border-r border-border/60; background: var(--sidebar); }
+  .workspace-sidebar[hidden], .studio-frame [hidden] { display: none !important; }
+  .sidebar-heading { @apply flex h-16 shrink-0 items-center justify-between gap-2 px-4; }
+  .sidebar-heading h1 { @apply text-base font-semibold tracking-tight; }
+  .sidebar-section-label { @apply mb-2 mt-5 px-2 text-[11px] font-medium text-muted-foreground; }
+  .workspace-toolbar { @apply flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border/60 px-5 py-2; }
+  .settings-sidebar { @apply gap-1 p-3; }
+  .settings-sidebar .sidebar-heading { @apply px-2; }
+  .settings-content { @apply mx-auto flex w-full max-w-[860px] flex-col gap-6 px-6 py-8 lg:px-12 lg:py-10; }
+  .settings-heading { @apply flex flex-col gap-2; }
+  .settings-heading h1 { @apply text-2xl font-semibold tracking-tight; }
+  .settings-group { @apply overflow-hidden rounded-xl border border-border/80; }
+  .settings-row { @apply flex flex-row flex-wrap items-center justify-between gap-4 border-b border-border/70 px-5 py-5 last:border-0; }
+  .settings-row > [data-slot="native-select-wrapper"] { @apply w-40 shrink-0; }
+  .workspace-empty { @apply m-auto flex max-w-lg flex-col items-center gap-4 px-8 py-12 text-center; }
+  .workspace-empty > svg { @apply mb-2 size-8 stroke-1 text-muted-foreground/50; }
+  .workspace-empty h2 { @apply text-xl font-medium tracking-tight; }
+  .workspace-empty p { @apply max-w-xs text-sm leading-7 text-muted-foreground; }
+  .editor-document { @apply mx-auto flex w-full max-w-[820px] flex-1 flex-col gap-4 px-7 pb-14 pt-10 lg:px-12; }
+  .record-format { @apply flex flex-nowrap items-center gap-1 overflow-x-auto border-y border-border/50 py-1; }
+  .record-editor .tiptap { font-size: 16px; line-height: 1.9; }
+  .studio-frame input, .studio-frame textarea { scroll-margin-top: 1rem; }
+}
+@media (max-width: 900px) {
+  .workspace-sidebar { width: 13rem; }
+  .studio-body { padding: 0; gap: 0; }
+  .studio-frame { border-radius: 0; border-top: 0; border-bottom: 0; }
+  .settings-content { padding: 1.5rem; }
+  .editor-document { padding: 1.5rem; }
+}
+
+/* Expose native material through the window shell; the content frame keeps its own surface. */
+html.native-material, .native-material body, .native-material #root { background: transparent; }
+.native-material .studio-shell,
+.native-material .studio-titlebar { background: transparent; }
+@media (prefers-reduced-motion: reduce) {
+  .studio-shell *, dialog * { transition-duration: 0s !important; animation-duration: 0s !important; scroll-behavior: auto !important; }
+}
+
+@layer components {
+  dialog { color-scheme: inherit; }
+}
+
+/* Dialog utilities use foreground; keep the scrim dark in both themes. */
+dialog::backdrop { background: var(--overlay); }
+.studio-shell:has(.studio-titlebar-macos) dialog[aria-labelledby="history-title"] { top: 2.5rem; height: calc(100dvh - 2.5rem); }
+
+@layer components {
+  .diary-browser-scroll [data-slot="table-container"] { overflow: visible; }
+  .diary-browser-scroll [data-slot="table-header"] { z-index: 1; }
 }

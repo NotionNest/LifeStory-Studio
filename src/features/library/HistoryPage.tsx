@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { Bookmark, ChevronRight, Circle, RotateCcw, X } from 'lucide-react'
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { Bookmark, ChevronRight, Circle, RotateCcw, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { EditorContent, useEditor, type JSONContent } from '@tiptap/react'
 import { AttachmentImageNode } from './attachmentExtensions'
@@ -13,10 +13,11 @@ function HistoryDocument({ document }: { document: JSONContent }) {
   return <EditorContent className="record-editor history-document mt-7" editor={editor} />
 }
 
-export function HistoryPanel({ record, sessionId, onRestored, onClose }: {
+export interface HistoryHandle {canLeave:()=>boolean}
+export const HistoryPage=forwardRef<HistoryHandle, {
   record: RecordFile; sessionId: string; onRestored: (session: EditingSession) => void; onClose: () => void
-}) {
-  const dialog = useRef<HTMLDialogElement>(null)
+}>(function HistoryPage({record,sessionId,onRestored,onClose},ref) {
+  const page = useRef<HTMLElement>(null)
   const [items, setItems] = useState<HistorySummary[]>([])
   const [cursor, setCursor] = useState<HistoryCursor | null>(null)
   const [viewingCurrent, setViewingCurrent] = useState(true)
@@ -26,7 +27,7 @@ export function HistoryPanel({ record, sessionId, onRestored, onClose }: {
   const [confirm, setConfirm] = useState(false)
   const [uncertain, setUncertain] = useState(false)
   const restoreRequest = useRef<RestoreHistory | null>(null)
-  const operation = useRef(false)
+  const operation = useRef(false),mutation=useRef(false)
   const load = async (before: HistoryCursor | null = null) => {
     if (operation.current) return
     operation.current = true
@@ -38,7 +39,8 @@ export function HistoryPanel({ record, sessionId, onRestored, onClose }: {
     } catch (cause) { setError(errorMessage(cause)) }
     finally { operation.current = false; setBusy(false) }
   }
-  useEffect(() => { dialog.current?.showModal(); void load() }, [])
+  useImperativeHandle(ref,()=>({canLeave:()=>!mutation.current&&!uncertain}),[busy,uncertain])
+  useEffect(() => { page.current?.focus(); void load() }, [])
   const select = async (id: string) => {
     if (operation.current || uncertain) return
     operation.current = true; setBusy(true); setError(''); setConfirm(false); setViewingCurrent(false); setSelected(null)
@@ -48,18 +50,18 @@ export function HistoryPanel({ record, sessionId, onRestored, onClose }: {
   }
   const mark = async () => {
     if (!selected || operation.current) return
-    operation.current = true; setBusy(true); setError('')
+    operation.current = true;mutation.current=true; setBusy(true); setError('')
     try {
       const important = !selected.summary.important
       await libraryApi.mark(record.id, selected.summary.id, important)
       setSelected({ ...selected, summary: { ...selected.summary, important } })
       setItems(old => old.map(item => item.id === selected.summary.id ? { ...item, important } : item))
     } catch (cause) { setError(errorMessage(cause)) }
-    finally { operation.current = false; setBusy(false) }
+    finally { operation.current = false;mutation.current=false; setBusy(false) }
   }
   const restore = async () => {
     if (!selected?.snapshot || operation.current) return
-    operation.current = true; setBusy(true); setError('')
+    operation.current = true;mutation.current=true; setBusy(true); setError('')
     restoreRequest.current ??= { recordId: record.id, revisionId: selected.summary.id, expectedContentVersion: record.contentVersion, sessionId, requestId: crypto.randomUUID() }
     try { onRestored(await libraryApi.restore(restoreRequest.current)) }
     catch (cause) {
@@ -68,29 +70,29 @@ export function HistoryPanel({ record, sessionId, onRestored, onClose }: {
       setUncertain(ambiguous)
       if (!ambiguous) restoreRequest.current = null
       setError(`${errorMessage(cause)}${ambiguous ? '。恢复结果尚未确认，请重试同一恢复请求后再继续编辑。' : ''}`)
-    } finally { operation.current = false; setBusy(false) }
+    } finally { operation.current = false;mutation.current=false; setBusy(false) }
   }
   const reread = async () => {
     if (operation.current) return
-    operation.current = true; setBusy(true); setError('')
+    operation.current = true;mutation.current=true; setBusy(true); setError('')
     try {
       const current = await libraryApi.read(record.id)
       onRestored(await libraryApi.begin(record.id, current.contentVersion))
     } catch (cause) { setError(`无法重新读取：${errorMessage(cause)}。请重试，当前编辑仍保持只读。`) }
-    finally { operation.current = false; setBusy(false) }
+    finally { operation.current = false;mutation.current=false; setBusy(false) }
   }
   const preview = viewingCurrent ? record : selected?.snapshot
   const previewDocument = viewingCurrent ? record.document : selected?.document
   const previewTime = viewingCurrent ? record.updatedAt : selected?.summary.createdAt
   const timeLabel = (time: number) => new Date(time).toLocaleString('zh-CN', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
   const years = new Set<number>()
-  return <dialog ref={dialog} onCancel={event => { event.preventDefault(); if (!busy && !uncertain) onClose() }} aria-labelledby="history-title" className="fixed inset-0 m-0 h-dvh max-h-none w-screen max-w-none overflow-hidden border-0 bg-card p-0 text-foreground outline-none backdrop:bg-card">
-    <div className="grid h-full min-h-0 grid-cols-[minmax(160px,36%)_minmax(0,1fr)] sm:grid-cols-[minmax(210px,21%)_minmax(0,1fr)]">
-      <aside className="flex min-h-0 flex-col border-r" aria-label="历史导航">
+  return <section ref={page} tabIndex={-1} aria-label="日记历史与恢复" className="flex h-full min-h-0 flex-1 flex-col bg-card text-foreground outline-none">
+    <header className="workspace-toolbar gap-3"><Button variant="ghost" size="sm" disabled={mutation.current||uncertain} onClick={onClose}><ArrowLeft data-icon="inline-start" aria-hidden="true"/>返回编辑</Button><h1 className="shrink-0 text-sm font-medium">历史与恢复</h1><span className="truncate text-xs text-muted-foreground">{record.title||'无标题日记'}</span></header>
+    <div className="grid min-h-0 flex-1 grid-cols-[minmax(160px,36%)_minmax(0,1fr)] sm:grid-cols-[minmax(210px,21%)_minmax(0,1fr)]">
+      <aside className="flex min-h-0 flex-col border-r bg-sidebar" aria-label="历史导航">
         <header className="shrink-0 px-5 pb-4 pt-5">
           <h2 id="history-title" className="text-xs font-medium text-muted-foreground">记录历史</h2>
           <p className="mt-0.5 text-2xl font-semibold tracking-tight">{new Date(record.updatedAt).getFullYear()}</p>
-          <p className="mt-3 inline-block rounded bg-muted/60 px-2 py-1 text-xs text-muted-foreground">按编辑轮次</p>
         </header>
         <section aria-label="历史版本列表" className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
           <button disabled={busy || uncertain} aria-pressed={viewingCurrent} onClick={() => { setViewingCurrent(true); setSelected(null); setConfirm(false); setError('') }} className={`mb-1 flex w-full items-start gap-2 rounded-lg px-3 py-4 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${viewingCurrent ? 'bg-muted/60' : ''}`}>
@@ -105,17 +107,16 @@ export function HistoryPanel({ record, sessionId, onRestored, onClose }: {
             return <div key={item.id}>
               {showYear && <h3 className="px-3 pb-1 pt-5 text-sm font-semibold">{year}</h3>}
               <button disabled={busy || uncertain} aria-pressed={active} onClick={() => void select(item.id)} className={`flex w-full items-start gap-2 rounded-lg px-3 py-4 text-left outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring ${active ? 'bg-muted/60' : ''}`}>
-                <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{timeLabel(item.createdAt)}</span><span className="mt-1.5 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"><Circle aria-hidden="true" className="size-1.5 fill-current text-primary" />{item.restoredFromId ? '恢复生成' : '本机保存'}{item.currentCheckpoint && ' · 本轮起始'}{item.referenced && ' · 被引用'}{!item.restorable && ' · 旧版正文'}</span><span className="sr-only">{item.excerpt || '空白正文'}</span></span>
+                <span className="min-w-0 flex-1"><span className="block text-sm font-medium">{timeLabel(item.createdAt)}</span>{(item.restoredFromId || item.referenced || !item.restorable) && <span className="mt-1.5 flex flex-wrap gap-1.5 text-xs text-muted-foreground">{item.restoredFromId && <span>恢复版本</span>}{item.referenced && <span>被引用</span>}{!item.restorable && <span>旧版正文</span>}</span>}<span className="mt-2 line-clamp-2 text-xs leading-5 text-muted-foreground">{item.excerpt || '空白正文'}</span></span>
                 {item.important && <Bookmark aria-label="重要版本" className="mt-0.5 size-3.5 shrink-0 fill-current text-primary" />}
                 {active && <ChevronRight aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />}
               </button>
               <div className="mx-3 border-b border-border/60" />
             </div>
           })}
-          {!busy && items.length === 0 && <p className="px-3 py-5 text-xs leading-6 text-muted-foreground">还没有历史版本。下次进入编辑时会保留本轮内容。</p>}
+          {!busy && items.length === 0 && <p className="px-3 py-4 text-xs text-muted-foreground">暂无历史版本</p>}
           <div className="flex flex-wrap gap-1 px-1 pt-4"><Button variant="ghost" size="sm" disabled={busy || uncertain} onClick={() => { setViewingCurrent(true); setSelected(null); setConfirm(false); void load() }}>刷新历史</Button>{cursor && <Button variant="ghost" size="sm" disabled={busy || uncertain} onClick={() => void load(cursor)}>加载更多历史</Button>}</div>
         </section>
-        <p className="shrink-0 border-t px-5 py-3 text-[11px] leading-5 text-muted-foreground">普通历史保留 90 天<br />重要及引用版本受保护</p>
       </aside>
       <section className="flex min-h-0 min-w-0 flex-col" aria-label="历史版本预览">
         <header className="flex min-h-16 shrink-0 flex-wrap items-center justify-between gap-2 border-b px-4 py-3 sm:px-6">
@@ -123,7 +124,6 @@ export function HistoryPanel({ record, sessionId, onRestored, onClose }: {
           <div className="flex items-center gap-1.5">
             {selected && !viewingCurrent && <Button variant="ghost" size="icon" title={selected.summary.important ? '取消重要标记' : '标记为重要'} disabled={busy || uncertain} onClick={() => void mark()}><Bookmark aria-hidden="true" className={selected.summary.important ? 'fill-current text-primary' : ''} /><span className="sr-only">{selected.summary.important ? '取消重要标记' : '标记为重要'}</span></Button>}
             <Button size="sm" disabled={busy || uncertain || viewingCurrent || !selected?.snapshot} onClick={() => setConfirm(true)}><RotateCcw aria-hidden="true" />恢复此版本</Button>
-            <Button variant="ghost" size="icon" disabled={busy || uncertain} onClick={onClose} title="关闭历史"><X aria-hidden="true" /><span className="sr-only">关闭历史</span></Button>
           </div>
         </header>
         {error && <p role="alert" className="shrink-0 border-b bg-destructive/5 px-6 py-3 text-sm text-destructive">{error}</p>}
@@ -138,5 +138,5 @@ export function HistoryPanel({ record, sessionId, onRestored, onClose }: {
         </div>
       </section>
     </div>
-  </dialog>
-}
+  </section>
+})

@@ -6,6 +6,15 @@ use rusqlite::{OptionalExtension, params_from_iter, types::Value as SqlValue};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TagUsage {
+    pub id: String,
+    pub name: String,
+    pub count: u32,
+    pub current: bool,
+}
+
 #[derive(Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase", default, deny_unknown_fields)]
 pub struct LibraryQuery {
@@ -44,6 +53,26 @@ pub struct QueryPage {
     pub total: u32,
     pub next_offset: Option<u32>,
     pub days: Vec<DayCount>,
+    pub tags: Vec<Tag>,
+}
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CalendarQuery {
+    pub filters: LibraryQuery,
+    pub from: String,
+    pub to: String,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalendarDay {
+    pub date: String,
+    pub count: u32,
+    pub items: Vec<SearchItem>,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CalendarPage {
+    pub days: Vec<CalendarDay>,
     pub tags: Vec<Tag>,
 }
 #[derive(Serialize)]
@@ -99,7 +128,7 @@ fn validate(q: &LibraryQuery) -> StorageResult<()> {
     }
     Ok(())
 }
-fn excerpt(text: &str, needle: &str) -> String {
+pub(crate) fn excerpt(text: &str, needle: &str) -> String {
     let lowered = text.to_ascii_lowercase();
     let index = if needle.is_empty() {
         0
@@ -113,25 +142,176 @@ fn excerpt(text: &str, needle: &str) -> String {
         text.chars().skip(before).take(140).collect::<String>()
     )
 }
+
+fn filters(query: &LibraryQuery) -> StorageResult<(Vec<SqlValue>, Vec<String>)> {
+    let keyword = query.keyword.trim();
+    let mut values = vec![];
+    let mut conditions = vec!["1=1".to_owned()];
+    let mut bind = |v: SqlValue| {
+        values.push(v);
+        format!("?{}", values.len())
+    };
+    if !query.kinds.is_empty() {
+        let p = bind(serde_json::to_string(&query.kinds)?.into());
+        conditions.push(format!("kind IN (SELECT value FROM json_each({p}))"));
+    }
+    if let Some(images) = query.has_images {
+        let p = bind(i64::from(images).into());
+        conditions.push(format!("images={p}"));
+    }
+    let mut tags = query.tag_ids.clone();
+    tags.sort();
+    tags.dedup();
+    if !tags.is_empty() {
+        let p = bind(serde_json::to_string(&tags)?.into());
+        let count = if query.tag_mode == "any" {
+            ">0".into()
+        } else {
+            format!("={}", tags.len())
+        };
+        conditions.push(format!("(SELECT count(*) FROM record_tags t WHERE t.record_id=base.id AND t.tag_id IN (SELECT value FROM json_each({p}))){count}"));
+    }
+    if !keyword.is_empty() {
+        let p = bind(keyword.to_owned().into());
+        let exact = format!(
+            "(instr(lower(COALESCE(title,'')),lower({p}))>0 OR instr(lower(body),lower({p}))>0 OR instr(lower(messages),lower({p}))>0)"
+        );
+        if keyword.chars().count() >= 3 && keyword.chars().all(char::is_alphanumeric) {
+            let f = bind(format!("\"{}\"", keyword).into());
+            conditions.push(format!("(id IN (SELECT record_id FROM record_search WHERE record_search MATCH {f}) OR instr(lower(messages),lower({p}))>0) AND {exact}"));
+        } else {
+            conditions.push(exact);
+        }
+    }
+    Ok((values, conditions))
+}
+type SearchRow = (String, Option<String>, String, String, String, String, bool);
+fn read_items(
+    db: &rusqlite::Connection,
+    rows: Vec<SearchRow>,
+    keyword: &str,
+) -> StorageResult<Vec<SearchItem>> {
+    let mut items = vec![];
+    for (id, title, record_date, kind, body, messages, has_images) in rows {
+        let needle = keyword.to_ascii_lowercase();
+        let match_field = if keyword.is_empty() {
+            None
+        } else if title
+            .as_deref()
+            .unwrap_or("")
+            .to_ascii_lowercase()
+            .contains(&needle)
+        {
+            Some("title".into())
+        } else if body.to_ascii_lowercase().contains(&needle) {
+            Some("body".into())
+        } else {
+            Some("message".into())
+        };
+        let text = if match_field.as_deref() == Some("message") || body.is_empty() {
+            &messages
+        } else {
+            &body
+        };
+        let mut stmt=db.prepare("SELECT t.id,t.display_name FROM tags t JOIN record_tags a ON a.tag_id=t.id WHERE a.record_id=?1 ORDER BY t.normalized_key")?;
+        let tags = stmt
+            .query_map([&id], |r| {
+                Ok(Tag {
+                    id: r.get(0)?,
+                    name: r.get(1)?,
+                })
+            })?
+            .collect::<Result<Vec<_>, _>>()?;
+        items.push(SearchItem {
+            id,
+            title,
+            record_date,
+            kind,
+            excerpt: excerpt(text, keyword),
+            has_images,
+            tags,
+            match_field,
+        });
+    }
+    Ok(items)
+}
+fn query_tags(db: &rusqlite::Connection) -> StorageResult<Vec<Tag>> {
+    let mut stmt=db.prepare("SELECT t.id,t.display_name FROM tags t WHERE EXISTS(SELECT 1 FROM record_tags a JOIN records r ON r.id=a.record_id WHERE a.tag_id=t.id AND r.deleted_at IS NULL AND r.kind='text') ORDER BY t.normalized_key")?;
+    Ok(stmt
+        .query_map([], |r| {
+            Ok(Tag {
+                id: r.get(0)?,
+                name: r.get(1)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?)
+}
+
 impl DatabaseWorker {
+    pub fn tag_catalog(&self, record_id: String) -> StorageResult<Vec<TagUsage>> {
+        identifier(&record_id)?;
+        self.call(move |db, _| {
+            let tx = db.transaction()?;
+            let exists: bool = tx.query_row(
+                "SELECT EXISTS(SELECT 1 FROM records WHERE id=?1 AND kind='text' AND deleted_at IS NULL)",
+                [&record_id], |row| row.get(0),
+            )?;
+            if !exists { return Err(fail("not_found", "日记不存在或已删除")); }
+            let mut statement = tx.prepare(
+                "SELECT t.id,t.display_name,count(r.id),max(CASE WHEN r.id=?1 THEN 1 ELSE 0 END)
+                 FROM tags t LEFT JOIN record_tags a ON a.tag_id=t.id
+                 LEFT JOIN records r ON r.id=a.record_id AND r.kind='text' AND r.deleted_at IS NULL
+                 GROUP BY t.id ORDER BY t.normalized_key,t.id",
+            )?;
+            Ok(statement.query_map([&record_id], |row| Ok(TagUsage {
+                id: row.get(0)?, name: row.get(1)?, count: row.get(2)?, current: row.get(3)?,
+            }))?.collect::<Result<Vec<_>, _>>()?)
+        })
+    }
+
+    pub fn query_calendar(&self, query: CalendarQuery) -> StorageResult<CalendarPage> {
+        validate(&query.filters)?;
+        date(&query.from)?;
+        date(&query.to)?;
+        if query.from > query.to || query.filters.offset != 0 || query.filters.month.is_some() {
+            return Err(fail("validation", "日历查询范围无效"));
+        }
+        self.call(move |db, _| {
+            let tx = db.transaction()?;
+            let span: f64 = tx.query_row("SELECT julianday(?2)-julianday(?1)", [&query.from, &query.to], |r| r.get(0))?;
+            if !(0.0..=41.0).contains(&span) { return Err(fail("validation", "日历最多查询 42 天")); }
+            let (mut values, mut conditions) = filters(&query.filters)?;
+            for (field, value, op) in [
+                ("record_date", Some(&query.from), ">="), ("record_date", Some(&query.to), "<="),
+                ("record_date", query.filters.date_from.as_ref(), ">="), ("record_date", query.filters.date_to.as_ref(), "<="),
+            ] {
+                if let Some(value) = value {
+                    values.push(value.clone().into());
+                    conditions.push(format!("{field}{op}?{}", values.len()));
+                }
+            }
+            let sql = format!("{BASE}, ranked AS (SELECT *, count(*) OVER (PARTITION BY record_date) AS day_count, row_number() OVER (PARTITION BY record_date ORDER BY created_at DESC,id) AS position FROM base WHERE {}) SELECT id,title,record_date,kind,body,messages,images,day_count FROM ranked WHERE position<=3 ORDER BY record_date,position", conditions.join(" AND "));
+            let mut stmt = tx.prepare(&sql)?;
+            let mut counts = std::collections::BTreeMap::new();
+            let rows = stmt.query_map(params_from_iter(&values), |r| {
+                let day: String = r.get(2)?;
+                let count: u32 = r.get(7)?;
+                Ok(((r.get(0)?,r.get(1)?,day.clone(),r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?),day,count))
+            })?.collect::<Result<Vec<(SearchRow,String,u32)>,_>>()?;
+            let mut search_rows = Vec::new();
+            for (row, day, count) in rows { counts.insert(day,count); search_rows.push(row); }
+            let mut grouped = std::collections::BTreeMap::<String,Vec<SearchItem>>::new();
+            for item in read_items(&tx,search_rows,query.filters.keyword.trim())? { grouped.entry(item.record_date.clone()).or_default().push(item); }
+            let mut dates = tx.prepare("WITH RECURSIVE dates(day) AS (SELECT ?1 UNION ALL SELECT date(day,'+1 day') FROM dates WHERE day<?2) SELECT day FROM dates")?;
+            let days = dates.query_map([&query.from,&query.to],|r|r.get::<_,String>(0))?.collect::<Result<Vec<_>,_>>()?.into_iter().map(|day|CalendarDay {count:counts.remove(&day).unwrap_or(0),items:grouped.remove(&day).unwrap_or_default(),date:day}).collect();
+            Ok(CalendarPage {days,tags:query_tags(&tx)?})
+        })
+    }
     pub fn query_library(&self, query: LibraryQuery) -> StorageResult<QueryPage> {
         validate(&query)?;
         self.call(move|db,_|{
       let tx=db.transaction()?;let db=&tx;
-      let keyword=query.keyword.trim();let mut values=vec![];let mut conditions=vec!["1=1".to_owned()];
-      let mut bind=|v:SqlValue|{values.push(v);format!("?{}",values.len())};
-      if !query.kinds.is_empty(){let p=bind(serde_json::to_string(&query.kinds)?.into());conditions.push(format!("kind IN (SELECT value FROM json_each({p}))"));}
-      if let Some(images)=query.has_images {let p=bind(i64::from(images).into());conditions.push(format!("images={p}"));}
-      let mut tags=query.tag_ids.clone();tags.sort();tags.dedup();
-      if !tags.is_empty(){let p=bind(serde_json::to_string(&tags)?.into());let count=if query.tag_mode=="any"{">0".into()}else{format!("={}",tags.len())};conditions.push(format!("(SELECT count(*) FROM record_tags t WHERE t.record_id=base.id AND t.tag_id IN (SELECT value FROM json_each({p}))){count}"));}
-      if !keyword.is_empty(){
-        let p=bind(keyword.to_owned().into());
-        let exact=format!("(instr(lower(COALESCE(title,'')),lower({p}))>0 OR instr(lower(body),lower({p}))>0 OR instr(lower(messages),lower({p}))>0)");
-        if keyword.chars().count()>=3 && keyword.chars().all(char::is_alphanumeric){
-          let f=bind(format!("\"{}\"",keyword).into());
-          conditions.push(format!("(id IN (SELECT record_id FROM record_search WHERE record_search MATCH {f}) OR instr(lower(messages),lower({p}))>0) AND {exact}"));
-        }else{conditions.push(exact);}
-      }
+      let keyword=query.keyword.trim();let (mut values,mut conditions)=filters(&query)?;
       let where_base=conditions.join(" AND ");
       // Month counts deliberately use all non-date filters; selecting a day replaces the date range.
       let days=if let Some(month)=&query.month {
@@ -147,18 +327,9 @@ impl DatabaseWorker {
       let sql=format!("{BASE} SELECT id,title,record_date,kind,body,messages,images FROM base WHERE {filter} ORDER BY record_date DESC,created_at DESC,id LIMIT 100 OFFSET ?{}",values.len());
       let mut stmt=db.prepare(&sql)?;
       let rows=stmt.query_map(params_from_iter(&values),|r|Ok((r.get::<_,String>(0)?,r.get::<_,Option<String>>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,String>(5)?,r.get::<_,bool>(6)?)))?.collect::<Result<Vec<_>,_>>()?;
-      let mut items=vec![];
-      for (id,title,record_date,kind,body,messages,has_images) in rows {
-        let needle=keyword.to_ascii_lowercase();
-        let match_field=if keyword.is_empty(){None}else if title.as_deref().unwrap_or("").to_ascii_lowercase().contains(&needle){Some("title".into())}else if body.to_ascii_lowercase().contains(&needle){Some("body".into())}else{Some("message".into())};
-        let text=if match_field.as_deref()==Some("message") || body.is_empty(){&messages}else{&body};
-        let mut stmt=db.prepare("SELECT t.id,t.display_name FROM tags t JOIN record_tags a ON a.tag_id=t.id WHERE a.record_id=?1 ORDER BY t.normalized_key")?;
-        let tags=stmt.query_map([&id],|r|Ok(Tag{id:r.get(0)?,name:r.get(1)?}))?.collect::<Result<Vec<_>,_>>()?;
-        items.push(SearchItem{id,title,record_date,kind,excerpt:excerpt(text,keyword),has_images,tags,match_field});
-      }
+      let items=read_items(db, rows, keyword)?;
       let next=query.offset.saturating_add(items.len() as u32);let next_offset=(next<total).then_some(next);
-      let mut stmt=db.prepare("SELECT t.id,t.display_name FROM tags t WHERE EXISTS(SELECT 1 FROM record_tags a JOIN records r ON r.id=a.record_id WHERE a.tag_id=t.id AND r.deleted_at IS NULL AND r.kind='text') ORDER BY t.normalized_key")?;
-      let tags=stmt.query_map([],|r|Ok(Tag{id:r.get(0)?,name:r.get(1)?}))?.collect::<Result<Vec<_>,_>>()?;
+      let tags=query_tags(db)?;
       Ok(QueryPage{items,total,next_offset,days,tags})
     })
     }

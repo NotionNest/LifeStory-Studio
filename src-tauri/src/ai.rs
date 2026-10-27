@@ -66,7 +66,16 @@ impl AiRunner {
 }
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ModelSelection {
+    pub model: Option<String>,
+    pub reasoning_effort: Option<String>,
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StartInput {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection: Option<ModelSelection>,
     pub request_id: String,
     pub record_id: String,
     pub profile_id: String,
@@ -85,6 +94,9 @@ pub struct Task {
     pub record_id: String,
     pub status: String,
     pub partial: String,
+    pub reasoning_summary: String,
+    pub started_at: i64,
+    pub updated_at: i64,
     pub error: Option<String>,
     pub result_id: Option<String>,
 }
@@ -117,7 +129,7 @@ pub struct Workspace {
 }
 fn task(db: &Connection, id: &str) -> StorageResult<Task> {
     db.query_row(
-        "SELECT id,record_id,status,partial,error,result_id FROM ai_tasks WHERE id=?1",
+        "SELECT id,record_id,status,partial,error,result_id,reasoning_summary,created_at,updated_at FROM ai_tasks WHERE id=?1",
         [id],
         |r| {
             Ok(Task {
@@ -127,6 +139,9 @@ fn task(db: &Connection, id: &str) -> StorageResult<Task> {
                 partial: r.get(3)?,
                 error: r.get(4)?,
                 result_id: r.get(5)?,
+                reasoning_summary: r.get(6)?,
+                started_at: r.get(7)?,
+                updated_at: r.get(8)?,
             })
         },
     )
@@ -216,7 +231,7 @@ pub(crate) fn invalidate_source(db: &Connection, source: &str) -> StorageResult<
             .collect::<Result<Vec<_>, _>>()?
     };
     for tid in ids {
-        db.execute("UPDATE ai_tasks SET status='cancelled',partial='',error='来源已移入回收站或删除',request_json='{}' WHERE id=?1",[&tid])?;
+        db.execute("UPDATE ai_tasks SET status='cancelled',partial='',reasoning_summary='',error='来源已移入回收站或删除',request_json='{}' WHERE id=?1",[&tid])?;
         db.execute(
             "DELETE FROM revision_pins WHERE owner_kind='ai_task' AND owner_id=?1",
             [&tid],
@@ -269,7 +284,18 @@ impl DatabaseWorker {
             rows.iter().map(|s| Ok(serde_json::from_str(s)?)).collect()
         })
     }
-    pub fn ai_configure(&self, mut profile: Profile, key: String) -> StorageResult<Profile> {
+    pub fn ai_configure(&self, profile: Profile, key: String) -> StorageResult<Profile> {
+        self.ai_configure_with_default(profile, key, None)
+    }
+    pub fn ai_configure_with_default(
+        &self,
+        mut profile: Profile,
+        key: String,
+        use_for_new_chat: Option<bool>,
+    ) -> StorageResult<Profile> {
+        if use_for_new_chat.is_some() && profile.protocol != "codex" {
+            return Err(fail("validation", "此默认选择仅适用于本机 CLI"));
+        }
         ai_providers::validate(&profile).map_err(|e| fail("validation", &e))?;
         self.call(move |db, _| {
             profile.id = id(db)?;
@@ -277,12 +303,24 @@ impl DatabaseWorker {
                 ai_providers::store_key(&profile.id, &key)
                     .map_err(|e| fail("credential_error", &e))?;
             }
-            if let Err(e) = db.execute(
-                "INSERT INTO ai_profiles VALUES(?1,?2,?3)",
-                params![profile.id, serde_json::to_string(&profile)?, now()?],
-            ) {
+            let saved = (|| -> StorageResult<()> {
+                let tx = db.transaction_with_behavior(TransactionBehavior::Immediate)?;
+                tx.execute(
+                    "INSERT INTO ai_profiles VALUES(?1,?2,?3)",
+                    params![profile.id, serde_json::to_string(&profile)?, now()?],
+                )?;
+                if use_for_new_chat == Some(true) {
+                    tx.execute(
+                        "UPDATE ai_preferences SET default_profile_id=?1 WHERE id=1",
+                        [&profile.id],
+                    )?;
+                }
+                tx.commit()?;
+                Ok(())
+            })();
+            if let Err(e) = saved {
                 let _ = ai_providers::delete_key(&profile.id);
-                return Err(e.into());
+                return Err(e);
             }
             Ok(profile)
         })
@@ -317,7 +355,8 @@ impl DatabaseWorker {
         identifier(&record)?;
         self.call(move|db,_|{
   let tx=db.transaction()?;let(title,kind)=tx.query_row("SELECT title,kind FROM records WHERE id=?1 AND deleted_at IS NULL",[&record],|r|Ok((r.get(0)?,r.get(1)?))).optional()?.ok_or_else(||fail("not_found","内容不存在或已删除"))?;
-  let mut stmt=tx.prepare("SELECT id,role,content_json,sequence FROM conversation_messages WHERE record_id=?1 ORDER BY sequence,id")?;let messages=stmt.query_map([&record],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,i64>(3)?)))?.map(|r|{let(id,role,raw,sequence)=r?;let content:Value=serde_json::from_str(&raw)?;Ok(json!({"id":id,"role":role,"text":message_text(&content),"images":content["images"],"sequence":sequence}))}).collect::<StorageResult<Vec<Value>>>()?;
+  let mut stmt=tx.prepare("SELECT m.id,m.role,m.content_json,m.sequence,m.created_at,t.reasoning_summary,t.updated_at-t.created_at FROM conversation_messages m LEFT JOIN ai_tasks t ON t.id=substr(m.request_id,11) AND m.request_id LIKE 'assistant:%' AND t.record_id=m.record_id WHERE m.record_id=?1 ORDER BY m.sequence,m.id")?;
+  let messages=stmt.query_map([&record],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,i64>(3)?,r.get::<_,i64>(4)?,r.get::<_,Option<String>>(5)?,r.get::<_,Option<i64>>(6)?)))?.map(|r|{let(id,role,raw,sequence,created_at,reasoning_summary,duration_ms)=r?;let content:Value=serde_json::from_str(&raw)?;Ok(json!({"id":id,"role":role,"text":message_text(&content),"images":content["images"],"sequence":sequence,"createdAt":created_at,"reasoningSummary":reasoning_summary,"durationMs":duration_ms}))}).collect::<StorageResult<Vec<Value>>>()?;
   let mut stmt=tx.prepare("SELECT COALESCE(x.source_id,x.unavailable_source_id,x.id),CASE WHEN r.deleted_at IS NULL THEN r.title END,COALESCE(r.kind,'text'),(x.source_deleted=1 OR r.id IS NULL OR r.deleted_at IS NOT NULL),x.source_revision_id FROM record_relations x LEFT JOIN records r ON r.id=x.source_id WHERE x.owner_id=?1 ORDER BY x.id")?;
   let sources=stmt.query_map([&record],|r|Ok(Related{id:r.get(0)?,title:r.get(1)?,kind:r.get(2)?,unavailable:r.get(3)?,revision_id:r.get(4)?}))?.collect::<Result<Vec<_>,_>>()?;
   let mut stmt=tx.prepare("SELECT DISTINCT r.id,r.title,r.kind,0,NULL FROM record_relations x JOIN records r ON r.id=x.owner_id WHERE x.source_id=?1 AND r.deleted_at IS NULL ORDER BY r.created_at DESC,r.id")?;
@@ -346,14 +385,28 @@ impl DatabaseWorker {
         record: String,
         profile_id: String,
         request: String,
+        selection: Option<ModelSelection>,
     ) -> StorageResult<(Profile, bool)> {
         self.call(move|db,_|{
             let task:Option<String>=db.query_row("SELECT effective_profile_json FROM ai_tasks WHERE request_id=?1",[request],|r|r.get(0)).optional()?.flatten();
             if let Some(raw)=task {return Ok((serde_json::from_str(&raw)?,true));}
             let stored:Option<String>=db.query_row("SELECT cli_profile_json FROM ai_conversations WHERE record_id=?1 AND profile_id=?2",params![record,profile_id],|r|r.get(0)).optional()?.flatten();
-            if let Some(raw)=stored{return Ok((serde_json::from_str(&raw)?,true));}
+            if selection.is_none()&&let Some(raw)=stored{return Ok((serde_json::from_str(&raw)?,true));}
             let raw:String=db.query_row("SELECT profile_json FROM ai_profiles WHERE id=?1",[profile_id],|r|r.get(0))?;
-            Ok((serde_json::from_str(&raw)?,false))
+            let mut profile:Profile=serde_json::from_str(&raw)?;
+            if let Some(selection)=selection {
+                if profile.protocol=="codex" {
+                    if let Some(model)=selection.model {
+                        profile.cli_model_mode=Some(if profile.cli_model_mode.as_deref()==Some("custom")&&profile.model==model{"custom"}else{"selected"}.into());profile.model=model;
+                        profile.reasoning_effort=selection.reasoning_effort;
+                    }else if selection.reasoning_effort.is_some(){profile.reasoning_effort=selection.reasoning_effort;}
+                }else{
+                    if selection.reasoning_effort.is_some(){return Err(fail("validation","此服务未提供推理强度选择"));}
+                    if let Some(model)=selection.model{profile.model=model;}
+                }
+                ai_providers::validate(&profile).map_err(|e|fail("validation",&e))?;
+            }
+            Ok((profile,false))
         })
     }
 
@@ -385,10 +438,11 @@ impl DatabaseWorker {
    let(date,timezone,kind):(String,String,String)=tx.query_row("SELECT record_date,created_timezone,kind FROM records WHERE id=?1 AND deleted_at IS NULL AND NOT EXISTS(SELECT 1 FROM ai_source_blocks b WHERE b.source_id=records.id)",[&input.record_id],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?))).optional()?.ok_or_else(||fail("not_found","目标内容已删除"))?;
    if input.kind=="chat"&&kind!="conversation"{return Err(fail("validation","请先创建对话再发送消息"))}
    let raw:String=tx.query_row("SELECT profile_json FROM ai_profiles WHERE id=?1",[&input.profile_id],|r|r.get(0)).optional()?.ok_or_else(||fail("not_found","服务配置不存在"))?;let mut profile:Profile=serde_json::from_str(&raw)?;if profile.label.starts_with("[已停用]"){return Err(fail("validation","服务已停用"))}
-   if profile.protocol=="codex" {
-     let cached:Option<String>=tx.query_row("SELECT cli_profile_json FROM ai_conversations WHERE record_id=?1 AND profile_id=?2",params![input.record_id,input.profile_id],|r|r.get(0)).optional()?.flatten();
-     if let Some(raw)=cached{profile=serde_json::from_str(&raw)?;}else if let Some(resolved)=effective{if resolved.id!=profile.id||resolved.codex_path!=profile.codex_path{return Err(fail("conflict","CLI 配置已改变，请重新核实"))}profile=resolved;}
-     if profile.model.trim().is_empty(){return Err(fail("validation","请先解析 CLI 当前模型"));}
+   if profile.protocol=="codex" || input.selection.is_some() || effective.is_some() {
+     let cached:Option<String>=if input.selection.is_none(){tx.query_row("SELECT cli_profile_json FROM ai_conversations WHERE record_id=?1 AND profile_id=?2",params![input.record_id,input.profile_id],|r|r.get(0)).optional()?.flatten()}else{None};
+     if let Some(raw)=cached{profile=serde_json::from_str(&raw)?;}else if let Some(resolved)=effective{if resolved.id!=profile.id||resolved.codex_path!=profile.codex_path||resolved.base_url!=profile.base_url||resolved.protocol!=profile.protocol{return Err(fail("conflict","服务配置已改变，请重新核实"))}profile=resolved;}else if input.selection.is_some(){return Err(fail("validation","请先解析本次模型选择"));}
+     if profile.protocol=="codex"&&profile.model.trim().is_empty(){return Err(fail("validation","请先解析 CLI 当前模型"));}
+     ai_providers::validate(&profile).map_err(|e|fail("validation",&e))?;
    }
    let active:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM ai_tasks WHERE record_id=?1 AND status='running')",[&input.record_id],|r|r.get(0))?;if active{return Err(fail("conflict","请先完成或取消当前任务"))}
    if input.kind=="draft" && input.preview.is_none(){return Err(fail("validation","请通过日记预览生成，再明确采用"))}
@@ -403,11 +457,11 @@ impl DatabaseWorker {
    let count:usize=messages.iter().map(|m|m.text.chars().count()).sum();if count>profile.context_chars{return Err(fail("validation","选材和对话超过该配置的上下文字符预算，请减少选材或创建新对话；没有截断发送"))}
    let tid=id(&tx)?;let time=now()?;
    tx.execute("INSERT INTO ai_tasks(id,record_id,profile_id,kind,status,created_at,updated_at,request_id,request_json) VALUES(?1,?2,?3,?4,'running',?5,?5,?6,?7)",params![tid,input.record_id,input.profile_id,input.kind,time,input.request_id,request])?;
-   tx.execute("UPDATE ai_tasks SET effective_profile_json=?2 WHERE id=?1",params![tid,if profile.protocol=="codex"{Some(serde_json::to_string(&profile)?)}else{None}])?;
+   tx.execute("UPDATE ai_tasks SET effective_profile_json=?2 WHERE id=?1",params![tid,Some(serde_json::to_string(&profile)?)])?;
    tx.execute("INSERT INTO ai_request_receipts VALUES(?1,?2,?3)",params![input.request_id,tid,crate::ai_experience::request_hash(&request)])?;
    if let Some(spec)=&input.preview{crate::ai_experience::insert_preview(&tx,&tid,&input.record_id,spec)?;}
    for(source,revision,text)in snapshots{tx.execute("INSERT INTO ai_task_sources VALUES(?1,?2,?3,?4)",params![tid,source,revision,text])?;tx.execute("INSERT INTO revision_pins VALUES(?1,'ai_task',?2)",params![revision,tid])?;if input.kind=="chat" && source!=input.record_id{tx.execute("INSERT INTO record_relations(id,owner_id,source_id,source_revision_id,relation_kind) VALUES(?1,?2,?3,?4,'conversation')",params![id(&tx)?,input.record_id,source,revision])?;}}
-   if input.kind=="chat"{tx.execute("UPDATE ai_conversations SET profile_id=?2,context_ids=?3,cli_profile_json=?4 WHERE record_id=?1",params![input.record_id,input.profile_id,serde_json::to_string(&input.source_ids)?,if profile.protocol=="codex"{Some(serde_json::to_string(&profile)?)}else{None}])?;let sequence:i64=tx.query_row("SELECT COALESCE(max(sequence),-1)+1 FROM conversation_messages WHERE record_id=?1",[&input.record_id],|r|r.get(0))?;tx.execute("INSERT INTO conversation_messages VALUES(?1,?2,?3,'user',?4,?5,?6)",params![id(&tx)?,input.record_id,sequence,json!({"text":input.text}).to_string(),format!("user:{tid}"),time])?;tx.execute("UPDATE records SET title=CASE WHEN title='新的对话' THEN ?2 ELSE title END,content_version=content_version+1,updated_at=?3 WHERE id=?1",params![input.record_id,input.text.chars().take(40).collect::<String>(),time])?;}
+   if input.kind=="chat"{tx.execute("UPDATE ai_conversations SET profile_id=?2,context_ids=?3,cli_profile_json=?4 WHERE record_id=?1",params![input.record_id,input.profile_id,serde_json::to_string(&input.source_ids)?,Some(serde_json::to_string(&profile)?)])?;let sequence:i64=tx.query_row("SELECT COALESCE(max(sequence),-1)+1 FROM conversation_messages WHERE record_id=?1",[&input.record_id],|r|r.get(0))?;tx.execute("INSERT INTO conversation_messages VALUES(?1,?2,?3,'user',?4,?5,?6)",params![id(&tx)?,input.record_id,sequence,json!({"text":input.text}).to_string(),format!("user:{tid}"),time])?;tx.execute("UPDATE records SET title=CASE WHEN title='新的对话' THEN ?2 ELSE title END,content_version=content_version+1,updated_at=?3 WHERE id=?1",params![input.record_id,input.text.chars().take(40).collect::<String>(),time])?;}
    let result=task(&tx,&tid)?;tx.commit()?;let _=(date,timezone);Ok((result,profile,messages))
   })
     }
@@ -420,12 +474,23 @@ impl DatabaseWorker {
             Ok(n == 1)
         })
     }
+    pub fn ai_reasoning_summary(&self, tid: String, summary: String) -> StorageResult<bool> {
+        if summary.len() > 200_000 {
+            return Err(fail("validation", "推理摘要超过长度限制"));
+        }
+        self.call(move |db, _| {
+            Ok(db.execute(
+                "UPDATE ai_tasks SET reasoning_summary=?2 WHERE id=?1 AND status='running'",
+                params![tid, summary],
+            )? == 1)
+        })
+    }
     pub fn ai_finish(&self, tid: String, result: Result<String, String>) -> StorageResult<()> {
         self.call(move|db,_|{
   let tx=db.transaction_with_behavior(TransactionBehavior::Immediate)?;let t=task(&tx,&tid)?;if t.status!="running"{return Ok(())}
   let valid:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM records WHERE id=?1 AND deleted_at IS NULL) AND NOT EXISTS(SELECT 1 FROM ai_task_sources s JOIN records r ON r.id=s.source_id WHERE s.task_id=?2 AND (r.deleted_at IS NOT NULL OR EXISTS(SELECT 1 FROM ai_source_blocks b WHERE b.source_id=r.id))) AND NOT EXISTS(SELECT 1 FROM ai_source_blocks WHERE source_id=?1)",params![t.record_id,tid],|r|r.get(0))?;
   if !valid{invalidate_source(&tx,&t.record_id)?;tx.commit()?;return Ok(())}
-  let output=match result{Ok(s) if !s.trim().is_empty()&&s.chars().count()<=200_000=>s,Ok(_)=>{tx.execute("UPDATE ai_tasks SET status='failed',error='结果为空或超过长度限制' WHERE id=?1",[&tid])?;tx.commit()?;return Ok(())},Err(e)=>{tx.execute("UPDATE ai_tasks SET status='failed',error=?2 WHERE id=?1",params![tid,e])?;tx.commit()?;return Ok(())}};
+  let output=match result{Ok(s) if !s.trim().is_empty()&&s.chars().count()<=200_000=>s,Ok(_)=>{tx.execute("UPDATE ai_tasks SET status='failed',error='结果为空或超过长度限制',updated_at=?2 WHERE id=?1",params![tid,now()?])?;tx.commit()?;return Ok(())},Err(e)=>{tx.execute("UPDATE ai_tasks SET status='failed',error=?2,updated_at=?3 WHERE id=?1",params![tid,e,now()?])?;tx.commit()?;return Ok(())}};
   let kind:String=tx.query_row("SELECT kind FROM ai_tasks WHERE id=?1",[&tid],|r|r.get(0))?;
   let result_id:Option<String>=None;
   if kind=="draft"{tx.execute("UPDATE ai_previews SET text=?2 WHERE task_id=?1",params![tid,output])?;
@@ -514,6 +579,7 @@ impl AiRunner {
             input.record_id.clone(),
             input.profile_id.clone(),
             input.request_id.clone(),
+            input.selection.clone(),
         )?;
         let effective = if profile.protocol == "codex" {
             Some(if frozen {
@@ -522,6 +588,8 @@ impl AiRunner {
                 tauri::async_runtime::block_on(ai_providers::resolve_cli_profile(profile))
                     .map_err(|e| fail("provider_error", &e))?
             })
+        } else if input.selection.is_some() || frozen {
+            Some(profile)
         } else {
             None
         };
@@ -582,8 +650,14 @@ impl AiRunner {
             let delta_db = db.clone();
             let delta_id = tid.clone();
             let token = cancel.clone();
-            let generate =
-                ai_providers::generate(&profile, messages, cancel.clone(), move |delta| {
+            let summary_db = db.clone();
+            let summary_id = tid.clone();
+            let summary_cancel = cancel.clone();
+            let generate = ai_providers::generate_with_summary(
+                &profile,
+                messages,
+                cancel.clone(),
+                move |delta| {
                     output.push_str(delta);
                     if output.chars().count() > 200_000 {
                         token.store(true, Ordering::SeqCst);
@@ -598,7 +672,16 @@ impl AiRunner {
                         }
                         last = Instant::now();
                     }
-                });
+                },
+                move |summary| {
+                    if !summary_db
+                        .ai_reasoning_summary(summary_id.clone(), summary.to_owned())
+                        .unwrap_or(false)
+                    {
+                        summary_cancel.store(true, Ordering::SeqCst);
+                    }
+                },
+            );
             tokio::pin!(generate);
             let result = tokio::select! {r=&mut generate=>r,_=monitor=>{cancel.store(true,Ordering::SeqCst);(&mut generate).await}};
             if db.ai_finish(tid.clone(), result.clone()).is_err()
@@ -698,6 +781,7 @@ mod tests {
             .unwrap();
         let (t, _, _) = db
             .ai_prepare(StartInput {
+                selection: None,
                 request_id: "request".into(),
                 record_id: record.clone(),
                 profile_id: "profile".into(),

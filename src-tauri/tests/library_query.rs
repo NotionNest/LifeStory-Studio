@@ -139,6 +139,34 @@ fn diary_filters_calendar_and_chat_search_keep_separate_scopes() {
     assert_eq!(db.query_library(query.clone()).unwrap().total, 2);
     query.has_images = Some(false);
     assert_eq!(db.query_library(query.clone()).unwrap().items[0].id, "b");
+    let mut calendar_filters = query.clone();
+    calendar_filters.month = None;
+    for (images, mode, expected) in [
+        (Some(false), "any", vec!["b"]),
+        (Some(true), "all", vec!["a"]),
+        (None, "any", vec!["a", "b"]),
+    ] {
+        calendar_filters.has_images = images;
+        calendar_filters.tag_mode = mode.into();
+        let calendar = db
+            .query_calendar(lifestory_studio_lib::library_query::CalendarQuery {
+                filters: calendar_filters.clone(),
+                from: "2026-10-19".into(),
+                to: "2026-10-25".into(),
+            })
+            .unwrap();
+        assert_eq!(
+            calendar.days.iter().map(|day| day.count).sum::<u32>(),
+            expected.len() as u32
+        );
+        let ids: Vec<_> = calendar
+            .days
+            .iter()
+            .flat_map(|day| &day.items)
+            .map(|item| item.id.as_str())
+            .collect();
+        assert_eq!(ids, expected);
+    }
     query.tag_ids.clear();
     query.has_images = None;
     query.kinds = vec!["conversation".into()];
@@ -249,4 +277,230 @@ fn pending_empty_date_keeps_archive_date_consistent_in_results_and_calendar() {
     assert_eq!(page.total, 1);
     assert_eq!(page.items[0].record_date, "2026-10-20");
     assert_eq!(page.days[0].date, "2026-10-20");
+}
+
+#[test]
+fn calendar_previews_cover_every_day_without_the_list_page_limit() {
+    use lifestory_studio_lib::library_query::CalendarQuery;
+    let root = Workspace::new();
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    for i in 0..103 {
+        add(
+            &db,
+            &root,
+            &format!("calendar-{i:03}"),
+            "2026-10-20",
+            "同日合成记录",
+            "月历查询",
+        );
+    }
+    add(
+        &db,
+        &root,
+        "later-day",
+        "2026-10-21",
+        "其他日期",
+        "月历查询",
+    );
+    root.sql()
+        .execute("UPDATE records SET created_at=100", [])
+        .unwrap();
+    let page = db
+        .query_calendar(CalendarQuery {
+            filters: q("月历"),
+            from: "2026-10-01".into(),
+            to: "2026-11-01".into(),
+        })
+        .unwrap();
+    assert_eq!(page.days.len(), 32);
+    let day = page.days.iter().find(|d| d.date == "2026-10-20").unwrap();
+    assert_eq!(day.count, 103);
+    assert_eq!(day.items.len(), 3);
+    assert_eq!(day.items[0].id, "calendar-000");
+    assert_eq!(
+        page.days
+            .iter()
+            .find(|d| d.date == "2026-10-21")
+            .unwrap()
+            .items[0]
+            .id,
+        "later-day"
+    );
+    assert_eq!(page.days[0].count, 0);
+    let tail = db
+        .query_library(LibraryQuery {
+            date_from: Some("2026-10-20".into()),
+            date_to: Some("2026-10-20".into()),
+            offset: 100,
+            ..q("月历")
+        })
+        .unwrap();
+    assert_eq!(tail.items.len(), 3);
+}
+
+#[test]
+fn calendar_filters_intersect_dates_and_validate_grid_boundaries() {
+    use lifestory_studio_lib::library_query::CalendarQuery;
+    let root = Workspace::new();
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    add(&db, &root, "leap-day", "2024-02-29", "闰日", "匹配");
+    add(&db, &root, "outside", "2024-03-01", "下个月", "匹配");
+    add(&db, &root, "removed", "2024-02-29", "已移除", "匹配");
+    root.sql()
+        .execute("UPDATE records SET deleted_at=1 WHERE id='removed'", [])
+        .unwrap();
+    let page = db
+        .query_calendar(CalendarQuery {
+            filters: LibraryQuery {
+                date_to: Some("2024-02-29".into()),
+                ..q("匹配")
+            },
+            from: "2024-02-26".into(),
+            to: "2024-03-03".into(),
+        })
+        .unwrap();
+    assert_eq!(page.days.iter().map(|d| d.count).sum::<u32>(), 1);
+    assert_eq!(page.days[3].items[0].id, "leap-day");
+    for (from, to) in [
+        ("2026-01-01", "2026-02-12"),
+        ("2026-02-30", "2026-03-01"),
+        ("2026-12-31", "2026-01-01"),
+    ] {
+        assert!(
+            db.query_calendar(CalendarQuery {
+                filters: q(""),
+                from: from.into(),
+                to: to.into()
+            })
+            .is_err()
+        );
+    }
+    assert_eq!(
+        db.query_calendar(CalendarQuery {
+            filters: q(""),
+            from: "2025-12-29".into(),
+            to: "2026-01-04".into()
+        })
+        .unwrap()
+        .days
+        .len(),
+        7
+    );
+}
+
+#[test]
+fn global_chat_search_returns_message_hits_and_title_only_fallback_with_stable_paging() {
+    use lifestory_studio_lib::ai_experience::ChatQuery;
+    let root = Workspace::new();
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    for (id, title) in [
+        ("chat", "旅行会话"),
+        ("title", "旅行标题"),
+        ("gone", "旅行已删除"),
+        ("diary", "旅行日记"),
+    ] {
+        add(&db, &root, id, "2026-10-23", title, "");
+    }
+    let sql = root.sql();
+    sql.execute(
+        "UPDATE records SET kind='conversation',updated_at=10 WHERE id!='diary'",
+        [],
+    )
+    .unwrap();
+    sql.execute("UPDATE records SET deleted_at=1 WHERE id='gone'", [])
+        .unwrap();
+    for n in 0..103 {
+        sql.execute("INSERT INTO conversation_messages(id,record_id,sequence,role,content_json,request_id,created_at) VALUES(?1,'chat',?2,'user',?3,?1,1)",params![format!("message-{n}"),n,json!({"text":format!("前文 旅行 %{n}_ 后文"),"requestId":"不应命中"}).to_string()]).unwrap();
+    }
+    let first = db
+        .ai_chat_search(ChatQuery {
+            keyword: "旅行".into(),
+            offset: 0,
+        })
+        .unwrap();
+    assert_eq!(first.items.len(), 100);
+    assert_eq!(first.items[0].message_id.as_deref(), Some("message-102"));
+    assert_eq!(first.items[0].role.as_deref(), Some("user"));
+    assert!(first.items[0].excerpt.contains("旅行"));
+    let next = db
+        .ai_chat_search(ChatQuery {
+            keyword: "旅行".into(),
+            offset: first.next_offset.unwrap(),
+        })
+        .unwrap();
+    assert_eq!(next.items.len(), 4);
+    assert!(next.next_offset.is_none());
+    assert!(
+        next.items
+            .iter()
+            .any(|item| item.chat_id == "title" && item.message_id.is_none())
+    );
+    assert!(!next.items.iter().any(|item| {
+        first
+            .items
+            .iter()
+            .any(|old| old.chat_id == item.chat_id && old.message_id == item.message_id)
+    }));
+    assert_eq!(
+        db.ai_chat_search(ChatQuery {
+            keyword: "%102_".into(),
+            offset: 0
+        })
+        .unwrap()
+        .items
+        .len(),
+        1
+    );
+    assert!(
+        db.ai_chat_search(ChatQuery {
+            keyword: "不应命中".into(),
+            offset: 0
+        })
+        .unwrap()
+        .items
+        .is_empty()
+    );
+    for keyword in [" ".to_string(), "字".repeat(201)] {
+        assert!(db.ai_chat_search(ChatQuery { keyword, offset: 0 }).is_err());
+    }
+}
+
+#[test]
+fn tag_catalog_counts_only_active_diaries_and_keeps_unused_tags() {
+    let root = Workspace::new();
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    for id in ["current", "other", "deleted", "chat"] {
+        add(&db, &root, id, "2026-10-26", "合成标签日记", "合成正文");
+    }
+    let used = db.create_tag("生活".into()).unwrap();
+    let unused = db.create_tag("未使用".into()).unwrap();
+    assert_eq!(db.create_tag(" 生活 ".into()).unwrap().id, used.id);
+    let sql = root.sql();
+    for id in ["current", "other", "deleted", "chat"] {
+        sql.execute(
+            "INSERT INTO record_tags VALUES(?1,?2)",
+            params![id, used.id],
+        )
+        .unwrap();
+    }
+    sql.execute("UPDATE records SET deleted_at=1 WHERE id='deleted'", [])
+        .unwrap();
+    sql.execute("UPDATE records SET kind='conversation' WHERE id='chat'", [])
+        .unwrap();
+    let tags = db.tag_catalog("current".into()).unwrap();
+    let usage = tags.iter().find(|tag| tag.id == used.id).unwrap();
+    assert_eq!(usage.count, 2);
+    assert!(usage.current);
+    let zero = tags.iter().find(|tag| tag.id == unused.id).unwrap();
+    assert_eq!(zero.count, 0);
+    assert!(!zero.current);
+    sql.execute("DELETE FROM record_tags WHERE record_id='current'", [])
+        .unwrap();
+    let tags = db.tag_catalog("current".into()).unwrap();
+    let usage = tags.iter().find(|tag| tag.id == used.id).unwrap();
+    assert_eq!(usage.count, 1);
+    assert!(!usage.current);
+    for id in ["missing", "deleted", "chat", "invalid/id"] {
+        assert!(db.tag_catalog(id.into()).is_err());
+    }
 }

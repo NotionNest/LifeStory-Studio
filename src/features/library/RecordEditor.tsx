@@ -1,3 +1,4 @@
+import { BoldIcon, ItalicIcon, Heading2Icon, ListIcon, ImagePlusIcon, CalendarDaysIcon } from 'lucide-react'
 import { useEffect, useImperativeHandle, useRef, useState, type Ref, type FormEvent } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { AttachmentSurface } from './AttachmentImage'
@@ -7,14 +8,18 @@ import { imageIds } from './imageDocument'
 import { useRecordPersistence } from './useRecordPersistence'
 import StarterKit from '@tiptap/starter-kit'
 import { Button } from '@/components/ui/button'
+import { TagManager } from './TagManager'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { DateFilterContent } from '@/components/date-filter/DateFilterContent'
+import { blankDateCondition, resolveDateConstraint } from '@/components/date-filter/dateConditions'
 import { libraryApi, errorMessage, type RecordFile, type SaveInput, type Tag, type ImportReport, type EditingSession } from './api'
 export interface EditorHandle { imageDocument: (id: string, position: number) => object; acceptImage: (editing: EditingSession, id: string, position: number) => number; contentVersion: () => number; prepareLeave: () => Promise<'saved' | 'failed'>; resume: () => void; flush: () => Promise<'saved' | 'failed'>; save: () => Promise<boolean>; export: () => Promise<boolean>; discard: () => Promise<boolean> }
-interface Props { record: RecordFile; sessionId: string; recovered?: SaveInput | null; recoveredTags?: Tag[]; ref: Ref<EditorHandle>; onDirty: (dirty: boolean) => void; onBusy: (busy: boolean) => void; onSaved: () => void; onFailure: (message: string) => void; onHistory?: () => void; onImport?: (files: File[], position: number) => void; importReport?: ImportReport | null }
-export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref, onDirty, onBusy, onSaved, onFailure, onHistory, onImport, importReport }: Props) {
+interface Props { record: RecordFile; sessionId: string; recovered?: SaveInput | null; recoveredTags?: Tag[]; ref: Ref<EditorHandle>; onDirty: (dirty: boolean) => void; onBusy: (busy: boolean) => void; onSaved: () => void; onFailure: (message: string) => void; onImport?: (files: File[], position: number) => void; importReport?: ImportReport | null }
+export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref, onDirty, onBusy, onSaved, onFailure, onImport, importReport }: Props) {
   const [title, setTitle] = useState(recovered ? recovered.title ?? '' : record.title ?? '')
   const [date, setDate] = useState(recovered?.recordDate ?? record.recordDate)
   const [tags, setTags] = useState(recovered ? recoveredTags ?? [] : record.tags)
-  const [tagName, setTagName] = useState('')
+  const [dateOpen,setDateOpen]=useState(false)
   const [error, setError] = useState('')
   const picker = useRef<HTMLInputElement>(null), lastPosition = useRef<number | null>(null)
   const article = useRef<HTMLElement>(null), locked = useRef(false)
@@ -40,6 +45,7 @@ export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref,
   persistenceRef.current = persistence
   const { status, busy, changed, save } = persistence
   const freeze = (value: boolean) => {
+    if(value)setDateOpen(false)
     locked.current = value; setReadOnly(value); editor?.setEditable(!value, false)
     // Apply to native controls synchronously, before React commits the visual state.
     article.current?.querySelectorAll<HTMLInputElement>('input').forEach(input => { input.readOnly = value })
@@ -64,13 +70,6 @@ export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref,
     export: async () => {try {return await libraryApi.export(persistence.snapshot())} catch(cause) {setError(errorMessage(cause));return false}},
   }))
   useEffect(() => { onBusy(tagBusy) }, [tagBusy, onBusy])
-  const addTag = async () => {
-    if (locked.current || !tagName.trim() || tagBusy) return
-    setTagBusy(true); onBusy(true); setError('')
-    try { const tag = await libraryApi.tag(tagName); if (!tags.some(t => t.id === tag.id)) { setTags(old => [...old, tag]); changed() }; setTagName('') }
-    catch (cause) { setError(errorMessage(cause)) }
-    finally { setTagBusy(false) }
-  }
   const format = (action: 'bold' | 'italic' | 'heading' | 'list') => {
     if (!editor || locked.current) return
     const chain = editor.chain().focus()
@@ -82,30 +81,24 @@ export function RecordEditor({ record, sessionId, recovered, recoveredTags, ref,
   const guardInput = (event: FormEvent) => { if (locked.current) { event.preventDefault(); event.stopPropagation() } }
   const importFiles = (files: File[], position = lastPosition.current ?? editor?.state.doc.content.size ?? 0) => { if (!locked.current && files.length) onImport?.(files, position) }
   return <AttachmentSurface scope={{ recordId: record.id, revisionId: null, attachments: record.attachments, editable: !readOnly, imageIds: imageIds(editor?.getJSON() ?? record.document) }}><article ref={article} aria-busy={readOnly} onBeforeInputCapture={guardInput} onPasteCapture={event => { guardInput(event); if (!locked.current) { const files = Array.from(event.clipboardData.files); if (files.length) { event.preventDefault(); event.stopPropagation(); importFiles(files, editor?.state.selection.to ?? 0) } } }} onDragOver={event => { if (event.dataTransfer.types.includes('Files')) event.preventDefault() }} onDropCapture={event => { guardInput(event); if (locked.current) return; const files = Array.from(event.dataTransfer.files); if (files.length) { event.preventDefault(); event.stopPropagation(); importFiles(files, editor?.view.posAtCoords({left:event.clientX,top:event.clientY})?.pos ?? editor?.state.doc.content.size ?? 0) } }} onCompositionStart={persistence.compositionStart} onCompositionEnd={persistence.compositionEnd} className="flex min-w-0 flex-1 flex-col bg-card">
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-3">
+    <header className="flex flex-wrap items-center justify-between gap-3 px-6 py-2">
       <div><span role="status" className="text-xs text-muted-foreground">{status}</span></div>
-      <div className="flex items-center gap-3"><span className="text-xs text-muted-foreground">自动保存</span>{onHistory && <Button variant="outline" size="sm" disabled={readOnly || tagBusy} onClick={onHistory}>查看历史</Button>}</div>
     </header>
-    <div className="mx-auto flex w-full max-w-[860px] flex-1 flex-col gap-4 px-7 py-6 lg:px-12">
+    <div className="editor-document">
       {(error || persistence.error) && <p role="alert" className="rounded border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error || persistence.error} <Button variant="ghost" size="sm" disabled={busy} onClick={() => void save()}>立即重试</Button></p>}
       <input aria-label="记录标题" className="w-full bg-transparent text-2xl font-semibold outline-none placeholder:text-muted-foreground/60" placeholder="无标题记录" maxLength={240} readOnly={readOnly} value={title} onChange={e => { if (locked.current) return; setTitle(e.target.value); changed() }} />
-      <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        <label>记录日期 <input aria-label="记录日期" type="date" className="ml-2 rounded border bg-transparent px-2 py-1 text-foreground" readOnly={readOnly} value={date} onChange={e => { if (locked.current) return; setDate(e.target.value); changed() }} /></label>
-        <span>创建于 {new Date(record.createdAt).toLocaleString()}</span>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        {tags.map(tag => <button key={tag.id} className="rounded bg-secondary px-2 py-1 text-xs" title="移除标签" aria-label={`移除标签 ${tag.name}`} disabled={readOnly} onClick={() => { if (locked.current) return; setTags(old => old.filter(t => t.id !== tag.id)); changed() }}>#{tag.name} ×</button>)}
-        <input aria-label="新标签" className="w-28 border-b bg-transparent px-1 py-1 text-xs outline-none" placeholder="添加标签" maxLength={64} readOnly={readOnly} value={tagName} onChange={e => { if (!locked.current) setTagName(e.target.value) }} onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) { e.preventDefault(); void addTag() } }} />
-        <Button variant="ghost" size="sm" disabled={readOnly || tagBusy || busy || !tagName.trim()} onClick={() => void addTag()}>添加</Button>
-      </div>
-      <div className="flex gap-1 border-y py-1" role="toolbar" aria-label="正文格式">
-        {([['bold', '粗体'], ['italic', '斜体'], ['heading', '标题'], ['list', '列表']] as const).map(([action, text]) => <Button key={action} variant="ghost" size="sm" disabled={readOnly} onClick={() => format(action)}>{text}</Button>)}
-        {onImport && <><input ref={picker} aria-label="选择图片文件" type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" disabled={readOnly} onChange={event=>{const files=Array.from(event.target.files??[]);event.target.value='';importFiles(files)}}/><Button variant="ghost" size="sm" disabled={readOnly || tagBusy} onClick={()=>picker.current?.click()}>插入图片</Button></>}
+      <div className="record-format" role="toolbar" aria-label="日记编辑工具">
+        <Popover open={dateOpen&&!readOnly} onOpenChange={open=>{if(!locked.current)setDateOpen(open)}}><PopoverTrigger asChild><Button variant="outline" size="sm" aria-label="记录日期" disabled={readOnly}><CalendarDaysIcon aria-hidden="true"/>{date?date.replace(/-/g,'/'):'选择日期'}</Button></PopoverTrigger><PopoverContent align="start" className="w-80 max-w-[calc(100vw-2rem)] p-3" aria-label="选择记录日期"><DateFilterContent value={date?{...blankDateCondition,start:date}:null} capabilities={{fields:[{value:'start',label:'记录日期'}],operators:['is'],shortcuts:[]}} onChange={condition=>{if(locked.current)return;const next=resolveDateConstraint(condition).dateFrom??'';if(next!==date){setDate(next);changed()}}}/></PopoverContent></Popover>
+        <span aria-hidden="true" className="mx-1 h-4 shrink-0 border-l"/>
+        {([['bold', '粗体', BoldIcon], ['italic', '斜体', ItalicIcon], ['heading', '标题', Heading2Icon], ['list', '列表', ListIcon]] as const).map(([action, text, Icon]) => <Button key={action} variant="ghost" size="icon-sm" aria-label={text} title={text} disabled={readOnly} onClick={() => format(action)}><Icon aria-hidden="true"/></Button>)}
+        {onImport && <><input ref={picker} aria-label="选择图片文件" type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" disabled={readOnly} onChange={event=>{const files=Array.from(event.target.files??[]);event.target.value='';importFiles(files)}}/><Button variant="ghost" size="sm" disabled={readOnly || tagBusy} onClick={()=>picker.current?.click()}><ImagePlusIcon data-icon="inline-start" aria-hidden="true"/>插入图片</Button></>}
 
+        <TagManager recordId={record.id} tags={tags} disabled={readOnly} onBusy={value=>{setTagBusy(value);onBusy(value)}} onChange={next=>{if(locked.current)return;setTags(next);changed()}}/>
       </div>
+      {tags.length>0&&<div className="flex flex-wrap gap-2" aria-label="已选标签">{tags.map(tag=><span key={tag.id} className="rounded bg-secondary px-2 py-1 text-xs">#{tag.name}</span>)}</div>}
       <EditorContent className="record-editor flex-1" editor={editor} onFocus={() => { lastPosition.current=editor?.state.selection.to ?? null }} onKeyUp={() => {lastPosition.current=editor?.state.selection.to ?? null}} onMouseUp={() => {lastPosition.current=editor?.state.selection.to ?? null}} />
       {importReport && <div role="status" className="text-xs leading-6">{importReport.messages.map((line,index)=><p key={index}>{line}</p>)}{importReport.retry.length>0 && <Button size="sm" variant="outline" disabled={readOnly} onClick={()=>importFiles(importReport.retry)}>重试未成功图片</Button>}</div>}
-      <footer className="border-t pt-3 text-xs text-muted-foreground">原文 · 内容自动保存在本机</footer>
+
     </div>
   </article></AttachmentSurface>
 }
