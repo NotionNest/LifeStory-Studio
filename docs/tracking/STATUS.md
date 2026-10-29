@@ -1,6 +1,6 @@
 # 项目跟进
 
-本轮 PR 已创建（2026-10-29）：修复提交 43b7e0d 已推送 codex/fix-api-credentials-sidebar，并创建 [PR #23](https://github.com/NotionNest/LifeStory-Studio/pull/23) 指向 develop，标题与正文使用中文。PR 包含 API 密钥/连接测试、Sonner 与侧栏交互及最终 review 简化，已列明本地验证、首次高并发前端失败及受控并发复验、凭据兼容性与未验收范围。后续仅补充本条交付记录，不修改已验证业务源码。未合并或发布；远程 CI 最终结果待检查，不记为通过。
+本轮 PR 已创建并纠正分支命名（2026-10-29）：修复提交 43b7e0d 与交付记录 9684a27 已保留在 fix/api-credentials-sidebar，最终使用 [PR #24](https://github.com/NotionNest/LifeStory-Studio/pull/24) 指向 develop。首次 [PR #23](https://github.com/NotionNest/LifeStory-Studio/pull/23) 使用工具默认 codex/ 前缀，被仓库既有路由门禁明确拒绝；已关闭并在正文指向 #24，旧远程分支与提交保留，未修改或绕过 CI 规则。PR #24 包含 API 密钥/连接测试、Sonner 与侧栏交互及最终 review 简化，已列明本地验证、首次高并发前端失败及受控并发复验、凭据兼容性与未验收范围。后续只补充本条交付文档，不修改已验证业务源码。推送交付文档时曾遇 GitHub TLS/HTTP2 错误，单次 HTTP/1.1 传输重试成功，没有更改 TLS 校验或持久 Git 配置。未合并或发布；远程 CI 最终结果待检查，不记为通过。
 
 
 本轮分支与 PR 交付准备（2026-10-29，用户授权，REQ-11/12/13 / TASK-08、TASK-09、TASK-10）：已核对本机 develop 与远程 origin/develop 同为 076c64f（PR #22 已合入），并从该基线创建 codex/fix-api-credentials-sidebar。交付范围为本轮 API 连接测试漏传密钥修复、固定掩码/显式更换/普通编辑保留与统一绑定范围、Sonner 成功吐司及主题样式、侧栏宽度动效、单份条件导航与 review 可读性简化。用户授权提交并创建指向 develop 的 PR，不包含合并或发布。
