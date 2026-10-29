@@ -1,5 +1,8 @@
 # 项目跟进
 
+本轮 PR 已创建（2026-10-29）：修复提交 43b7e0d 已推送 codex/fix-api-credentials-sidebar，并创建 [PR #23](https://github.com/NotionNest/LifeStory-Studio/pull/23) 指向 develop，标题与正文使用中文。PR 包含 API 密钥/连接测试、Sonner 与侧栏交互及最终 review 简化，已列明本地验证、首次高并发前端失败及受控并发复验、凭据兼容性与未验收范围。后续仅补充本条交付记录，不修改已验证业务源码。未合并或发布；远程 CI 最终结果待检查，不记为通过。
+
+
 本轮分支与 PR 交付准备（2026-10-29，用户授权，REQ-11/12/13 / TASK-08、TASK-09、TASK-10）：已核对本机 develop 与远程 origin/develop 同为 076c64f（PR #22 已合入），并从该基线创建 codex/fix-api-credentials-sidebar。交付范围为本轮 API 连接测试漏传密钥修复、固定掩码/显式更换/普通编辑保留与统一绑定范围、Sonner 成功吐司及主题样式、侧栏宽度动效、单份条件导航与 review 可读性简化。用户授权提交并创建指向 develop 的 PR，不包含合并或发布。
 
 交付验证：npm run check 通过（架构 121 模块、lint、格式、类型、Rust 格式）；首次默认完整前端套件与原生编译同时运行，26 个隔离 worker 出现 4 文件 21 项失败（含超时与后续断言），未将其记为通过。首个 DiaryWorkflow 文件单独复现 12 项通过；未改源码或增大超时，完整前端限制 maxWorkers=2 后 26 文件 174 项通过（22.17s，/tmp/lifestory-pr-frontend-tests.log）。原生 cargo test --tests 共 89 项通过、2 项依既有标记忽略（需显式配置的 CLI 实机、长聊天性能），Clippy all-targets -D warnings 通过。生产前端构建通过（2.03s）；保留既有主包告警。
