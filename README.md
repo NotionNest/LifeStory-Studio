@@ -4,7 +4,7 @@
 
 前端技术：React + TypeScript + Vite + Tailwind CSS + shadcn/ui；长文编辑使用 Tiptap。
 
-当前阶段：文字记录与单一自动保存已实现，保存边界修复 PR #12 与 CI 分层优化 PR #13 已合入 develop。历史管理（LIB-04）已有本地成果。图片管理（LIB-05）已按 2026-10-20 确认修订为正文图片、撤销与记录历史，不设独立图片恢复；已合入 develop；LIB-06 时间线、日历与搜索筛选已验收并合入 develop，LIB-07 记录回收站与来源失效已验收并合入 develop（PR #19），LIB-08 已按用户确认重构为日记、独立聊天与设置，预览采用后才创建/补充日记；LIB-08/09 已通过 PR #20 合入 develop，LIB-09 已按用户确认收尾。约定的 Codex、API、日记采用/补充、取消/恢复及 Windows 主链路已获用户确认，未逐项确认的专项与兼容范围继续保留。TASK-08 已完成本轮外壳、日记、聊天、模型设置、回收站及历史独立页面的 UI/UX 集中改善；2026-10-27 用户明确本轮告一阶段，后续随功能开发逐步完善。未完成的快捷键与专项验证保留跟踪，不宣称全部验收。下一阶段按已确认顺序推进“写作与风格”，先细化文案审查，再规划练习与风格档案，见 [下一阶段工作](docs/development/WRITING_AND_STYLE_NEXT.md)。证据与限制见 [项目跟进](docs/tracking/STATUS.md)。
+当前阶段：文字记录与单一自动保存已实现，保存边界修复 PR #12 与 CI 分层优化 PR #13 已合入 develop。历史管理（LIB-04）已有本地成果。图片管理（LIB-05）已按 2026-10-20 确认修订为正文图片、撤销与记录历史，不设独立图片恢复；已合入 develop；LIB-06 时间线、日历与搜索筛选已验收并合入 develop，LIB-07 记录回收站与来源失效已验收并合入 develop（PR #19），LIB-08 已按用户确认重构为日记、独立聊天与设置，预览采用后才创建/补充日记；LIB-08/09 已通过 PR #20 合入 develop，LIB-09 已按用户确认收尾。约定的 Codex、API、日记采用/补充、取消/恢复及 Windows 主链路已获用户确认，未逐项确认的专项与兼容范围继续保留。TASK-08 已完成本轮外壳、日记、聊天、模型设置、回收站及历史独立页面的 UI/UX 集中改善；2026-10-27 用户明确本轮告一阶段，后续随功能开发逐步完善。未完成的快捷键与专项验证保留跟踪，不宣称全部验收。2026-10-27 用户确认先实施页面路由与会话架构重构（TASK-09 / DEC-17），见 [前端页面架构](docs/architecture/FRONTEND_NAVIGATION.md)。完成后按已确认顺序推进“写作与风格”，先细化文案审查，再规划练习与风格档案，见 [下一阶段工作](docs/development/WRITING_AND_STYLE_NEXT.md)。证据与限制见 [项目跟进](docs/tracking/STATUS.md)。
 
 ## 启动开发
 
@@ -34,6 +34,7 @@ npm run desktop:dev
 ## 架构方案入口
 
 - [架构与数据流](docs/architecture/ARCHITECTURE.md)
+- [应用入口与目录职责](docs/architecture/APP_STRUCTURE.md)
 - [技术选型与取舍](docs/architecture/TECH_STACK.md)
 - [数据、IPC 与 AI 契约](docs/architecture/DATA_AND_AI.md)
 - [开发环境与实施顺序](docs/architecture/DEVELOPMENT_PLAN.md)
@@ -42,6 +43,10 @@ npm run desktop:dev
 
 远程仓库：[NotionNest/LifeStory-Studio](https://github.com/NotionNest/LifeStory-Studio)（公开）。日常使用 develop 集成、release/<版本> 预发布、main 正式基线；main、develop、release/* 已启用 PR、CI Gate、禁止强推与删除保护。分支、提交、PR 和 CI 约定见 [Git 流程](docs/process/GIT_WORKFLOW.md)。
 
+前端依赖边界、统一格式及 CI 约定见 [持续质量检查](docs/process/FRONTEND_QUALITY.md)。
+
 测试投入与执行频率以 [测试边界](docs/process/TESTING_POLICY.md) 为准，按风险验证，不机械测试每次编辑或普通标点/装饰样式。
 
 这套流程参考规范驱动开发与长期 AI 协作实践，已落实为本项目文档。没有安装或声称启用了第三方流程工具。
+
+API 密钥存储（DEC-18，2026-10-27）：不使用系统钥匙串；按用户确认明文保存在应用私有配置文件，重启可用，不加入应用备份或导出。旧 API 配置需重新填写密钥，旧钥匙串条目不自动迁移或删除。

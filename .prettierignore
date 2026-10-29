@@ -1,0 +1,4 @@
+# shadcn 生成源码保留上游格式。
+src/components/ui/
+# npm 管理锁文件格式。
+package-lock.json

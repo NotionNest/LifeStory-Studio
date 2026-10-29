@@ -1,0 +1,131 @@
+[
+  {
+    "variant": "baseline",
+    "entryBytes": [
+      1219724
+    ],
+    "initialJSBytes": 1219724,
+    "initialGzipBytes": 378122,
+    "initialChunks": 1,
+    "totalChunks": 1,
+    "startupMedian": 647,
+    "documentReadyMedian": 234,
+    "pages": {
+      "diary": {
+        "first": 61,
+        "repeat": 27
+      },
+      "history": {
+        "first": 31.999999999999943,
+        "repeat": 27
+      },
+      "chat": {
+        "first": 29.000000000000057,
+        "repeat": 26.999999999999773
+      },
+      "appearance": {
+        "first": 25,
+        "repeat": 29
+      },
+      "api": {
+        "first": 28.000000000000057,
+        "repeat": 27
+      },
+      "trash": {
+        "first": 28,
+        "repeat": 26.000000000000227
+      },
+      "cli": {
+        "first": 27,
+        "repeat": null
+      }
+    },
+    "cliScanMedian": 1251.0000000000002
+  },
+  {
+    "variant": "route-lazy",
+    "entryBytes": [
+      390361
+    ],
+    "initialJSBytes": 770595,
+    "initialGzipBytes": 253119,
+    "initialChunks": 31,
+    "totalChunks": 41,
+    "startupMedian": 725,
+    "documentReadyMedian": 258,
+    "pages": {
+      "diary": {
+        "first": 80.00000000000006,
+        "repeat": 39.99999999999977
+      },
+      "history": {
+        "first": 31,
+        "repeat": 28
+      },
+      "chat": {
+        "first": 44,
+        "repeat": 28
+      },
+      "appearance": {
+        "first": 27.000000000000057,
+        "repeat": 27.999999999999773
+      },
+      "api": {
+        "first": 27.999999999999943,
+        "repeat": 27
+      },
+      "trash": {
+        "first": 27,
+        "repeat": 28
+      },
+      "cli": {
+        "first": 27,
+        "repeat": null
+      }
+    },
+    "cliScanMedian": 1252
+  },
+  {
+    "variant": "editor-lazy",
+    "entryBytes": [
+      766933
+    ],
+    "initialJSBytes": 766933,
+    "initialGzipBytes": 237160,
+    "initialChunks": 1,
+    "totalChunks": 2,
+    "startupMedian": 668.000244140625,
+    "documentReadyMedian": 257,
+    "pages": {
+      "diary": {
+        "first": 92,
+        "repeat": 28
+      },
+      "history": {
+        "first": 37,
+        "repeat": 28
+      },
+      "chat": {
+        "first": 44,
+        "repeat": 28
+      },
+      "appearance": {
+        "first": 27,
+        "repeat": 27
+      },
+      "api": {
+        "first": 28,
+        "repeat": 27
+      },
+      "trash": {
+        "first": 28,
+        "repeat": 28
+      },
+      "cli": {
+        "first": 27,
+        "repeat": null
+      }
+    },
+    "cliScanMedian": 1249
+  }
+]

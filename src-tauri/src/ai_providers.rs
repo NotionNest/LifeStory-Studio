@@ -12,7 +12,6 @@ use std::{
 
 const MAX_RESPONSE: usize = 4 * 1024 * 1024;
 const MAX_EVENT: usize = 256 * 1024;
-const SERVICE: &str = "LifeStory Studio AI";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -135,31 +134,6 @@ fn is_openrouter(p: &Profile) -> bool {
             .and_then(|u| u.host_str().map(str::to_owned))
             .is_some_and(|h| h.eq_ignore_ascii_case("openrouter.ai"))
 }
-fn entry(id: &str) -> Result<keyring::Entry, String> {
-    if id.is_empty()
-        || id.len() > 128
-        || !id
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
-    {
-        return Err("服务配置标识无效".into());
-    }
-    keyring::Entry::new(SERVICE, id).map_err(|_| "系统凭据存储不可用".into())
-}
-pub fn store_key(profile_id: &str, key: &str) -> Result<(), String> {
-    if key.trim().is_empty() || key.len() > 16384 || key.chars().any(char::is_control) {
-        return Err("API 密钥为空或格式无效".into());
-    }
-    entry(profile_id)?
-        .set_password(key)
-        .map_err(|_| "无法写入系统凭据存储".into())
-}
-pub fn delete_key(profile_id: &str) -> Result<(), String> {
-    match entry(profile_id)?.delete_credential() {
-        Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
-        Err(_) => Err("无法删除系统凭据".into()),
-    }
-}
 fn request(p: &Profile, messages: Vec<Message>) -> Result<(String, Value), String> {
     let base = p.base_url.trim_end_matches('/');
     let mapped: Vec<Value> = messages
@@ -227,11 +201,12 @@ pub async fn generate(
     cancelled: Arc<AtomicBool>,
     on_delta: impl FnMut(&str) + Send,
 ) -> Result<String, String> {
-    generate_with_summary(p, messages, cancelled, on_delta, |_| {}).await
+    generate_with_summary(p, None, messages, cancelled, on_delta, |_| {}).await
 }
 
 pub async fn generate_with_summary(
     p: &Profile,
+    key: Option<&str>,
     messages: Vec<Message>,
     cancelled: Arc<AtomicBool>,
     on_delta: impl FnMut(&str) + Send,
@@ -259,9 +234,7 @@ pub async fn generate_with_summary(
     if p.protocol == "codex" {
         return codex_generate(p, messages, cancelled, on_delta, on_summary).await;
     }
-    let key = entry(&p.id)?
-        .get_password()
-        .map_err(|_| "未配置密钥或系统凭据不可用")?;
+    let key = key.ok_or("未配置本机密钥，请在 API 设置中重新填写并保存")?;
     let (url, body) = request(p, messages)?;
     let client = reqwest::Client::builder()
         .retry(reqwest::retry::never())
@@ -1280,6 +1253,7 @@ for line in sys.stdin:
         let mut summary = String::new();
         let text = generate_with_summary(
             &p,
+            None,
             vec![Message {
                 role: "user".into(),
                 text: "synthetic".into(),
@@ -1787,22 +1761,6 @@ pub async fn resolve_cli_profile(mut profile: Profile) -> Result<Profile, String
     }
     validate(&profile)?;
     Ok(profile)
-}
-
-pub async fn models(p: &Profile) -> Result<Vec<String>, String> {
-    validate(p)?;
-    if p.protocol == "codex" {
-        return Ok(codex_catalog(p)
-            .await?
-            .models
-            .into_iter()
-            .map(|m| m.model)
-            .collect());
-    }
-    let key = entry(&p.id)?
-        .get_password()
-        .map_err(|_| "无法读取此配置的系统凭据")?;
-    models_with_key(p, &key).await
 }
 
 fn validate_catalog(p: &Profile, key: &str) -> Result<(), String> {

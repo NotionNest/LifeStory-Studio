@@ -1,0 +1,29 @@
+{
+  "date": "2026-10-28",
+  "platform": "macOS arm64",
+  "browser": "Google Chrome 156.0.8078.49 headless",
+  "node": "24.3.0",
+  "react": "19.3.1",
+  "build": "Vite production",
+  "viewport": [
+    1200,
+    900
+  ],
+  "chatContainer": [
+    1000,
+    800
+  ],
+  "browserMessageCharacters": 1024,
+  "nativeMessageCharacters": 1029,
+  "browserTrialsPerCase": 3,
+  "updatesPerTrial": 3,
+  "nativeTrialsPerCase": 5,
+  "nativeProfile": "debug test (not release)",
+  "sourceHashes": {
+    "src/features/chat/ChatMessageList.tsx": "fa8598aabb070f2e6b54524f334052a668c59fc32975808e8c6b2b4ba87da97a",
+    "src/features/chat/MessageDetails.tsx": "caa0c392862551c5029d0bd882718a6baa6467fa2172dc7f08eb39fc9aef2e37",
+    "src/components/ui/message-scroller.tsx": "91513c479236491b68a44fb049899aa922f2cdf2b5f77161538f9cd264d5ea56",
+    "src-tauri/src/ai.rs": "e36fec74d30ba8429a10ca6888eea9acdf65031259302b8916f523eb9e6f5655",
+    "package-lock.json": "e0648385d2b5a6fb9040e806e7e97d168b9938d46ecdc0d37a3738c88fd02927"
+  }
+}

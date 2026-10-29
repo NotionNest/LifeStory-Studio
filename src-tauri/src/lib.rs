@@ -4,6 +4,7 @@ pub mod ai_experience;
 pub mod ai_providers;
 pub mod attachments;
 mod commands;
+pub mod credentials;
 pub mod history;
 pub mod library_query;
 pub mod records;

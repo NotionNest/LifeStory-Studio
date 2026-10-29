@@ -554,7 +554,22 @@ pub async fn ai_models(
                     code: "not_found",
                     message: "服务配置不存在".into(),
                 })?;
-            crate::ai_providers::models(&profile).await
+            {
+                if profile.protocol == "codex" {
+                    crate::ai_providers::codex_catalog(&profile)
+                        .await
+                        .map(|catalog| {
+                            catalog
+                                .models
+                                .into_iter()
+                                .map(|model| model.model)
+                                .collect()
+                        })
+                } else {
+                    let key = record_task(&database, move |db| db.ai_key(profile_id)).await?;
+                    crate::ai_providers::models_with_key(&profile, &key).await
+                }
+            }
         }
         _ => {
             return Err(RecordError {

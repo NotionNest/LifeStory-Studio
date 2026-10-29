@@ -1,0 +1,90 @@
+@layer components {
+  .tiptap {
+    @apply min-h-40 rounded-md border border-input bg-card px-4 py-3 leading-7;
+  }
+  .tiptap:focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+  .tiptap p + p {
+    margin-top: 0.75em;
+  }
+}
+
+@layer components {
+  .record-editor .tiptap {
+    min-height: 50vh;
+    border: 0;
+    border-radius: 0;
+    padding: 0.5rem 0;
+    background: transparent;
+    font-size: 15px;
+    line-height: 1.95;
+  }
+  .record-editor .tiptap:focus-visible {
+    outline: none;
+  }
+  .record-editor .tiptap h1 {
+    font-size: 1.8em;
+    font-weight: 600;
+    margin: 1em 0 0.5em;
+  }
+  .record-editor .tiptap h2 {
+    font-size: 1.4em;
+    font-weight: 600;
+    margin: 1em 0 0.5em;
+  }
+  .record-editor .tiptap h3 {
+    font-size: 1.2em;
+    font-weight: 600;
+    margin: 1em 0 0.5em;
+  }
+  .record-editor .tiptap ul {
+    list-style: disc;
+    padding-left: 1.5em;
+  }
+  .record-editor .tiptap ol {
+    list-style: decimal;
+    padding-left: 1.5em;
+  }
+  .record-editor .tiptap blockquote {
+    border-left: 2px solid var(--border);
+    padding-left: 1em;
+    color: var(--muted-foreground);
+  }
+  .record-editor .tiptap pre {
+    white-space: pre-wrap;
+    background: var(--secondary);
+    padding: 0.8em;
+    border-radius: 0.25em;
+  }
+}
+
+@layer components {
+  .history-document .tiptap {
+    min-height: 0;
+  }
+}
+
+@layer components {
+  .editor-document {
+    @apply mx-auto flex w-full max-w-[820px] flex-1 flex-col gap-4 px-7 pb-14 pt-10 lg:px-12;
+  }
+  .record-format {
+    @apply flex flex-nowrap items-center gap-1 overflow-x-auto border-y border-border/50 py-1;
+  }
+  .record-editor .tiptap {
+    font-size: 16px;
+    line-height: 1.9;
+  }
+}
+
+@media (max-width: 900px) {
+  .editor-document {
+    padding: 1.5rem;
+  }
+}
+
+.studio-shell:has(.studio-titlebar-macos) dialog[aria-labelledby='history-title'] {
+  top: 2.5rem;
+  height: calc(100dvh - 2.5rem);
+}
