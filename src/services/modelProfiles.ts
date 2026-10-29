@@ -1,6 +1,8 @@
 import { invoke } from '@tauri-apps/api/core'
 
 export interface AiProfile {
+  hasKey?: boolean
+  keyScope?: Record<string, string | null> | null
   id: string
   label: string
   service: string

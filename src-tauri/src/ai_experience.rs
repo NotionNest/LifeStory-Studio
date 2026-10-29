@@ -378,17 +378,17 @@ impl DatabaseWorker {
         crate::ai_providers::validate(&profile).map_err(|e| fail("validation", &e))?;
         let old = profile.id.clone();
         identifier(&old)?;
-        if profile.protocol != "codex" && key.trim().is_empty() {
-            return Err(fail(
-                "validation",
-                "修改服务配置须重新输入凭据；不会自动复用旧目的地的密钥",
-            ));
-        }
         self.call(move|db,root|{
  let tx=db.transaction_with_behavior(TransactionBehavior::Immediate)?;
  let raw:String=tx.query_row("SELECT profile_json FROM ai_profiles WHERE id=?1",[&old],|r|r.get(0)).optional()?.ok_or_else(||fail("not_found","服务配置不存在"))?;let previous:crate::ai_providers::Profile=serde_json::from_str(&raw)?;
  if previous.label.starts_with("[已停用]"){return Err(fail("conflict","该配置已停用，请添加新服务"))}
  let running:bool=tx.query_row("SELECT EXISTS(SELECT 1 FROM ai_tasks WHERE profile_id=?1 AND status='running')",[&old],|r|r.get(0))?;if running{return Err(fail("conflict","请先完成或取消该服务的任务，再修改配置"))}
+ let key = if profile.protocol != "codex" && key.is_empty() {
+ if previous.connection_target() != profile.connection_target() {
+ return Err(fail("validation", "连接目标已改变，请重新填写 API Key"));
+ }
+ crate::credentials::read_key(root, &old).map_err(|e|fail("credential_error", &e))?
+ } else { key };
  profile.id=id(&tx)?;if profile.protocol!="codex"{crate::credentials::store_key(root, &profile.id,&key).map_err(|e|fail("credential_error",&e))?;}
  let saved=(||->StorageResult<()>{tx.execute("INSERT INTO ai_profiles VALUES(?1,?2,?3)",params![profile.id,serde_json::to_string(&profile)?,now()?])?;tx.execute("UPDATE ai_profiles SET profile_json=json_set(profile_json,'$.label',?2) WHERE id=?1",params![old,format!("[已停用] {}",previous.label)])?;match use_for_new_chat {
  Some(true)=>{tx.execute("UPDATE ai_preferences SET default_profile_id=?1 WHERE id=1",[&profile.id])?;},
@@ -396,7 +396,7 @@ impl DatabaseWorker {
  None=>{tx.execute("UPDATE ai_preferences SET default_profile_id=?2 WHERE default_profile_id=?1",params![old,profile.id])?;}
  }tx.commit()?;Ok(())})();
  if let Err(e)=saved{if profile.protocol!="codex"{let _=crate::credentials::delete_key(root, &profile.id);}return Err(e)}
- if previous.protocol!="codex"{crate::credentials::delete_key(root, &old).map_err(|_|fail("credential_error","新配置已保存并替换旧配置，但旧凭据未能清理，请在应用私有凭据目录中核对清理"))?;}Ok(profile)
+ if previous.protocol!="codex"{crate::credentials::delete_key(root, &old).map_err(|_|fail("credential_error","新配置已保存并替换旧配置，但旧凭据未能清理，请在应用私有凭据目录中核对清理"))?;}profile.has_key=profile.protocol!="codex";profile.key_scope=Some(profile.connection_target());Ok(profile)
  })
     }
 }

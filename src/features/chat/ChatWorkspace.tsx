@@ -11,6 +11,7 @@ import {
 import { BookOpenIcon, PenLineIcon, Trash2Icon, PencilIcon, XIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { WorkspaceSidebar } from '@/components/WorkspaceSidebar'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { DeleteRecordDialog } from '@/components/dialogs/DeleteRecordDialog'
 import { useChatView } from './ChatSessionProvider'
@@ -22,6 +23,7 @@ export function ChatWorkspace({ children }: { children?: ReactNode }) {
     active,
     titlebarTarget,
     sidebarOpen,
+    sidebarTrigger,
     onClose,
     setChatAddress,
     title,
@@ -134,11 +136,12 @@ export function ChatWorkspace({ children }: { children?: ReactNode }) {
       {active && (
         <PageActions target={onClose ? localActions : titlebarTarget} actions={pageActions} />
       )}
-      <aside
+      <WorkspaceSidebar
+        returnFocusRef={sidebarTrigger}
         id="chat-sidebar"
-        aria-label="聊天历史"
-        hidden={!sidebarOpen}
-        className="workspace-sidebar gap-3 p-3"
+        label="聊天历史"
+        open={sidebarOpen}
+        className="gap-3 p-3"
       >
         <div className="flex items-center justify-between gap-2">
           <h1 className="font-semibold">聊天</h1>
@@ -172,7 +175,7 @@ export function ChatWorkspace({ children }: { children?: ReactNode }) {
             </Button>
           )}
         </div>
-      </aside>
+      </WorkspaceSidebar>
       <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="聊天工作区">
         <header className="workspace-toolbar gap-2">
           <div className="min-w-0">

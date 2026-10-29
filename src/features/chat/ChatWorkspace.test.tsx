@@ -561,12 +561,19 @@ it('keeps unsent input when its history sidebar is collapsed and reopened', asyn
   try {
     await act(async () => ui.root.render(<ChatWorkspace {...props} />))
     await act(async () => ui.set('聊天输入', '侧栏收起后继续讲述'))
+    const sidebar = ui.host.querySelector('[aria-label="聊天历史"]')
     await act(async () => ui.root.render(<ChatWorkspace {...props} sidebarOpen={false} />))
-    expect(ui.host.querySelector<HTMLElement>('[aria-label="聊天历史"]')!.hidden).toBe(true)
+    expect(ui.host.querySelector('[aria-label="聊天历史"]')!.getAttribute('aria-hidden')).toBe(
+      'true',
+    )
+    expect(ui.host.querySelector('[aria-label="聊天历史"]')!.hasAttribute('inert')).toBe(true)
     expect(ui.host.querySelector<HTMLTextAreaElement>('[aria-label="聊天输入"]')!.value).toBe(
       '侧栏收起后继续讲述',
     )
     await act(async () => ui.root.render(<ChatWorkspace {...props} sidebarOpen />))
+    expect(ui.host.querySelector('[aria-label="聊天历史"]')).toBe(sidebar)
+    expect(sidebar!.hasAttribute('inert')).toBe(false)
+    expect(sidebar!.getAttribute('aria-hidden')).toBe('false')
     expect(ui.host.querySelector<HTMLTextAreaElement>('[aria-label="聊天输入"]')!.value).toBe(
       '侧栏收起后继续讲述',
     )

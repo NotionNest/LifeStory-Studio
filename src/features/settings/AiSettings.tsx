@@ -1,15 +1,10 @@
 import { modelProfilesApi, type AiProfile, type AiPreferences } from '@/services/modelProfiles'
 import { createContext, useContext, type ReactNode } from 'react'
 import { useEffect, useEffectEvent, useRef, useState } from 'react'
-import { EyeIcon, EyeOffIcon, PlugIcon } from 'lucide-react'
+import { PlugIcon } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  InputGroup,
-  InputGroupInput,
-  InputGroupAddon,
-  InputGroupButton,
-} from '@/components/ui/input-group'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field'
 import { errorMessage } from '@/lib/errors'
@@ -55,7 +50,7 @@ function useAiSettings({
     [manualModel, setManualModel] = useState(true),
     [editing, setEditing] = useState<string | null>(null),
     [dirty, setDirty] = useState(false),
-    [showKey, setShowKey] = useState(false),
+    [replacingKey, setReplacingKey] = useState(false),
     [testing, setTesting] = useState<string | null>(null)
   const [readingModels, setReadingModels] = useState(false)
   const catalogEpoch = useRef(0),
@@ -118,7 +113,7 @@ function useAiSettings({
     setProfile(next)
     setEditing(existing ? next.id : null)
     setKey('')
-    setShowKey(false)
+    setReplacingKey(false)
     setDirty(false)
     setModels([])
     setManualModel(true)
@@ -151,10 +146,12 @@ function useAiSettings({
       onFirstVisit()
     }
   }, [active, ready, profiles, preferences?.defaultProfileId])
+  const keyScope = savedProfile.current?.keyScope
   const savedConnection = Boolean(
     editing &&
-    savedProfile.current?.baseUrl === profile.baseUrl &&
-    savedProfile.current?.protocol === profile.protocol,
+    savedProfile.current?.hasKey &&
+    keyScope &&
+    Object.entries(keyScope).every(([field, value]) => profile[field as keyof AiProfile] === value),
   )
   const readModels = async () => {
     if (readingModels || busyRef.current) return
@@ -200,7 +197,7 @@ function useAiSettings({
       try {
         await modelProfilesApi.test(editing, request)
         onChange()
-        setMessage('连接测试成功。')
+        toast.success(`${profile.label} 连接测试成功`)
       } finally {
         setTesting(null)
       }
@@ -224,8 +221,8 @@ function useAiSettings({
     editing,
     dirty,
     setDirty,
-    showKey,
-    setShowKey,
+    replacingKey,
+    setReplacingKey,
     testing,
     readingModels,
     run,
@@ -239,6 +236,7 @@ function useAiSettings({
     selectProvider,
     cancel,
     savedConnection,
+    keyStored: savedConnection && !replacingKey,
     readModels,
     input,
     test,
@@ -258,6 +256,7 @@ export function AiSettings(props: Props) {
 }
 export function AiSettingsView() {
   const session = useContext(ApiSettingsContext)
+  const keyInput = useRef<HTMLInputElement>(null)
   if (!session) throw new Error('缺少会话上下文')
   const {
     ready,
@@ -277,8 +276,8 @@ export function AiSettingsView() {
     editing,
     dirty,
     setDirty,
-    showKey,
-    setShowKey,
+    replacingKey,
+    setReplacingKey,
     testing,
     readingModels,
     run,
@@ -292,10 +291,17 @@ export function AiSettingsView() {
     selectProvider,
     cancel,
     savedConnection,
+    keyStored,
     readModels,
     input,
     test,
   } = session
+  const getKeyStatusMessage = () => {
+    if (keyStored) return '密钥已保存。'
+    if (editing && profile.hasKey && !savedConnection) return '连接目标已改变，请重新填写 API Key。'
+    if (replacingKey) return '填写新密钥；取消本次修改将保留原密钥。'
+    return '请填写 API Key。'
+  }
   if (!ready)
     return (
       <p role="status" className="p-6">
@@ -366,7 +372,7 @@ export function AiSettingsView() {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={busy || dirty || !editing}
+                disabled={busy || dirty || !editing || !profile.hasKey}
                 onClick={() => void test()}
               >
                 测试连接
@@ -419,37 +425,47 @@ export function AiSettingsView() {
           {input('label', 'AI 配置名称')}
           <Field>
             <FieldLabel htmlFor="ai-key">API Key</FieldLabel>
-            <InputGroup>
-              <InputGroupInput
+            <div className="flex items-center gap-2">
+              <Input
+                ref={keyInput}
                 id="ai-key"
                 aria-label="AI API Key"
-                type={showKey ? 'text' : 'password'}
+                aria-describedby="ai-key-status"
+                type="password"
                 autoComplete="off"
                 disabled={busy}
-                required
-                placeholder={editing ? '重新填写 API Key' : undefined}
-                value={key}
+                readOnly={keyStored}
+                required={!keyStored}
+                value={keyStored ? '••••••••' : key}
                 onChange={(e) => {
+                  if (keyStored) return
                   clearCatalog()
                   setKey(e.target.value)
+                  setReplacingKey(Boolean(editing))
                   setDirty(true)
                   setMessage('')
                 }}
               />
-              <InputGroupAddon align="inline-end">
-                <InputGroupButton
+              {keyStored && (
+                <Button
                   type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={showKey ? '隐藏 API Key' : '显示 API Key'}
-                  aria-pressed={showKey}
+                  variant="outline"
                   disabled={busy}
-                  onClick={() => setShowKey((value) => !value)}
+                  onClick={() => {
+                    clearCatalog()
+                    setReplacingKey(true)
+                    keyInput.current?.focus()
+                    setDirty(true)
+                    setMessage('')
+                  }}
                 >
-                  {showKey ? <EyeOffIcon aria-hidden="true" /> : <EyeIcon aria-hidden="true" />}
-                </InputGroupButton>
-              </InputGroupAddon>
-            </InputGroup>
+                  更换密钥
+                </Button>
+              )}
+            </div>
+            <p id="ai-key-status" className="text-xs text-muted-foreground">
+              {getKeyStatusMessage()}
+            </p>
             <p className="text-xs text-muted-foreground">
               API Key 明文保存在本机应用私有目录，不加入应用备份或导出。
             </p>
@@ -462,7 +478,7 @@ export function AiSettingsView() {
                 type="button"
                 variant="ghost"
                 size="sm"
-                disabled={busy || readingModels || (!key.trim() && !savedConnection)}
+                disabled={busy || readingModels || (!key.trim() && !keyStored)}
                 onClick={() => void readModels()}
               >
                 {readingModels ? '正在读取…' : '读取模型目录'}

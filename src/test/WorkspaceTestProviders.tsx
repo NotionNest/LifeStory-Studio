@@ -1,4 +1,4 @@
-import type { ReactNode, RefObject } from 'react'
+import { useRef, type ReactNode, type RefObject } from 'react'
 import { AppearanceContext } from '@/contexts/AppearanceContext'
 import { ModelProfilesContext } from '@/contexts/ModelProfilesContext'
 import { WorkspaceContext } from '@/contexts/WorkspaceContext'
@@ -21,6 +21,7 @@ export function WorkspaceTestProviders({
   titlebarTarget?: HTMLElement | null
   sidebarOpen?: boolean
 }) {
+  const sidebarTrigger = useRef<HTMLButtonElement>(null)
   return (
     <AppearanceContext value={{ preference: 'system', change: () => {}, error: '', dark: false }}>
       <ModelProfilesContext
@@ -29,6 +30,7 @@ export function WorkspaceTestProviders({
         <WorkspaceContext
           value={{
             titlebarTarget,
+            sidebarTrigger,
             sidebarOpen,
             setSidebarOpen: () => {},
             setTitlebarTarget: () => {},

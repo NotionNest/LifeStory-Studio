@@ -281,13 +281,21 @@ impl DatabaseWorker {
     }
 
     pub fn ai_profiles(&self) -> StorageResult<Vec<Profile>> {
-        self.call(|db, _| {
+        self.call(|db, root| {
             let mut stmt =
                 db.prepare("SELECT profile_json FROM ai_profiles ORDER BY created_at,id")?;
             let rows = stmt
                 .query_map([], |r| r.get::<_, String>(0))?
                 .collect::<Result<Vec<_>, _>>()?;
-            rows.iter().map(|s| Ok(serde_json::from_str(s)?)).collect()
+            rows.iter()
+                .map(|s| {
+                    let mut profile: Profile = serde_json::from_str(s)?;
+                    profile.has_key = profile.protocol != "codex"
+                        && crate::credentials::read_key(root, &profile.id).is_ok();
+                    profile.key_scope = Some(profile.connection_target());
+                    Ok(profile)
+                })
+                .collect()
         })
     }
     pub fn ai_configure(&self, profile: Profile, key: String) -> StorageResult<Profile> {
@@ -328,6 +336,8 @@ impl DatabaseWorker {
                 let _ = crate::credentials::delete_key(root, &profile.id);
                 return Err(e);
             }
+            profile.has_key = profile.protocol != "codex";
+            profile.key_scope = Some(profile.connection_target());
             Ok(profile)
         })
     }
@@ -776,12 +786,7 @@ mod tests {
             model: "synthetic".into(),
             context_chars: 32000,
             max_output_tokens: 1000,
-            downstream: None,
-            codex_path: None,
-            output_token_parameter: None,
-            cli_model_mode: None,
-            reasoning_effort: None,
-            cli_version: None,
+            ..Default::default()
         };
         sql.execute(
             "INSERT INTO ai_profiles VALUES('profile',?1,0)",

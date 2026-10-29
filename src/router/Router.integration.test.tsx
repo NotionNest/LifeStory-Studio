@@ -140,8 +140,8 @@ beforeEach(() => {
   >)
   events.clear()
   saved = structuredClone(original)
-  vi.stubGlobal('matchMedia', () => ({
-    matches: false,
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: query.includes('prefers-reduced-motion'),
     addEventListener() {},
     removeEventListener() {},
   }))
@@ -241,7 +241,9 @@ async function setup(path = '/diaries') {
   const click = async (label: string) =>
     act(async () => {
       const node = [...host.querySelectorAll<HTMLElement>('button,a')].find(
-        (node) => node.getAttribute('aria-label') === label || node.textContent?.includes(label),
+        (node) =>
+          !node.closest('[inert], [aria-hidden="true"]') &&
+          (node.getAttribute('aria-label') === label || node.textContent?.includes(label)),
       )
       expect(node, label).toBeTruthy()
       node!.click()
