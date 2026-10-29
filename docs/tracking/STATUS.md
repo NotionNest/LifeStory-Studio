@@ -1,5 +1,7 @@
 # 项目跟进
 
+长聊天成果已提交并创建 PR（2026-10-29，用户授权）：源码与配套文档提交 96bbcbf 已推送 feat/chat-history，已创建 [PR #25](https://github.com/NotionNest/LifeStory-Studio/pull/25) 指向 develop，基线 d16db2a，中文标题/正文已包含全部长聊天实现、schema 17 迁移/权限与兼容影响、实际验证和未验收范围。PR 已附加到本会话。创建时远程 Validation develop@d16db2a 工作流正在运行（run 40848393845），尚无最终结论；随后仅补充本条交付记录，远程结果须以 PR 最新 head 对应的 CI 为准，不记为通过。交付本地检查见下一条（前端 184 项、原生 93 项通过，2 项原有忽略）。未合并、发布或安排自动跟进；双平台原生交互、真实资料库升级耗时与真实模型仍待专项验收。
+
 长聊天成果提交与 PR 交付准备（2026-10-29，用户授权，REQ-11/12/13 / TASK-11）：已 fetch 核对 feat/chat-history 基于最新 origin/develop=d16db2a，累计 38 个改动路径仅包含聊天 SQL 游标/增量、动态高度虚拟滚动、代码规范修订、schema 17 用户文字标记与配套规格/回归。提交前常见密钥模式、私有资料类型与大文件检查无命中，组件库没有测试文件且未运行组件库测试。授权提交中文说明并创建指向 develop 的 PR，不含合并或发布。
 
 交付验证：npm run check 通过（架构 125 模块、lint、格式、类型、Rust 格式）；完整前端以 maxWorkers=2 执行，27 文件 184 项通过（31.20s）。完整原生 cargo test --tests 在沙箱外按 test-threads=2 执行，93 项通过、2 项依既有标记忽略，没有真实模型或规模测量调用；Clippy all-targets -D warnings 通过（1.05s），生产前端构建通过（Vite 1.55s），保留主包 1,269.27 kB 大包提示。原生运行放在沙箱外是为了既有合成 HTTP 监听，不读真实凭据或日记。日志 /tmp/lifestory-chat-pr-check.log、/tmp/lifestory-chat-pr-frontend.log、/tmp/lifestory-chat-pr-native.log、/tmp/lifestory-chat-pr-clippy.log、/tmp/lifestory-chat-pr-build.log；git diff --check 通过。沿用此前同一 UI 实现的合成浏览器锚点证据；没有重复浏览器、真实模型或双平台桌面实机验收。schema 17 首次真实资料库升级耗时仍待验收，迁移前备份与失败回滚已有真实存储回归。PR 链接及远程 CI 状态在创建后记录，不将本地通过当作远程 CI 成功。
