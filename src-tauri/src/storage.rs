@@ -11,7 +11,7 @@ use rusqlite::Connection;
 use serde::Serialize;
 
 pub type StorageResult<T> = Result<T, Box<dyn Error + Send + Sync>>;
-const SCHEMA_VERSION: i64 = 16;
+const SCHEMA_VERSION: i64 = 17;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -175,6 +175,7 @@ fn initialize(root: &Path) -> StorageResult<Connection> {
             14 => include_str!("../migrations/014_chat_context.sql"),
             15 => include_str!("../migrations/015_cli_effective_profiles.sql"),
             16 => include_str!("../migrations/016_task_reasoning_summary.sql"),
+            17 => include_str!("../migrations/017_chat_user_text.sql"),
             _ => unreachable!(),
         };
         let transaction = connection.transaction()?;

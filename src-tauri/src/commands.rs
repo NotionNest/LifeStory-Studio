@@ -433,12 +433,14 @@ pub async fn ai_create_conversation(
     .await
 }
 #[tauri::command]
-pub async fn ai_workspace(
+pub async fn ai_chat_window(
     database: State<'_, DatabaseWorker>,
     runner: State<'_, crate::ai::AiRunner>,
     record_id: String,
+    input: crate::chat_history::WindowRequest,
 ) -> Result<crate::ai::Workspace, RecordError> {
-    let mut workspace = record_task(&database, move |db| db.ai_workspace(record_id)).await?;
+    let mut workspace =
+        record_task(&database, move |db| db.ai_chat_window(record_id, input)).await?;
     if let Some(task) = workspace.task.as_mut() {
         runner.decorate(task)
     }

@@ -8,6 +8,7 @@ import {
 } from 'react'
 import { useChatSession } from './useChatSession'
 type ChatSession = ReturnType<typeof useChatSession>
+export type ChatMessagesView = ChatSession['messages']
 
 // Only committed view projections are published; the session remains the sole state owner.
 function createViewSubscription<View extends object>(initial: View) {

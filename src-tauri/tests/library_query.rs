@@ -244,7 +244,7 @@ fn paging_validation_and_index_upgrade_do_not_lose_or_repeat_records() {
         assert!(db.query_library(query).is_err());
     }
     drop(db);
-    sql.execute_batch("DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; DROP TABLE ai_source_blocks; DROP TABLE ai_provider_checks; DROP TABLE ai_task_sources; DROP TABLE ai_tasks; DROP TABLE ai_profiles; DROP INDEX records_trash_due; ALTER TABLE record_relations DROP COLUMN unavailable_source_id; DROP TRIGGER library_search_insert;DROP TRIGGER library_search_update;DROP TRIGGER library_search_delete;DELETE FROM record_search;INSERT INTO record_search VALUES('r-000','过期残留');PRAGMA user_version=8;").unwrap();
+    sql.execute_batch("DROP TRIGGER chat_user_text_insert; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; DROP TABLE ai_source_blocks; DROP TABLE ai_provider_checks; DROP TABLE ai_task_sources; DROP TABLE ai_tasks; DROP TABLE ai_profiles; DROP INDEX records_trash_due; ALTER TABLE record_relations DROP COLUMN unavailable_source_id; DROP TRIGGER library_search_insert;DROP TRIGGER library_search_update;DROP TRIGGER library_search_delete;DELETE FROM record_search;INSERT INTO record_search VALUES('r-000','过期残留');PRAGMA user_version=8;").unwrap();
     drop(sql);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
     assert_eq!(db.query_library(q("过期残留")).unwrap().total, 0);

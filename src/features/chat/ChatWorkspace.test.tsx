@@ -67,11 +67,6 @@ vi.mock('./MessageDetails', async (original) => {
     },
   }
 })
-const scroller = vi.hoisted(() => ({ scrollToMessage: vi.fn(() => true) }))
-vi.mock('@/components/ui/message-scroller', async (original) => ({
-  ...(await original<typeof import('@/components/ui/message-scroller')>()),
-  useMessageScroller: () => scroller,
-}))
 class Observer {
   observe() {}
   unobserve() {}
@@ -81,6 +76,20 @@ Object.assign(globalThis, {
   IS_REACT_ACT_ENVIRONMENT: true,
   ResizeObserver: Observer,
   IntersectionObserver: Observer,
+})
+Object.defineProperties(HTMLElement.prototype, {
+  clientHeight: {
+    configurable: true,
+    get() {
+      return this.getAttribute('aria-label') === '聊天消息' ? 600 : 180
+    },
+  },
+  clientWidth: {
+    configurable: true,
+    get() {
+      return 900
+    },
+  },
 })
 HTMLDialogElement.prototype.showModal = function () {
   this.open = true
@@ -100,6 +109,7 @@ const profile: AiProfile = {
   codexPath: null,
 }
 const workspace: AiWorkspace = {
+  page: { hasBefore: false, hasAfter: false, latest: { id: 'm1', sequence: 0 }, hasUserText: true },
   id: 'chat',
   title: '散步聊天',
   kind: 'conversation',
@@ -604,10 +614,7 @@ it('opens exact search messages, repeats locations in the same chat and preserve
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 30))
     })
-    expect(scroller.scrollToMessage).toHaveBeenCalledWith(
-      'm1',
-      expect.objectContaining({ align: 'center' }),
-    )
+    expect(chatsApi.workspace).toHaveBeenCalledWith('chat', { around: 'm1' })
     expect(ui.host.querySelector('mark')?.textContent).toBe('散步')
     expect(document.activeElement?.getAttribute('data-message-id')).toBe('m1')
     await act(async () =>
@@ -621,7 +628,7 @@ it('opens exact search messages, repeats locations in the same chat and preserve
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 30))
     })
-    expect(scroller.scrollToMessage).toHaveBeenCalledTimes(2)
+    expect(document.activeElement?.getAttribute('data-message-id')).toBe('m1')
     expect(ui.host.querySelector('mark')?.textContent).toBe('今天')
     await act(() => ui.click('新对话'))
     expect(ui.host.querySelector<HTMLTextAreaElement>('[aria-label="聊天输入"]')!.value).toBe(
@@ -647,7 +654,7 @@ it('reports a missing search message instead of silently locating another messag
       ),
     )
     expect(ui.host.textContent).toContain('命中的消息已不存在')
-    expect(scroller.scrollToMessage).not.toHaveBeenCalled()
+    expect(ui.host.querySelector('[data-message-id]:focus')).toBeNull()
   } finally {
     await ui.end()
   }
@@ -949,6 +956,7 @@ it('queues during generation, sends in order and keeps the next unsent draft', a
   vi.useFakeTimers()
   let server: AiWorkspace = {
     ...workspace,
+    page: { ...workspace.page, hasAfter: true, latest: { id: 'future', sequence: 100 } },
     task: {
       id: 'first',
       recordId: 'chat',
@@ -989,8 +997,18 @@ it('queues during generation, sends in order and keeps the next unsent draft', a
     expect(ui.host.querySelector('[aria-label="待发送消息"]')!.textContent).toContain(
       '第二条待发送',
     )
+    await act(async () =>
+      ui.root.render(
+        <ChatWorkspace
+          {...props}
+          intent={{ chatId: 'chat', messageId: 'm1', keyword: '散步', nonce: 55 }}
+        />,
+      ),
+    )
+    expect(ui.host.querySelector('mark')?.textContent).toBe('散步')
     server = { ...server, task: { ...server.task!, status: 'completed' } }
     await act(async () => vi.advanceTimersByTimeAsync(450))
+    expect(ui.host.querySelector('mark')?.textContent).toBe('散步')
     expect(chatsApi.send).toHaveBeenCalledTimes(1)
     expect(chatsApi.send).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -1004,6 +1022,7 @@ it('queues during generation, sends in order and keeps the next unsent draft', a
     )
     server = { ...server, task: { ...server.task!, status: 'completed' } }
     await act(async () => vi.advanceTimersByTimeAsync(450))
+    expect(ui.host.querySelector('mark')?.textContent).toBe('散步')
     expect(chatsApi.send).toHaveBeenCalledTimes(2)
     expect(chatsApi.send).toHaveBeenLastCalledWith(
       expect.objectContaining({ text: '第二条待发送' }),

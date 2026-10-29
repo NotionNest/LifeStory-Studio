@@ -1,5 +1,51 @@
 # 项目跟进
 
+长聊天成果提交与 PR 交付准备（2026-10-29，用户授权，REQ-11/12/13 / TASK-11）：已 fetch 核对 feat/chat-history 基于最新 origin/develop=d16db2a，累计 38 个改动路径仅包含聊天 SQL 游标/增量、动态高度虚拟滚动、代码规范修订、schema 17 用户文字标记与配套规格/回归。提交前常见密钥模式、私有资料类型与大文件检查无命中，组件库没有测试文件且未运行组件库测试。授权提交中文说明并创建指向 develop 的 PR，不含合并或发布。
+
+交付验证：npm run check 通过（架构 125 模块、lint、格式、类型、Rust 格式）；完整前端以 maxWorkers=2 执行，27 文件 184 项通过（31.20s）。完整原生 cargo test --tests 在沙箱外按 test-threads=2 执行，93 项通过、2 项依既有标记忽略，没有真实模型或规模测量调用；Clippy all-targets -D warnings 通过（1.05s），生产前端构建通过（Vite 1.55s），保留主包 1,269.27 kB 大包提示。原生运行放在沙箱外是为了既有合成 HTTP 监听，不读真实凭据或日记。日志 /tmp/lifestory-chat-pr-check.log、/tmp/lifestory-chat-pr-frontend.log、/tmp/lifestory-chat-pr-native.log、/tmp/lifestory-chat-pr-clippy.log、/tmp/lifestory-chat-pr-build.log；git diff --check 通过。沿用此前同一 UI 实现的合成浏览器锚点证据；没有重复浏览器、真实模型或双平台桌面实机验收。schema 17 首次真实资料库升级耗时仍待验收，迁移前备份与失败回滚已有真实存储回归。PR 链接及远程 CI 状态在创建后记录，不将本地通过当作远程 CI 成功。
+
+四项改进建议复核（2026-10-29，用户再次要求按收益落实，REQ-11/12/13 / TASK-11）：已逐项核对 feat/chat-history 当前源码，四项均已由前述规范修订落实：旧 ai_workspace/ai_workspace_query 全量链路和权限已删除；scrollToFn 统一记录程序化偏移、scroll 消费标记，无四类输入或 document 监听；useHistoryPaging 独立管理读取/失败/重试，消息视图仅装配和渲染；loadMessages/setPinned 包装已删除，直接使用 loadWindow/setAtLatest。manualPending 有意采用单个可空的最新有效请求 ID，比计数或 Set 更直接对应当前仅最新请求能提交的规则；旧请求完成不会清掉新请求的等待状态，已有重叠顺序回归保护。本轮没有发现遗漏，未为重复建议再次改写业务源码；仅检索核对、读取既有 79 项前端业务及真实浏览器锚点证据，并运行 git diff --check，通过。源码未变，因此未重复运行测试或组件库测试；原生双平台实测仍待验收，未提交、推送或发布。
+
+has_user_text 读取性能修订（2026-10-29，用户授权，REQ-11/12/13 / TASK-11）：窗口读取已从历史 json_tree EXISTS 改为按 ai_conversations 主键读取持久化 has_user_text。原 EXISTS 在找到首条有效文字时会短路，不是所有聊天每次都全量解析；但无文字/仅图片或首条有效文字较晚时存在反复遍历成本，本轮将该查询彻底移出读取热路径。没有增加客户端缓存、额外 IPC 参数或可选元数据；所有前后页、搜索窗口和增量轮询仍返回完整历史语义。
+
+schema 17 新增会话标记，升级时按原 json_tree/trim 条件回填一次；沿用既有迁移前备份和失败回滚。AFTER INSERT 触发器只检查新插入的用户消息，存在非空 text 时置 true，与消息在同一事务中提交/回滚；助手回应、空文字、仅图片不置位。新增文字会立即反映在增量读取，重启保留结果，不会因为当前显示页没有用户文字就禁用整理日记。当前消息只追加，彻底删除聊天会级联删除会话标记；没有为了缓存引入新的消息编辑、删除或恢复策略。
+
+验证：AI/真实存储 22 项、启动/迁移 8 项、附件 6 项、查询 8 项先通过（44 项）；补齐其余原生回归后，累计 93 项通过，2 项依原有标记忽略（真实 CLI 配置、显式长历史测量）。新增保护覆盖 false→true、助手/空格消息不置位、实际图片导入、消息与标记同事务回滚、旧历史页仍读全局结果、不同聊天隔离及重启保持；迁移验证旧嵌套文字/图片/助手数据正确回填且内容未重写、schema 16 备份可读、异常旧 JSON 导致迁移失败时 schema/原内容不变。既有早期版本升级夹具已同步移除新字段/触发器后再重放迁移，没有降低原来的保存/恢复/查询验收。
+
+扩展 lib 回归首轮有两项在 TcpListener::bind(127.0.0.1:0) 因沙箱返回 Operation not permitted 而失败，未将该轮记为全通过；仅在沙箱外重跑 synthetic_http_stream_decodes_native_event_body 与 saved_api_key_reaches_connection_test_after_restart，分别通过（0.03s/0.21s），没有改用例、超时或业务代码。未重复已通过用例，继续执行被中断的其他存储目标。日志 /tmp/lifestory-chat-flag-tests.log、/tmp/lifestory-chat-flag-remaining.log、/tmp/lifestory-chat-flag-http.log、/tmp/lifestory-chat-flag-key-test.log、/tmp/lifestory-chat-flag-rest.log。Clippy all-targets -D warnings、Rust 格式与 git diff --check 均通过。
+
+独立 SQL 工作量检查：SQLite 3.42.0、内存合成表、执行实际 017 迁移 SQL，5,000 条无用户文字时旧条件执行 160,024 条 VM 指令；末尾追加首条文字后为 160,047。新读取两种情况均为 13 条，结果与旧条件一致；EXPLAIN QUERY PLAN 使用会话 record_id 主键索引，不依赖消息数量。该诊断是 SQL 逻辑工作量对照，不是 Rust/IPC/真实桌面耗时、FPS 或发布性能结论；原始 /tmp/lifestory-chat-flag-sql-work.json，没有增加日常规模压力门禁。
+
+本轮未修改前端协议或界面，因此未重跑前端/浏览器、组件库测试、真实模型、原生 ignored 规模测量或双平台桌面实机。首次打开旧资料库需要一次性回填，真实资料库迁移/启动耗时尚未实测；只使用临时合成库，没有打开用户资料。当前 feat/chat-history，未提交、推送、创建 PR 或发布。协议与实施文档已同步；下一步仍是原生桌面与真实规模的隔离验收。
+
+长聊天代码规范复审修订（2026-10-29，用户指定重复代码与可维护性两项，REQ-11/12/13 / TASK-11）：删除 ai_workspace Tauri 命令、注册、旧自动权限与 Rust 全量入口/None 分支，仅保留 ai_chat_window 有界读取；七列消息查询、任务 LEFT JOIN 与 JSON 映射只存在于 chat_history::read，page 在 Rust 与前端均必填。现有 Rust 小历史用例改走真实分页接口，日记来源关系断言仍核对实际 SQLite 持久化；显式 ignored 性能用例改测当前 100 条尾页并校验顺序，未为旧测试保留全量生产代码，10 月 28 日原始性能数据不改写。
+
+权限核对额外发现：上轮 ai_chat_window 已在 invoke_handler 注册，但 build.rs 命令清单和 manage-records 仍写 ai_workspace。本轮已一并替换，Tauri 构建生成新命令权限；核对生成 ACL，默认窗口能力允许 ai_chat_window，旧命令和旧权限均已不存在。该核对和编译不代替真实桌面 IPC 端到端验收。
+
+前端：ChatMessageList.tsx 缩为 91 行，ChatHistory 只装配/渲染，不持有滚动 ref 或异步读取状态；ChatMessageRow 展示消息/任务，useHistoryPaging 用一份请求状态和串行标识管理读页、回最新、失败重试，useChatScroll 管理虚拟测量、搜索定位、焦点与滚动锚点。统一 scrollToFn 记录实际程序化滚动偏移并在匹配的 scroll 事件中消费；删除滚轮、键盘、触摸、指针推断以及 document 的 pointerup/pointercancel 监听。贴底状态归会话，直接暴露 loadWindow 与 setAtLatest，删除 loadMessages/setPinned 包装和 pinned 可变 ref。manualPending 从 Map 改为单个可空的最新有效请求 ID；新代次重置，旧完成不能清掉新等待，已失效旧请求也不阻塞轮询；新增两种重叠完成顺序的自动回归。
+
+浏览器补验发现并修复到顶接前页时的间距测量边界：键盘 Home 稳定到顶后，最后一条上方消息重测增高 28px，原行尾 padding 被当成可见内容，导致漏补偿。记录实际重测与滚动写入后，将 24px 行距交给虚拟列表 gap，保持原总间距及末端留白；未加回输入类型监听。最初一次键盘断言同时采入仍在进行的原生滚动，后续用受控延迟明确错开滚动结束与分页返回，再确认并修复上述真实偏移；最终键盘前后同一消息 top=55px，偏差 0px。
+
+实际验证：聊天/路由/应用业务 8 文件 79 项通过（10.04s，/tmp/lifestory-chat-review-business-final.log），原生 AI/真实存储 21 项（2.39s）与相关 AI 单元 2 项（0.16s）通过，Clippy all-targets -D warnings 通过（13.38s）。npm run check 通过（架构 125 模块、lint、格式、类型、Rust 格式），生产前端构建通过（Vite 1.43s），保留既有大包提示。检索确认生产与测试不再引用 ai_workspace/ai_workspace_query，消息列表/滚动 Hook 不再含上述输入/全局监听或透传名称；git diff --check 通过。
+
+隔离 Chrome 156 生产构建，5,000 条合成历史、1200×920 视口、1000/680px 聊天宽度：真实消息/图片/推理组件与合成服务，连续前后分页及裁剪、搜索焦点/高亮、图片迟到、推理展开、宽度变化、历史阅读追加、回最新/末端追加、失败保留再重试和键盘 Home 读一页均通过；所有锚点检查偏差 0px，末端距离 0px，DOM 实测挂载 10–16 行、消息驻留 ≤300，页面/控制台无错误。原始 /tmp/lifestory-chat-review-browser.json，截图 /tmp/lifestory-chat-review-tail.png、/tmp/lifestory-chat-review-search.png；服务和浏览器已关闭。
+
+本轮只处理用户指定规范项及核对中发现的权限/锚点问题，未改动 has_user_text 查询策略。未运行组件库测试、完整前端/Rust 套件、显式 ignored 规模性能测试、真实模型、Tauri 原生 IPC 或 macOS/Windows 硬件专项；不将 Chrome/ACL 核对记为双平台桌面验收。当前 feat/chat-history，未提交、推送、创建 PR 或发布。当前职责、协议与性能存档说明已同步。
+
+分支迁移（2026-10-29，用户授权）：已 fetch 核对最新 origin/develop 为 d16db2a（PR #24 已合入），将本地 develop 快进至相同提交，并从该基线创建并切换到 feat/chat-history。原 fix/api-credentials-sidebar 分支保留。迁移前后 23 个已修改/未跟踪文件的 SHA-256 指纹一致，包含长聊天实现及新增审查文档；随后仅在本文件补记本条。当前所有功能改动仍未提交，未推送或创建 PR。基线文件树与原 HEAD 一致，没有合并冲突或业务源码变化；不重复运行业务/组件库测试，沿用上轮验证。
+
+长聊天增量读取、游标分页与动态高度虚拟化（2026-10-29，用户明确授权，REQ-11/12/13 / TASK-11）：已将 10 月 28 日选定策略接入生产路径。新增 ai_chat_window，空请求读尾部，before/after 使用 sequence+消息 ID 校验归属，around 查询目标附近；SQL 层每次最多 100 条，不在全量 workspace 返回后切片。同一事务返回任务、来源/关联/预览和最新水位；生成中读取水位之后的新消息，按 ID/sequence 去重并保留不变行引用，驻留窗口最多 300 条。历史窗口尚未连到最新端或追加会裁掉阅读位置时，只刷新元数据并保留窗口，经向后滚动继续读取。100/300 是读取及驻留策略，不是聊天总容量限制。
+
+聊天页采用锁定 @tanstack/react-virtual 3.14.23 的动态测量、稳定键和末端锚定；本页面滚动所有权从 MessageScroller 移到业务虚拟列表，共享组件库源码未修改。连续前后滚动自动读页、裁剪另一端；可见锚点保留，未裁剪的焦点行保持挂载，焦点消息确已离开驻留窗口时归回聊天区域。回到最新必须成功读尾页且请求仍有效后才清除搜索并滚到底；用户主动发送同样请求跟随最新，自动投递队列则保留历史位置与搜索。程序化定位/尺寸补偿不触发自动分页，分页只响应滚轮、键盘、触摸或滚动条操作。读取失败保留内容并提供“重试读取”。
+
+高风险保护：分页/刷新/轮询共用请求序号与会话代次（含路由访问），手动请求期间不再启动轮询，旧聊天请求不会阻塞新聊天轮询；迟到的回最新返回无效结果，不清掉新搜索。真实 SQLite 回归覆盖窗口顺序、互斥方向、跨聊天/非聊天拒绝、空增量、终态及来源失效/预览元数据；350 条历史下模型上下文与日记预览仍包含窗口之外的首条内容。hasUserText 按全历史计算，整理日记不依赖当前显示页。原生成/选材和上下文长度校验路径保留，没有显示分页截断模型输入或数据迁移。
+
+实际验证：聊天、路由与应用业务 8 文件 77 项通过（14.95s，/tmp/lifestory-chat-business-final.log）；原生 AI/真实存储 21 项通过（3.70s，/tmp/lifestory-chat-rust-final.log）；Clippy all-targets -D warnings 通过（18.68s）。npm run check 通过（架构 122 模块、lint、格式、类型、Rust 格式）；生产前端构建通过（4.11s），保留主包 1,269.53 kB 的大包提示；git diff --check 通过。初轮前端暴露零尺寸 jsdom 视口装配及重复搜索问题，补齐真实尺寸装配、按路由访问重新定位后通过；没有降低功能验收或运行组件库测试。
+
+真实浏览器：隔离生产构建、Chrome 156.0.8078.49、1200×920 视口、1000/680px 聊天宽度、5,000 条合成历史。真实 ChatMessageList/图片/推理控件，服务与 Context 为受控合成装配；原生 SQL 分页由上述真实存储回归单独验证，不把浏览器数组夹具当作数据库分页。4 次向前和 2 次向后读取（包含裁剪）保持同一可见消息位置，实测挂载 9–15 行、驻留 ≤300；搜索 m800 聚焦、高亮、图片迟到、推理展开、宽度变化、历史阅读期间追加、尾页重读/贴底图片/贴底追加，以及失败保留内容再重试均通过，锚点检查偏差 0px，末端距离 0px。页面身份/非空/无框架覆盖/控制台无错误核对通过。初轮向上阅读出现 28px 偏移，已对视口上方重测行显式补偿；另修复程序化滚动误触发读页，最终用真实滚轮复验。原始 /tmp/lifestory-chat-browser.json，截图 /tmp/lifestory-chat-tail.png、/tmp/lifestory-chat-search.png；临时浏览器和服务正常关闭。当前会话未提供 Browser 插件，使用已安装 Playwright 与 Chrome；没有新增浏览器依赖。
+
+未运行组件库测试、完整前端/Rust 套件、真实模型、Tauri WKWebView / Windows WebView2 实机、原生 IPC 端到端或签名安装包；触摸/滚动条拖动输入分支已实现，未作对应硬件实测。Chrome 合成结果不等于双平台流畅度、FPS、发布或用户验收。未提交、推送、创建 PR 或发布；下一步在隔离资料目录完成 macOS/Windows 原生连续滚动及图片长聊天验收，再处理实机差异。行为与协议见 [实施边界](../development/CHAT_HISTORY_IMPLEMENTATION.md)、[数据与 AI 契约](../architecture/DATA_AND_AI.md)。
+
 本轮 PR 已创建并纠正分支命名（2026-10-29）：修复提交 43b7e0d 与交付记录 9684a27 已保留在 fix/api-credentials-sidebar，最终使用 [PR #24](https://github.com/NotionNest/LifeStory-Studio/pull/24) 指向 develop。首次 [PR #23](https://github.com/NotionNest/LifeStory-Studio/pull/23) 使用工具默认 codex/ 前缀，被仓库既有路由门禁明确拒绝；已关闭并在正文指向 #24，旧远程分支与提交保留，未修改或绕过 CI 规则。PR #24 包含 API 密钥/连接测试、Sonner 与侧栏交互及最终 review 简化，已列明本地验证、首次高并发前端失败及受控并发复验、凭据兼容性与未验收范围。后续只补充本条交付文档，不修改已验证业务源码。推送交付文档时曾遇 GitHub TLS/HTTP2 错误，单次 HTTP/1.1 传输重试成功，没有更改 TLS 校验或持久 Git 配置。未合并或发布；远程 CI 最终结果待检查，不记为通过。
 
 

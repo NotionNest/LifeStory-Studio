@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-ai-chat-window"
+description = "Enables the ai_chat_window command without any pre-configured scope."
+commands.allow = ["ai_chat_window"]
+
+[[permission]]
+identifier = "deny-ai-chat-window"
+description = "Denies the ai_chat_window command without any pre-configured scope."
+commands.deny = ["ai_chat_window"]
