@@ -112,6 +112,7 @@ pub struct Related {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Workspace {
+    pub page: crate::chat_history::MessagePage,
     pub id: String,
     pub title: Option<String>,
     pub kind: String,
@@ -367,12 +368,16 @@ impl DatabaseWorker {
             Ok(result)
         })
     }
-    pub fn ai_workspace(&self, record: String) -> StorageResult<Workspace> {
+    pub fn ai_chat_window(
+        &self,
+        record: String,
+        input: crate::chat_history::WindowRequest,
+    ) -> StorageResult<Workspace> {
         identifier(&record)?;
         self.call(move|db,_|{
   let tx=db.transaction()?;let(title,kind)=tx.query_row("SELECT title,kind FROM records WHERE id=?1 AND deleted_at IS NULL",[&record],|r|Ok((r.get(0)?,r.get(1)?))).optional()?.ok_or_else(||fail("not_found","内容不存在或已删除"))?;
-  let mut stmt=tx.prepare("SELECT m.id,m.role,m.content_json,m.sequence,m.created_at,t.reasoning_summary,t.updated_at-t.created_at FROM conversation_messages m LEFT JOIN ai_tasks t ON t.id=substr(m.request_id,11) AND m.request_id LIKE 'assistant:%' AND t.record_id=m.record_id WHERE m.record_id=?1 ORDER BY m.sequence,m.id")?;
-  let messages=stmt.query_map([&record],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?,r.get::<_,i64>(3)?,r.get::<_,i64>(4)?,r.get::<_,Option<String>>(5)?,r.get::<_,Option<i64>>(6)?)))?.map(|r|{let(id,role,raw,sequence,created_at,reasoning_summary,duration_ms)=r?;let content:Value=serde_json::from_str(&raw)?;Ok(json!({"id":id,"role":role,"text":message_text(&content),"images":content["images"],"sequence":sequence,"createdAt":created_at,"reasoningSummary":reasoning_summary,"durationMs":duration_ms}))}).collect::<StorageResult<Vec<Value>>>()?;
+  if kind != "conversation" {return Err(fail("validation","消息窗口仅适用于聊天"));}
+  let (messages,page) = crate::chat_history::window(&tx,&record,input)?;
   let mut stmt=tx.prepare("SELECT COALESCE(x.source_id,x.unavailable_source_id,x.id),CASE WHEN r.deleted_at IS NULL THEN r.title END,COALESCE(r.kind,'text'),(x.source_deleted=1 OR r.id IS NULL OR r.deleted_at IS NOT NULL),x.source_revision_id FROM record_relations x LEFT JOIN records r ON r.id=x.source_id WHERE x.owner_id=?1 ORDER BY x.id")?;
   let sources=stmt.query_map([&record],|r|Ok(Related{id:r.get(0)?,title:r.get(1)?,kind:r.get(2)?,unavailable:r.get(3)?,revision_id:r.get(4)?}))?.collect::<Result<Vec<_>,_>>()?;
   let mut stmt=tx.prepare("SELECT DISTINCT r.id,r.title,r.kind,0,NULL FROM record_relations x JOIN records r ON r.id=x.owner_id WHERE x.source_id=?1 AND r.deleted_at IS NULL ORDER BY r.created_at DESC,r.id")?;
@@ -385,7 +390,7 @@ impl DatabaseWorker {
   let effective:Option<String>=tx.query_row("SELECT cli_profile_json FROM ai_conversations WHERE record_id=?1",[&record],|r|r.get(0)).optional()?.flatten();
   let effective:Option<Profile>=effective.map(|s|serde_json::from_str(&s)).transpose()?;
   let effective_model=effective.as_ref().map(|p|p.model.clone());let effective_effort=effective.and_then(|p|p.reasoning_effort);
-  Ok(Workspace{id:record,title,kind,messages,sources,related,task:latest.map(|id|task(&tx,&id)).transpose()?,profile_id,linked_diary_id,adopted_sequence,preview_task_id,context_ids,effective_model,effective_effort})
+  Ok(Workspace{page,id:record,title,kind,messages,sources,related,task:latest.map(|id|task(&tx,&id)).transpose()?,profile_id,linked_diary_id,adopted_sequence,preview_task_id,context_ids,effective_model,effective_effort})
  })
     }
     pub fn ai_task(&self, tid: String) -> StorageResult<Task> {
@@ -817,10 +822,22 @@ mod tests {
         let mut state = db.ai_task(t.id.clone()).unwrap();
         runner.decorate(&mut state);
         assert_eq!(state.status, "save_failed");
-        assert_eq!(db.ai_workspace(record.clone()).unwrap().messages.len(), 1);
+        assert_eq!(
+            db.ai_chat_window(record.clone(), Default::default())
+                .unwrap()
+                .messages
+                .len(),
+            1
+        );
         sql.execute_batch("DROP TRIGGER block_result;").unwrap();
         runner.retry_save(&db, t.id.clone()).unwrap();
-        assert_eq!(db.ai_workspace(record).unwrap().messages.len(), 2);
+        assert_eq!(
+            db.ai_chat_window(record, Default::default())
+                .unwrap()
+                .messages
+                .len(),
+            2
+        );
         assert!(runner.retry_save(&db, t.id).is_err());
         drop(sql);
         drop(db);

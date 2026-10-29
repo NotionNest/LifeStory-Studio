@@ -9,7 +9,23 @@ export interface AiRelated {
   unavailable: boolean
   revisionId: string | null
 }
+export interface MessageCursor {
+  id: string
+  sequence: number
+}
+export interface ChatWindowRequest {
+  before?: MessageCursor
+  after?: MessageCursor
+  around?: string
+}
+export interface MessagePage {
+  hasBefore: boolean
+  hasAfter: boolean
+  latest: MessageCursor | null
+  hasUserText: boolean
+}
 export interface AiWorkspace {
+  page: MessagePage
   id: string
   title: string | null
   kind: string
@@ -72,5 +88,6 @@ export const chatsApi = {
   },
   create: (recordDate: string, timezone: string) =>
     invoke<string>('ai_create_conversation', { recordDate, timezone }),
-  workspace: (recordId: string) => invoke<AiWorkspace>('ai_workspace', { recordId }),
+  workspace: (recordId: string, input: ChatWindowRequest = {}) =>
+    invoke<AiWorkspace>('ai_chat_window', { recordId, input }),
 }

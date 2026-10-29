@@ -21,27 +21,39 @@ function deferred() {
   return { promise, resolve, reject }
 }
 function workspace(id: string, title: string): AiWorkspace {
-  return { id, title, kind: 'conversation', messages: [], sources: [], related: [], task: null }
+  return {
+    page: { hasBefore: false, hasAfter: false, latest: null, hasUserText: false },
+    id,
+    title,
+    kind: 'conversation',
+    messages: [],
+    sources: [],
+    related: [],
+    task: null,
+  }
 }
 async function setup(running = false) {
   const root = createRoot(document.createElement('div'))
   const setWorkspace = vi.fn(),
     setError = vi.fn()
   let refresh!: () => Promise<void>
+  let loadWindow!: ReturnType<typeof useChatTask>['loadWindow']
   function Probe({ id, active }: { id: string; active: boolean }) {
     const current = useRef<string | null>(id),
       alive = useRef(true)
     useLayoutEffect(() => {
       current.current = id
     }, [id])
-    refresh = useChatTask({
+    const task = useChatTask({
       current,
       alive,
       running,
       setWorkspace,
       setError,
       sessionKey: `${active}:${id}`,
-    }).refresh
+    })
+    refresh = task.refresh
+    loadWindow = task.loadWindow
     return null
   }
   const render = (id: string, active = true) =>
@@ -56,6 +68,7 @@ async function setup(running = false) {
   return {
     render,
     refresh: () => refresh(),
+    loadWindow: () => loadWindow({}),
     setWorkspace,
     setError,
     unmount: () => act(() => root.unmount()),
@@ -177,6 +190,106 @@ it('propagates a current manual refresh failure to its operation', async () => {
   try {
     await expect(h.refresh()).rejects.toThrow('read failed')
     expect(h.setError).not.toHaveBeenCalled()
+  } finally {
+    await h.unmount()
+  }
+})
+it('does not let a polling tick supersede a pending manual window read', async () => {
+  vi.useFakeTimers()
+  const slow = deferred()
+  vi.mocked(chatsApi.workspace).mockReturnValueOnce(slow.promise)
+  const h = await setup(true)
+  try {
+    const manual = h.refresh()
+    await act(() => vi.advanceTimersByTimeAsync(1200))
+    expect(chatsApi.workspace).toHaveBeenCalledTimes(1)
+    slow.resolve(workspace('a', 'manual page'))
+    await manual
+    expect(h.setWorkspace).toHaveBeenCalledWith(workspace('a', 'manual page'))
+    vi.mocked(chatsApi.workspace).mockResolvedValue(workspace('a', 'poll'))
+    await act(() => vi.advanceTimersByTimeAsync(400))
+    expect(h.setWorkspace).toHaveBeenLastCalledWith(workspace('a', 'poll'))
+  } finally {
+    await h.unmount()
+  }
+})
+it('does not let an earlier visit block polling the next chat', async () => {
+  vi.useFakeTimers()
+  const old = deferred()
+  vi.mocked(chatsApi.workspace).mockReturnValueOnce(old.promise)
+  const h = await setup(true)
+  try {
+    const pending = h.refresh()
+    await h.render('b')
+    vi.mocked(chatsApi.workspace).mockResolvedValueOnce(workspace('b', 'fresh'))
+    await act(() => vi.advanceTimersByTimeAsync(400))
+    expect(h.setWorkspace).toHaveBeenCalledWith(workspace('b', 'fresh'))
+    old.resolve(workspace('a', 'late'))
+    await pending
+    expect(h.setWorkspace).toHaveBeenCalledTimes(1)
+  } finally {
+    await h.unmount()
+  }
+})
+
+it('returns false for a superseded tail request so callers do not reset a new search', async () => {
+  const old = deferred()
+  vi.mocked(chatsApi.workspace).mockReturnValueOnce(old.promise)
+  const h = await setup()
+  try {
+    const pending = h.loadWindow()
+    await h.render('b')
+    old.resolve(workspace('a', 'late tail'))
+    expect(await pending).toBe(false)
+    expect(h.setWorkspace).not.toHaveBeenCalled()
+  } finally {
+    await h.unmount()
+  }
+})
+it('an older manual completion cannot resume polling while a newer read is pending', async () => {
+  vi.useFakeTimers()
+  const older = deferred(),
+    newer = deferred()
+  vi.mocked(chatsApi.workspace)
+    .mockReturnValueOnce(older.promise)
+    .mockReturnValueOnce(newer.promise)
+  const h = await setup(true)
+  try {
+    const first = h.refresh(),
+      second = h.refresh()
+    older.resolve(workspace('a', 'old'))
+    await first
+    await act(() => vi.advanceTimersByTimeAsync(800))
+    expect(chatsApi.workspace).toHaveBeenCalledTimes(2)
+    expect(h.setWorkspace).not.toHaveBeenCalled()
+    newer.resolve(workspace('a', 'new'))
+    await second
+    vi.mocked(chatsApi.workspace).mockResolvedValue(workspace('a', 'poll'))
+    await act(() => vi.advanceTimersByTimeAsync(400))
+    expect(h.setWorkspace).toHaveBeenLastCalledWith(workspace('a', 'poll'))
+  } finally {
+    await h.unmount()
+  }
+})
+it('a superseded slow read does not block polling after the latest manual read completes', async () => {
+  vi.useFakeTimers()
+  const older = deferred(),
+    newer = deferred()
+  vi.mocked(chatsApi.workspace)
+    .mockReturnValueOnce(older.promise)
+    .mockReturnValueOnce(newer.promise)
+  const h = await setup(true)
+  try {
+    const first = h.refresh(),
+      second = h.refresh()
+    newer.resolve(workspace('a', 'new'))
+    await second
+    vi.mocked(chatsApi.workspace).mockResolvedValue(workspace('a', 'poll'))
+    await act(() => vi.advanceTimersByTimeAsync(400))
+    expect(h.setWorkspace).toHaveBeenLastCalledWith(workspace('a', 'poll'))
+    older.resolve(workspace('a', 'old'))
+    await first
+    expect(h.setWorkspace).toHaveBeenCalledTimes(2)
   } finally {
     await h.unmount()
   }

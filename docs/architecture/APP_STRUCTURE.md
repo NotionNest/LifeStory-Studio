@@ -217,3 +217,10 @@ useChatPreview 输入从 36 项收紧为 18 项，生成/采用/撤销协议留�
 常驻边界为外壳/默认首页/小loader/Root错误边界和窗口业务会话；编辑器/历史可作为一个重型UI加载组。辅助聊天视图和API/CLI设置视图仍受静态模块耦合牵引，需先与常驻会话解耦，再验证独立加载收益；不能卸载会话来减包。细粒度原型虽入口文件变小，却需要31个首屏JS文件，集中组则为1个首屏/2个总文件；后续优先按业务组评估。
 
 测量脚本和原型不属于产品入口；正常构建已恢复。具体方法、原始样本、首开/预取与兼容验证要求见 [桌面启动与加载边界实测](../development/STARTUP_LOADING_MEASUREMENT.md)。
+
+
+### 2026-10-29 长聊天复审后的视图职责
+
+ChatMessageList 负责装配和虚拟行渲染；ChatMessageRow 展示持久消息及任务中的内容；useHistoryPaging 负责串行分页/回最新与加载/失败重试；useChatScroll 负责动态测量、锚点、搜索与焦点，通过统一 scrollToFn 标记实际程序化偏移，原生 scroll 事件排除该偏移后才触发读页。没有滚轮/键盘/触摸/指针推断或 document 级结束监听。行间距交给虚拟列表 gap，不混入内容测量边界。
+
+会话维护 atLatest 及其直接状态 setter，已提交的 workspace/atLatest 快照供增量合并读取；消息分区直接暴露 loadWindow/setAtLatest，不透出内部可变 pinned ref。useChatTask 的手动等待只保留最新有效请求 ID，代次切换重置，旧请求完成不清除新请求；其余串行轮询和迟到校验不变。原生仅保留 ai_chat_window 有界查询，page 必填，构建清单、默认窗口权限及自动生成的命令权限使用同一命令名。

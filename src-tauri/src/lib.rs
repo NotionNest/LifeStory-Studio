@@ -3,6 +3,7 @@ pub mod ai_cli;
 pub mod ai_experience;
 pub mod ai_providers;
 pub mod attachments;
+pub mod chat_history;
 mod commands;
 pub mod credentials;
 pub mod history;
@@ -125,7 +126,7 @@ pub fn run() {
             commands::ai_configure,
             commands::ai_delete_profile,
             commands::ai_create_conversation,
-            commands::ai_workspace,
+            commands::ai_chat_window,
             commands::ai_task,
             commands::ai_start,
             commands::ai_cancel,

@@ -33,6 +33,8 @@ export function useChatState(defaultProfileId: string | null) {
   const [selection, setSelection] = useState<ModelSelection | undefined>(undefined)
   const [localActions, setLocalActions] = useState<HTMLDivElement | null>(null)
   const [targetOpen, setTargetOpen] = useState(false)
+  const [latestVersion, setLatestVersion] = useState(0)
+  const [atLatest, setAtLatest] = useState(true)
   const [location, setLocation] = useState<MessageLocation | null>(null)
   const contextDiary = useRef<string | null>(null)
   const diaryChats = useRef(new Map<string, string>())
@@ -108,6 +110,10 @@ export function useChatState(defaultProfileId: string | null) {
     setTargetOpen,
     location,
     setLocation,
+    latestVersion,
+    setLatestVersion,
+    atLatest,
+    setAtLatest,
     contextDiary,
     diaryChats,
     inputRef,

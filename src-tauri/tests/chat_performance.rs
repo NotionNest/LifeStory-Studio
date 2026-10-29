@@ -4,7 +4,7 @@ use serde_json::json;
 use std::{fs, time::Instant};
 #[test]
 #[ignore = "synthetic long-history measurement, run explicitly"]
-fn measure_long_chat_workspace() {
+fn measure_long_chat_window() {
     let root = std::env::temp_dir().join(format!("lifestory-chat-bench-{}", std::process::id()));
     fs::create_dir(&root).unwrap();
     let worker = DatabaseWorker::start(root.clone()).unwrap();
@@ -21,29 +21,18 @@ fn measure_long_chat_workspace() {
         tx.commit().unwrap();
         for _ in 0..5 {
             let start = Instant::now();
-            let workspace = worker.ai_workspace(id.clone()).unwrap();
+            let workspace = worker
+                .ai_chat_window(id.clone(), Default::default())
+                .unwrap();
             let read = start.elapsed().as_secs_f64() * 1000.;
+            assert_eq!(workspace.messages.len(), 100);
+            assert_eq!(workspace.messages[0]["sequence"], count - 100);
+            assert_eq!(workspace.messages[99]["sequence"], count - 1);
+            assert_eq!(workspace.page.has_before, count > 100);
             let start = Instant::now();
             let payload = serde_json::to_vec(&workspace).unwrap();
             println!(
-                "CHAT_BENCH count={count} read_ms={read:.3} serialize_ms={:.3} bytes={}",
-                start.elapsed().as_secs_f64() * 1000.,
-                payload.len()
-            );
-        }
-        for _ in 0..5 {
-            let start = Instant::now();
-            let mut query = sql.prepare("SELECT sequence,content_json FROM conversation_messages WHERE record_id=?1 ORDER BY sequence DESC LIMIT 100").unwrap();
-            let messages = query.query_map([&id], |row| Ok((row.get::<_,i64>(0)?, row.get::<_,String>(1)?))).unwrap()
-                .map(|row| { let (sequence, raw) = row.unwrap(); json!({"sequence":sequence,"content":serde_json::from_str::<serde_json::Value>(&raw).unwrap()}) })
-                .collect::<Vec<_>>();
-            let read = start.elapsed().as_secs_f64() * 1000.;
-            assert_eq!(messages.len(), 100);
-            assert_eq!(messages[0]["sequence"], count - 1);
-            let start = Instant::now();
-            let payload = serde_json::to_vec(&messages).unwrap();
-            println!(
-                "PAGE_BENCH count={count} read_ms={read:.3} serialize_ms={:.3} bytes={}",
+                "WINDOW_BENCH count={count} read_ms={read:.3} serialize_ms={:.3} bytes={}",
                 start.elapsed().as_secs_f64() * 1000.,
                 payload.len()
             );

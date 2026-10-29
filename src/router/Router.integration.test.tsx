@@ -201,6 +201,12 @@ beforeEach(() => {
   vi.mocked(chatsApi.workspace).mockResolvedValue({
     id: 'chat',
     kind: 'conversation',
+    page: {
+      hasBefore: false,
+      hasAfter: false,
+      latest: { id: 'message', sequence: 0 },
+      hasUserText: true,
+    },
     title: '合成聊天',
     messages: [{ id: 'message', role: 'user', text: '合成讲述', sequence: 0 }],
     sources: [],
@@ -649,6 +655,12 @@ it('retains a queued message and input draft while chat views unmount, then disp
   let server: Awaited<ReturnType<typeof chatsApi.workspace>> = {
     id: 'chat',
     kind: 'conversation',
+    page: {
+      hasBefore: false,
+      hasAfter: false,
+      latest: { id: 'message', sequence: 0 },
+      hasUserText: true,
+    },
     title: '合成聊天',
     messages: [{ id: 'message', role: 'user', text: '合成讲述', sequence: 0 }],
     sources: [],

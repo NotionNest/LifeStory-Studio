@@ -1,7 +1,7 @@
 import { trashApi } from '@/services/trash'
 import { aiTasksApi, type AiTask } from '@/services/aiTasks'
 import type { ModelSelection } from '@/services/modelProfiles'
-import { chatsApi } from '@/services/chats'
+import { chatsApi, type ChatWindowRequest } from '@/services/chats'
 import { recordsApi } from '@/services/records'
 import { searchApi } from '@/services/search'
 import { useLocation, useNavigate } from 'react-router'
@@ -16,6 +16,7 @@ import { errorMessage } from '@/lib/errors'
 import { emptyFilters } from '@/features/library/useLibraryQuery'
 import { useChatState } from './useChatState'
 import { useChatTask } from './useChatTask'
+import { historyRequest, mergeHistory } from './chatHistory'
 import { useChatQueue } from './useChatQueue'
 import { useChatPreview } from './useChatPreview'
 export function useChatSession() {
@@ -78,6 +79,10 @@ export function useChatSession() {
     setTargetOpen,
     location,
     setLocation,
+    latestVersion,
+    setLatestVersion,
+    atLatest,
+    setAtLatest,
     contextDiary,
     diaryChats,
     inputRef,
@@ -185,12 +190,34 @@ export function useChatSession() {
       if (address) setChatAddress(address.chat, address.replace, address.preview)
     }
   }
-  const { refresh } = useChatTask({
-    sessionKey: `${active}:${selectedRoute.diaryId ?? ''}:${id ?? ''}`,
+  const history = useRef({ workspace, atLatest })
+  useLayoutEffect(() => {
+    history.current = { workspace, atLatest }
+  }, [workspace, atLatest])
+  const readWorkspace = useCallback(async (record: string, input?: ChatWindowRequest) => {
+    const { workspace: previous, atLatest } = history.current
+    if (
+      !previous ||
+      previous.id !== record ||
+      input?.around ||
+      (input && !input.before && !input.after)
+    )
+      return chatsApi.workspace(record, input)
+    const incoming = await chatsApi.workspace(record, input ?? historyRequest(previous))
+    return mergeHistory(
+      previous,
+      incoming,
+      input?.before ? 'before' : input?.after ? 'after' : 'updates',
+      atLatest,
+    )
+  }, [])
+  const { refresh, loadWindow } = useChatTask({
+    readWorkspace,
+    sessionKey: `${active}:${selectedRoute.diaryId ?? ''}:${id ?? ''}:${routerLocation.key}`,
     current,
     alive,
     setWorkspace,
-    running,
+    running: running && readyChatId === id,
     setError,
   })
   const isCurrent = useCallback(
@@ -247,8 +274,8 @@ export function useChatSession() {
       if (!queued) {
         setText('')
         drafts.current.delete(draftKey())
+        setLocation(null)
       }
-      setLocation(null)
       if (contextDiary.current) diaryChats.current.set(contextDiary.current, sent.recordId)
       drafts.current.set(sent.recordId, {
         text: queued ? text : '',
@@ -262,20 +289,25 @@ export function useChatSession() {
       }
       current.current = sent.recordId
       setWorkspace((old) => (old?.id === sent.recordId ? { ...old, task: sent } : null))
+      if (queued) {
+        await refresh()
+        void refreshChats()
+        return
+      }
       const w = await chatsApi.workspace(sent.recordId)
       setWorkspace(w)
-      if (!queued) {
-        const used = w.effectiveModel
-          ? { model: w.effectiveModel, reasoningEffort: w.effectiveEffort ?? null }
-          : selection
-        setSelection(used)
-        drafts.current.set(sent.recordId, {
-          text: '',
-          sources: [...sources],
-          profileId,
-          selection: used,
-        })
-      }
+      setLatestVersion((value) => value + 1)
+      setAtLatest(true)
+      const used = w.effectiveModel
+        ? { model: w.effectiveModel, reasoningEffort: w.effectiveEffort ?? null }
+        : selection
+      setSelection(used)
+      drafts.current.set(sent.recordId, {
+        text: '',
+        sources: [...sources],
+        profileId,
+        selection: used,
+      })
       void refreshChats()
     },
     run,
@@ -298,10 +330,17 @@ export function useChatSession() {
     setWorkspace((old) => (old?.id === id ? old : null))
     void (async () => {
       try {
-        const w = await chatsApi.workspace(id)
+        const w = await chatsApi.workspace(id, route.messageId ? { around: route.messageId } : {})
         if (!valid) return
         setReadyChatId(id)
         setWorkspace(w)
+        setAtLatest(!route.messageId)
+        if (route.messageId)
+          setLocation({
+            messageId: route.messageId,
+            keyword: searchKeyword.current,
+            nonce: Date.now(),
+          })
         if (loadedChat.current !== id && !drafts.current.has(id)) {
           setProfileId(w.profileId ?? '')
           setSelection(
@@ -337,6 +376,11 @@ export function useChatSession() {
     id,
     active,
     setReadyChatId,
+    setAtLatest,
+    route.messageId,
+    routerLocation.key,
+    searchKeyword,
+    setLocation,
     setWorkspace,
     loadedChat,
     drafts,
@@ -412,8 +456,6 @@ export function useChatSession() {
         .catch((e) => {
           if (valid) setError(errorMessage(e))
         })
-    if (route.messageId)
-      setLocation({ messageId: route.messageId, keyword: searchKeyword.current, nonce: Date.now() })
     return () => {
       valid = false
     }
@@ -498,8 +540,7 @@ export function useChatSession() {
   }, [workspace?.sources, items, targetRecord])
   const availablePreview =
     workspace?.previewTaskId ?? (id ? previewSession.lifecycle.cachedTaskId(id) : null)
-  const canMakeDiary =
-    !!id && !!workspace?.messages.some((message) => message.role === 'user' && message.text.trim())
+  const canMakeDiary = !!id && !!workspace?.page.hasUserText
   const deleted = () => {
     setDeleteImpact(null)
     for (const [diary, chat] of diaryChats.current) {
@@ -548,7 +589,13 @@ export function useChatSession() {
   const followLatest = () => {
     if (location) setLocation({ ...location, follow: true })
   }
-  const resetLocation = () => setLocation(null)
+  const resetLocation = async () => {
+    if (!(await loadWindow({}))) return false
+    setLocation(null)
+    setAtLatest(true)
+    setLatestVersion((value) => value + 1)
+    return true
+  }
   const retrySave = () =>
     void run(async () => {
       await aiTasksApi.retrySave(task!.id)
@@ -636,6 +683,10 @@ export function useChatSession() {
       missing,
       followLatest,
       resetLocation,
+      latestVersion,
+      loadWindow,
+      atLatest,
+      setAtLatest,
       retrySave,
     },
     composer: {

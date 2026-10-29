@@ -37,7 +37,7 @@ fn main() {
             "ai_configure",
             "ai_delete_profile",
             "ai_create_conversation",
-            "ai_workspace",
+            "ai_chat_window",
             "ai_task",
             "ai_start",
             "ai_cancel",

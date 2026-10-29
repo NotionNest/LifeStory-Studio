@@ -93,7 +93,9 @@ fn messages_and_previews_are_independent_and_sources_point_to_selected_versions(
         )
         .unwrap();
     db.ai_finish(t.id, Ok("合成回应".into())).unwrap();
-    let w = db.ai_workspace(conversation.clone()).unwrap();
+    let w = db
+        .ai_chat_window(conversation.clone(), Default::default())
+        .unwrap();
     assert_eq!(w.messages.len(), 2);
     assert_eq!(w.messages[1]["text"], "合成回应");
     let source = &w.sources[0];
@@ -136,7 +138,16 @@ fn messages_and_previews_are_independent_and_sources_point_to_selected_versions(
         db.read_record("source".into()).unwrap().title.as_deref(),
         Some("合成原文")
     );
-    assert_eq!(db.ai_workspace(result).unwrap().sources.len(), 2);
+    assert_eq!(
+        root.sql()
+            .query_row(
+                "SELECT count(*) FROM record_relations WHERE owner_id=?1",
+                [result],
+                |row| row.get::<_, i64>(0)
+            )
+            .unwrap(),
+        2
+    );
 }
 #[test]
 fn cancellation_deletion_and_restart_reject_late_completion() {
@@ -152,7 +163,7 @@ fn cancellation_deletion_and_restart_reject_late_completion() {
     db.ai_cancel(t.id.clone()).unwrap();
     db.ai_finish(t.id, Ok("不应保存的晚到结果".into())).unwrap();
     assert_eq!(
-        db.ai_workspace(conversation.clone())
+        db.ai_chat_window(conversation.clone(), Default::default())
             .unwrap()
             .messages
             .len(),
@@ -184,7 +195,13 @@ fn cancellation_deletion_and_restart_reject_late_completion() {
     drop(db);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
     assert_eq!(db.ai_task(t.id).unwrap().status, "interrupted");
-    assert_eq!(db.ai_workspace(conversation).unwrap().messages.len(), 3);
+    assert_eq!(
+        db.ai_chat_window(conversation, Default::default())
+            .unwrap()
+            .messages
+            .len(),
+        3
+    );
 }
 #[test]
 fn capacity_and_deleted_sources_fail_before_sending_or_writing_user_message() {
@@ -200,7 +217,7 @@ fn capacity_and_deleted_sources_fail_before_sending_or_writing_user_message() {
             .is_err()
     );
     assert!(
-        db.ai_workspace(conversation.clone())
+        db.ai_chat_window(conversation.clone(), Default::default())
             .unwrap()
             .messages
             .is_empty()
@@ -229,7 +246,12 @@ fn capacity_and_deleted_sources_fail_before_sending_or_writing_user_message() {
         db.ai_prepare(input(&conversation, "deleted", "chat"))
             .is_err()
     );
-    assert!(db.ai_workspace(conversation).unwrap().messages.is_empty());
+    assert!(
+        db.ai_chat_window(conversation, Default::default())
+            .unwrap()
+            .messages
+            .is_empty()
+    );
 }
 
 #[test]
@@ -255,7 +277,13 @@ fn deleting_fence_blocks_new_material_and_rejects_prepared_results_before_recycl
     assert!(db.read_record("source".into()).is_ok());
     db.ai_finish(t.id, Ok("not saved after fence".into()))
         .unwrap();
-    assert_eq!(db.ai_workspace(conversation).unwrap().messages.len(), 1);
+    assert_eq!(
+        db.ai_chat_window(conversation, Default::default())
+            .unwrap()
+            .messages
+            .len(),
+        1
+    );
     db.trash_move(delete).unwrap();
     assert!(db.read_record("source".into()).is_err());
     assert_eq!(
@@ -280,8 +308,11 @@ fn conversation_images_are_local_deduplicated_and_excluded_from_model_messages()
         .unwrap();
     db.import_conversation_image(request(), bytes.clone())
         .unwrap();
-    let w = db.ai_workspace(conversation.clone()).unwrap();
+    let w = db
+        .ai_chat_window(conversation.clone(), Default::default())
+        .unwrap();
     assert_eq!(w.messages.len(), 1);
+    assert!(!w.page.has_user_text);
     let aid = w.messages[0]["images"][0].as_str().unwrap();
     assert!(
         !db.attachment_bytes(conversation.clone(), aid.into(), None, false)
@@ -292,6 +323,12 @@ fn conversation_images_are_local_deduplicated_and_excluded_from_model_messages()
         .ai_prepare(input(&conversation, "image-context", "chat"))
         .unwrap();
     assert!(messages.iter().all(|m| !m.text.trim().is_empty()));
+    assert!(
+        db.ai_chat_window(conversation.clone(), Default::default())
+            .unwrap()
+            .page
+            .has_user_text
+    );
     assert!(!messages.iter().any(|m| m.text.contains(aid)
         || m.text.contains("synthetic.png")
         || m.text.contains("data:image")));
@@ -364,7 +401,10 @@ fn lazy_chat_and_validation_are_atomic_and_never_create_diaries() {
     let (t, _, messages) = db.ai_prepare(make("lazy-send")).unwrap();
     assert!(!messages.iter().any(|m| m.text.contains("公园散步")));
     assert_eq!(
-        db.ai_workspace(t.record_id.clone()).unwrap().messages.len(),
+        db.ai_chat_window(t.record_id.clone(), Default::default())
+            .unwrap()
+            .messages
+            .len(),
         1
     );
     let page = db.query_library(Default::default()).unwrap();
@@ -417,7 +457,9 @@ fn preview_is_not_a_diary_and_adoption_is_idempotent_and_preserves_chat() {
         "用户修改后的日记"
     );
     assert_eq!(
-        db.ai_workspace(chat).unwrap().linked_diary_id,
+        db.ai_chat_window(chat, Default::default())
+            .unwrap()
+            .linked_diary_id,
         Some(result.record_id)
     );
 }
@@ -509,7 +551,7 @@ fn source_deletion_invalidates_preview_and_domain_trash_is_separate() {
     assert_eq!(trash.items[0].id, chat);
     db.trash_restore(chat.clone(), trash.items[0].deleted_at)
         .unwrap();
-    assert!(db.ai_workspace(chat).is_ok());
+    assert!(db.ai_chat_window(chat, Default::default()).is_ok());
 }
 #[test]
 fn schema_twelve_upgrade_preserves_drafts_chats_and_preferences_persist() {
@@ -523,11 +565,11 @@ fn schema_twelve_upgrade_preserves_drafts_chats_and_preferences_persist() {
     let sql = root.sql();
     sql.execute("UPDATE records SET kind='draft' WHERE id='source'", [])
         .unwrap();
-    sql.execute_batch("ALTER TABLE ai_tasks DROP COLUMN reasoning_summary; ALTER TABLE ai_tasks DROP COLUMN effective_profile_json; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; PRAGMA user_version=12;").unwrap();
+    sql.execute_batch("DROP TRIGGER chat_user_text_insert; ALTER TABLE ai_tasks DROP COLUMN reasoning_summary; ALTER TABLE ai_tasks DROP COLUMN effective_profile_json; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; PRAGMA user_version=12;").unwrap();
     drop(sql);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
     assert!(db.read_record("source".into()).is_ok());
-    assert!(db.ai_workspace(chat).is_ok());
+    assert!(db.ai_chat_window(chat, Default::default()).is_ok());
     assert_eq!(db.query_library(Default::default()).unwrap().items.len(), 1);
     db.ai_set_default(Some("test-profile".into())).unwrap();
     drop(db);
@@ -645,7 +687,12 @@ fn purged_adopted_diary_cannot_be_recreated_from_the_same_preview() {
     let mut another = adopt_request(&preview.id, "合成日记");
     another.request_id = "another-adopt-attempt".into();
     assert!(db.ai_adopt(another).is_err());
-    assert!(db.ai_workspace(chat).unwrap().preview_task_id.is_none());
+    assert!(
+        db.ai_chat_window(chat, Default::default())
+            .unwrap()
+            .preview_task_id
+            .is_none()
+    );
     assert_eq!(
         root.sql()
             .query_row("SELECT count(*) FROM records WHERE kind='text'", [], |r| {
@@ -668,15 +715,27 @@ fn chosen_chat_context_is_persisted_and_removal_does_not_readd_old_sources() {
     tell.source_ids = vec!["source".into(), "second-source".into()];
     let (task, _, _) = db.ai_prepare(tell).unwrap();
     db.ai_finish(task.id, Ok("回应".into())).unwrap();
-    assert_eq!(db.ai_workspace(chat.clone()).unwrap().context_ids.len(), 2);
+    assert_eq!(
+        db.ai_chat_window(chat.clone(), Default::default())
+            .unwrap()
+            .context_ids
+            .len(),
+        2
+    );
     drop(db);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
-    assert_eq!(db.ai_workspace(chat.clone()).unwrap().context_ids.len(), 2);
+    assert_eq!(
+        db.ai_chat_window(chat.clone(), Default::default())
+            .unwrap()
+            .context_ids
+            .len(),
+        2
+    );
     let mut tell = input(&chat, "clear-context", "chat");
     tell.source_ids.clear();
     let (task, _, _) = db.ai_prepare(tell).unwrap();
     db.ai_finish(task.id, Ok("回应".into())).unwrap();
-    let w = db.ai_workspace(chat).unwrap();
+    let w = db.ai_chat_window(chat, Default::default()).unwrap();
     assert!(w.context_ids.is_empty());
     assert!(!w.sources.is_empty());
 }
@@ -726,7 +785,7 @@ fn cli_effective_model_is_frozen_per_conversation_and_survives_restart() {
     drop(db);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
     assert_eq!(
-        db.ai_workspace(chat.clone())
+        db.ai_chat_window(chat.clone(), Default::default())
             .unwrap()
             .effective_model
             .as_deref(),
@@ -894,7 +953,7 @@ fn chat_model_override_is_per_turn_and_does_not_change_defaults_or_history() {
         Some("test-profile")
     );
     assert_eq!(
-        db.ai_workspace(chat.clone())
+        db.ai_chat_window(chat.clone(), Default::default())
             .unwrap()
             .effective_model
             .as_deref(),
@@ -947,7 +1006,10 @@ fn chat_model_override_is_per_turn_and_does_not_change_defaults_or_history() {
     drop(db);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
     assert_eq!(
-        db.ai_workspace(chat).unwrap().effective_model.as_deref(),
+        db.ai_chat_window(chat, Default::default())
+            .unwrap()
+            .effective_model
+            .as_deref(),
         Some("another-model")
     );
 }
@@ -1001,7 +1063,10 @@ fn cli_chat_override_replaces_only_future_snapshots_and_keeps_custom_configurati
     let (task, _, _) = db.ai_prepare_resolved(request, Some(resolved)).unwrap();
     db.ai_finish(task.id, Ok("新的合成回应".into())).unwrap();
     assert_eq!(
-        db.ai_workspace(chat).unwrap().effective_effort.as_deref(),
+        db.ai_chat_window(chat, Default::default())
+            .unwrap()
+            .effective_effort
+            .as_deref(),
         Some("medium")
     );
     assert_eq!(db.ai_profiles().unwrap().remove(0).model, "custom-model");
@@ -1024,7 +1089,10 @@ fn message_observations_persist_without_entering_the_prompt_and_are_cleared_with
     db.ai_finish(task.id.clone(), Ok("合成正文".into()))
         .unwrap();
     assert!(!db.ai_reasoning_summary(task.id, "迟到内容".into()).unwrap());
-    let messages = db.ai_workspace(conversation.clone()).unwrap().messages;
+    let messages = db
+        .ai_chat_window(conversation.clone(), Default::default())
+        .unwrap()
+        .messages;
     assert!(messages[0]["createdAt"].as_i64().unwrap() > 0);
     assert_eq!(messages[1]["reasoningSummary"], "合成公开摘要");
     assert!(messages[1]["durationMs"].as_i64().unwrap() >= 0);
@@ -1036,7 +1104,9 @@ fn message_observations_persist_without_entering_the_prompt_and_are_cleared_with
     drop(db);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
     assert_eq!(
-        db.ai_workspace(conversation.clone()).unwrap().messages[1]["reasoningSummary"],
+        db.ai_chat_window(conversation.clone(), Default::default())
+            .unwrap()
+            .messages[1]["reasoningSummary"],
         "合成公开摘要"
     );
     let impact = db.trash_impact("source".into()).unwrap();
@@ -1047,7 +1117,296 @@ fn message_observations_persist_without_entering_the_prompt_and_are_cleared_with
     })
     .unwrap();
     assert_eq!(
-        db.ai_workspace(conversation).unwrap().messages[1]["reasoningSummary"],
+        db.ai_chat_window(conversation, Default::default())
+            .unwrap()
+            .messages[1]["reasoningSummary"],
         ""
+    );
+}
+
+#[test]
+fn chat_windows_are_bounded_scoped_and_do_not_truncate_model_or_preview_history() {
+    use lifestory_studio_lib::chat_history::{MessageCursor, WindowRequest};
+    use rusqlite::params;
+    let (root, db, conversation) = setup();
+    let other = db
+        .ai_create_conversation("2026-10-29".into(), "Asia/Shanghai".into())
+        .unwrap();
+    let mut sql = root.sql();
+    let tx = sql.transaction().unwrap();
+    for sequence in 0..350 {
+        tx.execute("INSERT INTO conversation_messages(id,record_id,sequence,role,content_json,request_id,created_at) VALUES(?1,?2,?3,?4,?5,?6,1)",params![format!("m{sequence}"),conversation,sequence,if sequence==0 {"user"} else {"assistant"},serde_json::json!({"text":format!("历史合成{sequence}")}).to_string(),format!("history-{sequence}")]).unwrap();
+    }
+    tx.commit().unwrap();
+    let cursor = |sequence| MessageCursor {
+        id: format!("m{sequence}"),
+        sequence,
+    };
+    assert!(
+        db.ai_chat_window("source".into(), WindowRequest::default())
+            .is_err()
+    );
+    let tail = db
+        .ai_chat_window(conversation.clone(), WindowRequest::default())
+        .unwrap();
+    assert_eq!(tail.messages.len(), 100);
+    assert_eq!(tail.messages[0]["sequence"], 250);
+    assert_eq!(tail.messages[99]["sequence"], 349);
+    let page = tail.page;
+    assert!(page.has_before && !page.has_after && page.has_user_text);
+    let before = db
+        .ai_chat_window(
+            conversation.clone(),
+            WindowRequest {
+                before: Some(cursor(250)),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(before.messages.len(), 100);
+    assert_eq!(before.messages[0]["sequence"], 150);
+    assert_eq!(before.messages[99]["sequence"], 249);
+    assert!(before.page.has_after);
+    let after = db
+        .ai_chat_window(
+            conversation.clone(),
+            WindowRequest {
+                after: Some(cursor(249)),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(after.messages[0]["sequence"], 250);
+    assert!(!after.page.has_after);
+    let around = db
+        .ai_chat_window(
+            conversation.clone(),
+            WindowRequest {
+                around: Some("m60".into()),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(around.messages.len(), 100);
+    assert_eq!(around.messages[50]["id"], "m60");
+    assert!(
+        db.ai_chat_window(
+            other.clone(),
+            WindowRequest {
+                around: Some("m60".into()),
+                ..Default::default()
+            }
+        )
+        .is_err()
+    );
+    assert!(
+        db.ai_chat_window(
+            other,
+            WindowRequest {
+                after: Some(cursor(249)),
+                ..Default::default()
+            }
+        )
+        .is_err()
+    );
+    assert!(
+        db.ai_chat_window(
+            conversation.clone(),
+            WindowRequest {
+                after: Some(cursor(249)),
+                before: Some(cursor(250)),
+                ..Default::default()
+            }
+        )
+        .is_err()
+    );
+    let empty = db
+        .ai_chat_window(
+            conversation.clone(),
+            WindowRequest {
+                after: Some(cursor(349)),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert!(empty.messages.is_empty());
+    assert_eq!(empty.page.latest.unwrap().sequence, 349);
+    // Full authorized context remains independent from the display page.
+    let (task, _, messages) = db
+        .ai_prepare(input(&conversation, "history-chat", "chat"))
+        .unwrap();
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.text.contains("历史合成0"))
+    );
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.text.contains("历史合成349"))
+    );
+    assert!(messages.len() >= 350);
+    db.ai_finish(task.id, Ok("新回应".into())).unwrap();
+    let delta = db
+        .ai_chat_window(
+            conversation.clone(),
+            WindowRequest {
+                after: Some(cursor(349)),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(delta.messages.len(), 2);
+    assert_eq!(delta.task.unwrap().status, "completed");
+    let (preview, _, messages) = db
+        .ai_prepare(input(&conversation, "history-preview", "draft"))
+        .unwrap();
+    assert!(
+        messages
+            .iter()
+            .any(|message| message.text.contains("历史合成0"))
+    );
+    db.ai_finish(preview.id.clone(), Ok("合成预览".into()))
+        .unwrap();
+    let metadata = db
+        .ai_chat_window(
+            conversation,
+            WindowRequest {
+                after: Some(cursor(349)),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        metadata.preview_task_id.as_deref(),
+        Some(preview.id.as_str())
+    );
+    assert!(metadata.page.has_user_text);
+    root.sql()
+        .execute("UPDATE records SET deleted_at=123 WHERE id='source'", [])
+        .unwrap();
+    let invalidated = db
+        .ai_chat_window(
+            metadata.id,
+            WindowRequest {
+                after: Some(cursor(349)),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert!(
+        invalidated
+            .sources
+            .iter()
+            .any(|source| source.id == "source" && source.unavailable)
+    );
+}
+
+#[test]
+fn chat_user_text_flag_tracks_committed_user_text_across_windows_and_restart() {
+    use lifestory_studio_lib::chat_history::{MessageCursor, WindowRequest};
+    use rusqlite::params;
+    use serde_json::json;
+    let (root, db, chat) = setup();
+    assert!(
+        !db.ai_chat_window(chat.clone(), WindowRequest::default())
+            .unwrap()
+            .page
+            .has_user_text
+    );
+    let other = db
+        .ai_create_conversation("2026-10-29".into(), "Asia/Shanghai".into())
+        .unwrap();
+    let mut sql = root.sql();
+    let tx = sql.transaction().unwrap();
+    for sequence in 0..150 {
+        let (role, content) = if sequence % 2 == 0 {
+            ("user", json!({"text":"   "}))
+        } else {
+            ("assistant", json!({"text":"合成助手回应"}))
+        };
+        tx.execute(
+            "INSERT INTO conversation_messages VALUES(?1,?2,?3,?4,?5,?1,1)",
+            params![
+                format!("flag-{sequence}"),
+                chat,
+                sequence,
+                role,
+                content.to_string()
+            ],
+        )
+        .unwrap();
+    }
+    tx.commit().unwrap();
+    let tail = db
+        .ai_chat_window(chat.clone(), WindowRequest::default())
+        .unwrap();
+    assert_eq!(tail.messages.len(), 100);
+    assert!(!tail.page.has_user_text);
+    let cursor = MessageCursor {
+        id: "flag-149".into(),
+        sequence: 149,
+    };
+    let delta = || WindowRequest {
+        after: Some(cursor.clone()),
+        ..Default::default()
+    };
+    for _ in 0..3 {
+        let update = db.ai_chat_window(chat.clone(), delta()).unwrap();
+        assert!(update.messages.is_empty());
+        assert!(!update.page.has_user_text);
+    }
+    let tx = sql.transaction().unwrap();
+    tx.execute("INSERT INTO conversation_messages VALUES('rolled-back-text',?1,150,'user',?2,'rolled-back-text',1)",params![chat,json!({"text":"将回滚的文字"}).to_string()]).unwrap();
+    assert!(
+        tx.query_row(
+            "SELECT has_user_text FROM ai_conversations WHERE record_id=?1",
+            [&chat],
+            |row| row.get::<_, bool>(0)
+        )
+        .unwrap()
+    );
+    tx.rollback().unwrap();
+    assert!(
+        !db.ai_chat_window(chat.clone(), delta())
+            .unwrap()
+            .page
+            .has_user_text
+    );
+    // Legacy nested text has the same meaning as the original json_tree predicate.
+    sql.execute("INSERT INTO conversation_messages VALUES('committed-text',?1,150,'user',?2,'committed-text',1)",params![chat,json!({"content":[{"text":"合成用户讲述"}]}).to_string()]).unwrap();
+    let update = db.ai_chat_window(chat.clone(), delta()).unwrap();
+    assert_eq!(update.messages.len(), 1);
+    assert!(update.page.has_user_text);
+    let oldest = db
+        .ai_chat_window(
+            chat.clone(),
+            WindowRequest {
+                before: Some(cursor),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    assert!(oldest.page.has_user_text);
+    assert!(
+        oldest
+            .messages
+            .iter()
+            .all(|message| message["id"] != "committed-text")
+    );
+    assert!(
+        !db.ai_chat_window(other, WindowRequest::default())
+            .unwrap()
+            .page
+            .has_user_text
+    );
+    drop(sql);
+    drop(db);
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    assert!(
+        db.ai_chat_window(chat, WindowRequest::default())
+            .unwrap()
+            .page
+            .has_user_text
     );
 }

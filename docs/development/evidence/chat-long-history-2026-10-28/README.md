@@ -24,3 +24,6 @@ cargo test --locked --manifest-path src-tauri/Cargo.toml --test chat_performance
 ```
 
 该测量显式 ignored，普通 cargo test 不会自动执行长历史规模。完整结论及工程决策见 ../../CHAT_LONG_HISTORY_MEASUREMENT.md。
+
+
+2026-10-29 生产实现后更新：旧全量 workspace 入口已删除，当前 chat_performance 显式测试只测真实 ai_chat_window 的 100 条尾页及元数据，并核对窗口数量和顺序，输出 WINDOW_BENCH。上面的原生运行命令仍可用，但当前结果不能与 native.txt 的旧全量/原始 SQL 数据视作同一实现；复现 10 月 28 日指标须使用当时源码。原始 native.txt、browser.json 与环境哈希保留，本轮没有重新运行规模性能测量。
