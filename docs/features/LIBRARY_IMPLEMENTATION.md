@@ -74,7 +74,7 @@ LIB-01 收敛结果：图片解码支持及上限已验证，目标 schema 与�
 
 ## LIB-01 契约文件与实证
 
-目标数据库 DDL 见 [002_records.sql](../../src-tauri/migrations/002_records.sql)，前后端传输字段见 [api.ts](../../src/features/library/api.ts)。LIB-02 已激活编号迁移与文字记录业务命令；契约以这些源文件为准，避免维护平行副本。编辑器节点白名单及附件/来源 ID 的逐项验证由业务写入层实施，不能只依靠 JSON 合法性检查。
+目标数据库 DDL 见 [002_records.sql](../../src-tauri/migrations/002_records.sql)，前后端传输字段见 [records.ts](../../src/services/records.ts)。LIB-02 已激活编号迁移与文字记录业务命令；契约以这些源文件为准，避免维护平行副本。编辑器节点白名单及附件/来源 ID 的逐项验证由业务写入层实施，不能只依靠 JSON 合法性检查。
 
 DDL 通过真实 bundled SQLite 的 3 个契约用例：跨记录版本拒绝、共享图片保护、回收期限及幂等请求约束。迁移激活前仍须补齐旧库快照、升级事务及相关回归；不要直接对现有用户库执行该目标 DDL。
 

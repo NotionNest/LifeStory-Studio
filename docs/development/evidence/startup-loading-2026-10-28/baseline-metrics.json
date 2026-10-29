@@ -1,0 +1,962 @@
+[
+  {
+    "variant": "baseline",
+    "round": 0,
+    "launched": 1793183225527,
+    "events": [
+      {
+        "event": "module-ready",
+        "hash": "",
+        "timeOrigin": 1793183229050,
+        "now": 117,
+        "epoch": 1793183229167
+      },
+      {
+        "event": "startup",
+        "moduleStart": 116,
+        "ready": 329,
+        "resources": [
+          {
+            "name": "metric",
+            "duration": 77,
+            "bytes": 0
+          }
+        ],
+        "timeOrigin": 1793183229050,
+        "now": 329,
+        "epoch": 1793183229380
+      },
+      {
+        "event": "isolation",
+        "directoryVerified": true,
+        "timeOrigin": 1793183229050,
+        "now": 338,
+        "epoch": 1793183229388
+      },
+      {
+        "event": "page",
+        "name": "diary",
+        "phase": "first",
+        "elapsed": 90.99999999999994,
+        "path": "/diaries/5e67a646-6607-4e16-a39f-1191b7f45093",
+        "timeOrigin": 1793183229050,
+        "now": 438,
+        "epoch": 1793183229489
+      },
+      {
+        "event": "page",
+        "name": "history",
+        "phase": "first",
+        "elapsed": 45,
+        "path": "/diaries/5e67a646-6607-4e16-a39f-1191b7f45093/history",
+        "timeOrigin": 1793183229050,
+        "now": 489,
+        "epoch": 1793183229539
+      },
+      {
+        "event": "page",
+        "name": "chat",
+        "phase": "first",
+        "elapsed": 47,
+        "path": "/chats/new",
+        "timeOrigin": 1793183229050,
+        "now": 541,
+        "epoch": 1793183229592
+      },
+      {
+        "event": "page",
+        "name": "appearance",
+        "phase": "first",
+        "elapsed": 23.000000000000114,
+        "path": "/settings/appearance",
+        "timeOrigin": 1793183229050,
+        "now": 571.0000000000001,
+        "epoch": 1793183229621
+      },
+      {
+        "event": "diagnostic",
+        "visibility": "visible",
+        "focus": false,
+        "home": false,
+        "busy": [],
+        "timeOrigin": 1793183229050,
+        "now": 623,
+        "epoch": 1793183229674
+      },
+      {
+        "event": "page",
+        "name": "api",
+        "phase": "first",
+        "elapsed": 47,
+        "path": "/settings/models/api",
+        "timeOrigin": 1793183229050,
+        "now": 624,
+        "epoch": 1793183229675
+      },
+      {
+        "event": "page",
+        "name": "trash",
+        "phase": "first",
+        "elapsed": 34,
+        "path": "/settings/trash/diary",
+        "timeOrigin": 1793183229050,
+        "now": 670,
+        "epoch": 1793183229721
+      },
+      {
+        "event": "page",
+        "name": "cli",
+        "phase": "first",
+        "elapsed": 27.000000000000114,
+        "path": "/settings/models/cli",
+        "timeOrigin": 1793183229050,
+        "now": 703.0000000000001,
+        "epoch": 1793183229754
+      },
+      {
+        "event": "cli-scan-ready",
+        "elapsed": 1632,
+        "timeOrigin": 1793183229050,
+        "now": 2308,
+        "epoch": 1793183231359
+      },
+      {
+        "event": "page",
+        "name": "diary",
+        "phase": "repeat",
+        "elapsed": 41,
+        "path": "/diaries/5e67a646-6607-4e16-a39f-1191b7f45093",
+        "timeOrigin": 1793183229050,
+        "now": 2357,
+        "epoch": 1793183231408
+      },
+      {
+        "event": "page",
+        "name": "history",
+        "phase": "repeat",
+        "elapsed": 28,
+        "path": "/diaries/5e67a646-6607-4e16-a39f-1191b7f45093/history",
+        "timeOrigin": 1793183229050,
+        "now": 2391,
+        "epoch": 1793183231441
+      },
+      {
+        "event": "page",
+        "name": "chat",
+        "phase": "repeat",
+        "elapsed": 26.999999999999545,
+        "path": "/chats/new",
+        "timeOrigin": 1793183229050,
+        "now": 2424,
+        "epoch": 1793183231475
+      },
+      {
+        "event": "page",
+        "name": "appearance",
+        "phase": "repeat",
+        "elapsed": 28,
+        "path": "/settings/appearance",
+        "timeOrigin": 1793183229050,
+        "now": 2458,
+        "epoch": 1793183231509
+      },
+      {
+        "event": "page",
+        "name": "api",
+        "phase": "repeat",
+        "elapsed": 22,
+        "path": "/settings/models/api",
+        "timeOrigin": 1793183229050,
+        "now": 2491,
+        "epoch": 1793183231541
+      },
+      {
+        "event": "page",
+        "name": "trash",
+        "phase": "repeat",
+        "elapsed": 30.000000000000455,
+        "path": "/settings/trash/diary",
+        "timeOrigin": 1793183229050,
+        "now": 2526.0000000000005,
+        "epoch": 1793183231576
+      },
+      {
+        "event": "done",
+        "alerts": [],
+        "resourceCount": 17,
+        "timeOrigin": 1793183229050,
+        "now": 2531,
+        "epoch": 1793183231582
+      }
+    ],
+    "startupMs": 3852
+  },
+  {
+    "variant": "baseline",
+    "round": 1,
+    "launched": 1793183231596,
+    "events": [
+      {
+        "event": "module-ready",
+        "hash": "",
+        "timeOrigin": 1793183232054.0002,
+        "now": 67,
+        "epoch": 1793183232122
+      },
+      {
+        "event": "startup",
+        "moduleStart": 67,
+        "ready": 195,
+        "resources": [
+          {
+            "name": "metric",
+            "duration": 19,
+            "bytes": 0
+          }
+        ],
+        "timeOrigin": 1793183232054.0002,
+        "now": 195,
+        "epoch": 1793183232250
+      },
+      {
+        "event": "isolation",
+        "directoryVerified": true,
+        "timeOrigin": 1793183232054.0002,
+        "now": 202,
+        "epoch": 1793183232257
+      },
+      {
+        "event": "page",
+        "name": "diary",
+        "phase": "first",
+        "elapsed": 61,
+        "path": "/diaries/d42adb72-ccc4-4c6a-8a2a-871d52ac00e3",
+        "timeOrigin": 1793183232054.0002,
+        "now": 271,
+        "epoch": 1793183232326
+      },
+      {
+        "event": "page",
+        "name": "history",
+        "phase": "first",
+        "elapsed": 36,
+        "path": "/diaries/d42adb72-ccc4-4c6a-8a2a-871d52ac00e3/history",
+        "timeOrigin": 1793183232054.0002,
+        "now": 313,
+        "epoch": 1793183232367
+      },
+      {
+        "event": "page",
+        "name": "chat",
+        "phase": "first",
+        "elapsed": 29.000000000000057,
+        "path": "/chats/new",
+        "timeOrigin": 1793183232054.0002,
+        "now": 347.00000000000006,
+        "epoch": 1793183232402
+      },
+      {
+        "event": "page",
+        "name": "appearance",
+        "phase": "first",
+        "elapsed": 25,
+        "path": "/settings/appearance",
+        "timeOrigin": 1793183232054.0002,
+        "now": 379,
+        "epoch": 1793183232434
+      },
+      {
+        "event": "page",
+        "name": "api",
+        "phase": "first",
+        "elapsed": 28.000000000000057,
+        "path": "/settings/models/api",
+        "timeOrigin": 1793183232054.0002,
+        "now": 413.00000000000006,
+        "epoch": 1793183232467
+      },
+      {
+        "event": "page",
+        "name": "trash",
+        "phase": "first",
+        "elapsed": 26,
+        "path": "/settings/trash/diary",
+        "timeOrigin": 1793183232054.0002,
+        "now": 446,
+        "epoch": 1793183232501
+      },
+      {
+        "event": "page",
+        "name": "cli",
+        "phase": "first",
+        "elapsed": 29,
+        "path": "/settings/models/cli",
+        "timeOrigin": 1793183232054.0002,
+        "now": 480,
+        "epoch": 1793183232535
+      },
+      {
+        "event": "diagnostic",
+        "visibility": "visible",
+        "focus": false,
+        "home": false,
+        "busy": [],
+        "timeOrigin": 1793183232054.0002,
+        "now": 568.0000000000001,
+        "epoch": 1793183232622
+      },
+      {
+        "event": "cli-scan-ready",
+        "elapsed": 1236,
+        "timeOrigin": 1793183232054.0002,
+        "now": 1687,
+        "epoch": 1793183233742
+      },
+      {
+        "event": "page",
+        "name": "diary",
+        "phase": "repeat",
+        "elapsed": 26,
+        "path": "/diaries/d42adb72-ccc4-4c6a-8a2a-871d52ac00e3",
+        "timeOrigin": 1793183232054.0002,
+        "now": 1721,
+        "epoch": 1793183233776
+      },
+      {
+        "event": "page",
+        "name": "history",
+        "phase": "repeat",
+        "elapsed": 27,
+        "path": "/diaries/d42adb72-ccc4-4c6a-8a2a-871d52ac00e3/history",
+        "timeOrigin": 1793183232054.0002,
+        "now": 1754,
+        "epoch": 1793183233809
+      },
+      {
+        "event": "page",
+        "name": "chat",
+        "phase": "repeat",
+        "elapsed": 27.000000000000227,
+        "path": "/chats/new",
+        "timeOrigin": 1793183232054.0002,
+        "now": 1787.0000000000002,
+        "epoch": 1793183233842
+      },
+      {
+        "event": "page",
+        "name": "appearance",
+        "phase": "repeat",
+        "elapsed": 29,
+        "path": "/settings/appearance",
+        "timeOrigin": 1793183232054.0002,
+        "now": 1821,
+        "epoch": 1793183233876
+      },
+      {
+        "event": "page",
+        "name": "api",
+        "phase": "repeat",
+        "elapsed": 27,
+        "path": "/settings/models/api",
+        "timeOrigin": 1793183232054.0002,
+        "now": 1855,
+        "epoch": 1793183233910
+      },
+      {
+        "event": "page",
+        "name": "trash",
+        "phase": "repeat",
+        "elapsed": 26,
+        "path": "/settings/trash/diary",
+        "timeOrigin": 1793183232054.0002,
+        "now": 1887,
+        "epoch": 1793183233942
+      },
+      {
+        "event": "done",
+        "alerts": [],
+        "resourceCount": 17,
+        "timeOrigin": 1793183232054.0002,
+        "now": 1893,
+        "epoch": 1793183233948
+      }
+    ],
+    "startupMs": 653.000244140625
+  },
+  {
+    "variant": "baseline",
+    "round": 2,
+    "launched": 1793183233961,
+    "events": [
+      {
+        "event": "module-ready",
+        "hash": "",
+        "timeOrigin": 1793183234330,
+        "now": 118.00000000000001,
+        "epoch": 1793183234448
+      },
+      {
+        "event": "startup",
+        "moduleStart": 118.00000000000001,
+        "ready": 234,
+        "resources": [
+          {
+            "name": "metric",
+            "duration": 26.000000000000014,
+            "bytes": 0
+          }
+        ],
+        "timeOrigin": 1793183234330,
+        "now": 234,
+        "epoch": 1793183234564
+      },
+      {
+        "event": "isolation",
+        "directoryVerified": true,
+        "timeOrigin": 1793183234330,
+        "now": 241,
+        "epoch": 1793183234572
+      },
+      {
+        "event": "page",
+        "name": "diary",
+        "phase": "first",
+        "elapsed": 59,
+        "path": "/diaries/fdb5657a-65a0-476c-aec3-6370866083f2",
+        "timeOrigin": 1793183234330,
+        "now": 309,
+        "epoch": 1793183234639
+      },
+      {
+        "event": "page",
+        "name": "history",
+        "phase": "first",
+        "elapsed": 30.000000000000057,
+        "path": "/diaries/fdb5657a-65a0-476c-aec3-6370866083f2/history",
+        "timeOrigin": 1793183234330,
+        "now": 345.00000000000006,
+        "epoch": 1793183234675
+      },
+      {
+        "event": "page",
+        "name": "chat",
+        "phase": "first",
+        "elapsed": 27.999999999999943,
+        "path": "/chats/new",
+        "timeOrigin": 1793183234330,
+        "now": 379,
+        "epoch": 1793183234709
+      },
+      {
+        "event": "page",
+        "name": "appearance",
+        "phase": "first",
+        "elapsed": 26.000000000000057,
+        "path": "/settings/appearance",
+        "timeOrigin": 1793183234330,
+        "now": 412.00000000000006,
+        "epoch": 1793183234742
+      },
+      {
+        "event": "page",
+        "name": "api",
+        "phase": "first",
+        "elapsed": 29,
+        "path": "/settings/models/api",
+        "timeOrigin": 1793183234330,
+        "now": 448,
+        "epoch": 1793183234778
+      },
+      {
+        "event": "page",
+        "name": "trash",
+        "phase": "first",
+        "elapsed": 25.000000000000057,
+        "path": "/settings/trash/diary",
+        "timeOrigin": 1793183234330,
+        "now": 479.00000000000006,
+        "epoch": 1793183234809
+      },
+      {
+        "event": "page",
+        "name": "cli",
+        "phase": "first",
+        "elapsed": 27,
+        "path": "/settings/models/cli",
+        "timeOrigin": 1793183234330,
+        "now": 512,
+        "epoch": 1793183234843
+      },
+      {
+        "event": "diagnostic",
+        "visibility": "visible",
+        "focus": false,
+        "home": false,
+        "busy": [],
+        "timeOrigin": 1793183234330,
+        "now": 619,
+        "epoch": 1793183234949
+      },
+      {
+        "event": "cli-scan-ready",
+        "elapsed": 1277,
+        "timeOrigin": 1793183234330,
+        "now": 1762,
+        "epoch": 1793183236092
+      },
+      {
+        "event": "page",
+        "name": "diary",
+        "phase": "repeat",
+        "elapsed": 26.999999999999773,
+        "path": "/diaries/fdb5657a-65a0-476c-aec3-6370866083f2",
+        "timeOrigin": 1793183234330,
+        "now": 1796,
+        "epoch": 1793183236126
+      },
+      {
+        "event": "page",
+        "name": "history",
+        "phase": "repeat",
+        "elapsed": 27,
+        "path": "/diaries/fdb5657a-65a0-476c-aec3-6370866083f2/history",
+        "timeOrigin": 1793183234330,
+        "now": 1828,
+        "epoch": 1793183236158
+      },
+      {
+        "event": "page",
+        "name": "chat",
+        "phase": "repeat",
+        "elapsed": 27,
+        "path": "/chats/new",
+        "timeOrigin": 1793183234330,
+        "now": 1861,
+        "epoch": 1793183236192
+      },
+      {
+        "event": "page",
+        "name": "appearance",
+        "phase": "repeat",
+        "elapsed": 29.000000000000227,
+        "path": "/settings/appearance",
+        "timeOrigin": 1793183234330,
+        "now": 1896.0000000000002,
+        "epoch": 1793183236226
+      },
+      {
+        "event": "page",
+        "name": "api",
+        "phase": "repeat",
+        "elapsed": 28,
+        "path": "/settings/models/api",
+        "timeOrigin": 1793183234330,
+        "now": 1929,
+        "epoch": 1793183236259
+      },
+      {
+        "event": "page",
+        "name": "trash",
+        "phase": "repeat",
+        "elapsed": 25,
+        "path": "/settings/trash/diary",
+        "timeOrigin": 1793183234330,
+        "now": 1961,
+        "epoch": 1793183236292
+      },
+      {
+        "event": "done",
+        "alerts": [],
+        "resourceCount": 17,
+        "timeOrigin": 1793183234330,
+        "now": 1967,
+        "epoch": 1793183236297
+      }
+    ],
+    "startupMs": 603
+  },
+  {
+    "variant": "baseline",
+    "round": 3,
+    "launched": 1793183236310,
+    "events": [
+      {
+        "event": "module-ready",
+        "hash": "",
+        "timeOrigin": 1793183236697,
+        "now": 136,
+        "epoch": 1793183236834
+      },
+      {
+        "event": "startup",
+        "moduleStart": 136,
+        "ready": 260,
+        "resources": [
+          {
+            "name": "metric",
+            "duration": 21,
+            "bytes": 0
+          }
+        ],
+        "timeOrigin": 1793183236697,
+        "now": 260,
+        "epoch": 1793183236958
+      },
+      {
+        "event": "isolation",
+        "directoryVerified": true,
+        "timeOrigin": 1793183236697,
+        "now": 268,
+        "epoch": 1793183236965
+      },
+      {
+        "event": "page",
+        "name": "diary",
+        "phase": "first",
+        "elapsed": 64,
+        "path": "/diaries/c4587285-c5c6-40ff-b62a-e24b96d62c8f",
+        "timeOrigin": 1793183236697,
+        "now": 339,
+        "epoch": 1793183237037
+      },
+      {
+        "event": "page",
+        "name": "history",
+        "phase": "first",
+        "elapsed": 31.999999999999943,
+        "path": "/diaries/c4587285-c5c6-40ff-b62a-e24b96d62c8f/history",
+        "timeOrigin": 1793183236697,
+        "now": 377,
+        "epoch": 1793183237075
+      },
+      {
+        "event": "page",
+        "name": "chat",
+        "phase": "first",
+        "elapsed": 43,
+        "path": "/chats/new",
+        "timeOrigin": 1793183236697,
+        "now": 427,
+        "epoch": 1793183237125
+      },
+      {
+        "event": "page",
+        "name": "appearance",
+        "phase": "first",
+        "elapsed": 28,
+        "path": "/settings/appearance",
+        "timeOrigin": 1793183236697,
+        "now": 461,
+        "epoch": 1793183237159
+      },
+      {
+        "event": "page",
+        "name": "api",
+        "phase": "first",
+        "elapsed": 28,
+        "path": "/settings/models/api",
+        "timeOrigin": 1793183236697,
+        "now": 495,
+        "epoch": 1793183237192
+      },
+      {
+        "event": "page",
+        "name": "trash",
+        "phase": "first",
+        "elapsed": 28,
+        "path": "/settings/trash/diary",
+        "timeOrigin": 1793183236697,
+        "now": 528,
+        "epoch": 1793183237226
+      },
+      {
+        "event": "page",
+        "name": "cli",
+        "phase": "first",
+        "elapsed": 27,
+        "path": "/settings/models/cli",
+        "timeOrigin": 1793183236697,
+        "now": 561,
+        "epoch": 1793183237259
+      },
+      {
+        "event": "diagnostic",
+        "visibility": "visible",
+        "focus": false,
+        "home": false,
+        "busy": [],
+        "timeOrigin": 1793183236697,
+        "now": 637,
+        "epoch": 1793183237335
+      },
+      {
+        "event": "cli-scan-ready",
+        "elapsed": 1251.0000000000002,
+        "timeOrigin": 1793183236697,
+        "now": 1785.0000000000002,
+        "epoch": 1793183238483
+      },
+      {
+        "event": "page",
+        "name": "diary",
+        "phase": "repeat",
+        "elapsed": 27,
+        "path": "/diaries/c4587285-c5c6-40ff-b62a-e24b96d62c8f",
+        "timeOrigin": 1793183236697,
+        "now": 1819,
+        "epoch": 1793183238517
+      },
+      {
+        "event": "page",
+        "name": "history",
+        "phase": "repeat",
+        "elapsed": 27,
+        "path": "/diaries/c4587285-c5c6-40ff-b62a-e24b96d62c8f/history",
+        "timeOrigin": 1793183236697,
+        "now": 1852,
+        "epoch": 1793183238550
+      },
+      {
+        "event": "page",
+        "name": "chat",
+        "phase": "repeat",
+        "elapsed": 24,
+        "path": "/chats/new",
+        "timeOrigin": 1793183236697,
+        "now": 1885,
+        "epoch": 1793183238583
+      },
+      {
+        "event": "page",
+        "name": "appearance",
+        "phase": "repeat",
+        "elapsed": 30,
+        "path": "/settings/appearance",
+        "timeOrigin": 1793183236697,
+        "now": 1921,
+        "epoch": 1793183238619
+      },
+      {
+        "event": "page",
+        "name": "api",
+        "phase": "repeat",
+        "elapsed": 27,
+        "path": "/settings/models/api",
+        "timeOrigin": 1793183236697,
+        "now": 1953,
+        "epoch": 1793183238651
+      },
+      {
+        "event": "page",
+        "name": "trash",
+        "phase": "repeat",
+        "elapsed": 28,
+        "path": "/settings/trash/diary",
+        "timeOrigin": 1793183236697,
+        "now": 1986,
+        "epoch": 1793183238684
+      },
+      {
+        "event": "done",
+        "alerts": [],
+        "resourceCount": 17,
+        "timeOrigin": 1793183236697,
+        "now": 1992,
+        "epoch": 1793183238690
+      }
+    ],
+    "startupMs": 647
+  },
+  {
+    "variant": "baseline",
+    "round": 4,
+    "launched": 1793183238703,
+    "events": [
+      {
+        "event": "module-ready",
+        "hash": "",
+        "timeOrigin": 1793183239109,
+        "now": 65,
+        "epoch": 1793183239175
+      },
+      {
+        "event": "startup",
+        "moduleStart": 65,
+        "ready": 173.00000000000003,
+        "resources": [
+          {
+            "name": "metric",
+            "duration": 18,
+            "bytes": 0
+          }
+        ],
+        "timeOrigin": 1793183239109,
+        "now": 173.00000000000003,
+        "epoch": 1793183239283
+      },
+      {
+        "event": "isolation",
+        "directoryVerified": true,
+        "timeOrigin": 1793183239109,
+        "now": 182,
+        "epoch": 1793183239292
+      },
+      {
+        "event": "page",
+        "name": "diary",
+        "phase": "first",
+        "elapsed": 60,
+        "path": "/diaries/bd6b7eef-c00f-4c48-8c86-50dcc58fe38a",
+        "timeOrigin": 1793183239109,
+        "now": 250,
+        "epoch": 1793183239360
+      },
+      {
+        "event": "page",
+        "name": "history",
+        "phase": "first",
+        "elapsed": 27,
+        "path": "/diaries/bd6b7eef-c00f-4c48-8c86-50dcc58fe38a/history",
+        "timeOrigin": 1793183239109,
+        "now": 282,
+        "epoch": 1793183239392
+      },
+      {
+        "event": "page",
+        "name": "chat",
+        "phase": "first",
+        "elapsed": 26,
+        "path": "/chats/new",
+        "timeOrigin": 1793183239109,
+        "now": 315,
+        "epoch": 1793183239425
+      },
+      {
+        "event": "page",
+        "name": "appearance",
+        "phase": "first",
+        "elapsed": 18,
+        "path": "/settings/appearance",
+        "timeOrigin": 1793183239109,
+        "now": 340,
+        "epoch": 1793183239450
+      },
+      {
+        "event": "page",
+        "name": "api",
+        "phase": "first",
+        "elapsed": 27.999999999999943,
+        "path": "/settings/models/api",
+        "timeOrigin": 1793183239109,
+        "now": 374,
+        "epoch": 1793183239484
+      },
+      {
+        "event": "page",
+        "name": "trash",
+        "phase": "first",
+        "elapsed": 28.000000000000057,
+        "path": "/settings/trash/diary",
+        "timeOrigin": 1793183239109,
+        "now": 408.00000000000006,
+        "epoch": 1793183239518
+      },
+      {
+        "event": "page",
+        "name": "cli",
+        "phase": "first",
+        "elapsed": 26.999999999999943,
+        "path": "/settings/models/cli",
+        "timeOrigin": 1793183239109,
+        "now": 440,
+        "epoch": 1793183239550
+      },
+      {
+        "event": "diagnostic",
+        "visibility": "visible",
+        "focus": false,
+        "home": false,
+        "busy": [],
+        "timeOrigin": 1793183239109,
+        "now": 566.0000000000001,
+        "epoch": 1793183239676
+      },
+      {
+        "event": "cli-scan-ready",
+        "elapsed": 1144,
+        "timeOrigin": 1793183239109,
+        "now": 1557,
+        "epoch": 1793183240667
+      },
+      {
+        "event": "page",
+        "name": "diary",
+        "phase": "repeat",
+        "elapsed": 27,
+        "path": "/diaries/bd6b7eef-c00f-4c48-8c86-50dcc58fe38a",
+        "timeOrigin": 1793183239109,
+        "now": 1591,
+        "epoch": 1793183240701
+      },
+      {
+        "event": "page",
+        "name": "history",
+        "phase": "repeat",
+        "elapsed": 27,
+        "path": "/diaries/bd6b7eef-c00f-4c48-8c86-50dcc58fe38a/history",
+        "timeOrigin": 1793183239109,
+        "now": 1624,
+        "epoch": 1793183240734
+      },
+      {
+        "event": "page",
+        "name": "chat",
+        "phase": "repeat",
+        "elapsed": 26.999999999999773,
+        "path": "/chats/new",
+        "timeOrigin": 1793183239109,
+        "now": 1657,
+        "epoch": 1793183240767
+      },
+      {
+        "event": "page",
+        "name": "appearance",
+        "phase": "repeat",
+        "elapsed": 24,
+        "path": "/settings/appearance",
+        "timeOrigin": 1793183239109,
+        "now": 1690,
+        "epoch": 1793183240800
+      },
+      {
+        "event": "page",
+        "name": "api",
+        "phase": "repeat",
+        "elapsed": 26,
+        "path": "/settings/models/api",
+        "timeOrigin": 1793183239109,
+        "now": 1724,
+        "epoch": 1793183240834
+      },
+      {
+        "event": "page",
+        "name": "trash",
+        "phase": "repeat",
+        "elapsed": 26.000000000000227,
+        "path": "/settings/trash/diary",
+        "timeOrigin": 1793183239109,
+        "now": 1757.0000000000002,
+        "epoch": 1793183240867
+      },
+      {
+        "event": "done",
+        "alerts": [],
+        "resourceCount": 17,
+        "timeOrigin": 1793183239109,
+        "now": 1763.0000000000002,
+        "epoch": 1793183240873
+      }
+    ],
+    "startupMs": 579
+  }
+]

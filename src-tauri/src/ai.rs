@@ -274,6 +274,12 @@ impl DatabaseWorker {
  })
     }
 
+    pub fn ai_key(&self, profile: String) -> StorageResult<String> {
+        self.call(move |_, root| {
+            crate::credentials::read_key(root, &profile).map_err(|e| fail("credential_error", &e))
+        })
+    }
+
     pub fn ai_profiles(&self) -> StorageResult<Vec<Profile>> {
         self.call(|db, _| {
             let mut stmt =
@@ -297,10 +303,10 @@ impl DatabaseWorker {
             return Err(fail("validation", "此默认选择仅适用于本机 CLI"));
         }
         ai_providers::validate(&profile).map_err(|e| fail("validation", &e))?;
-        self.call(move |db, _| {
+        self.call(move |db, root| {
             profile.id = id(db)?;
             if profile.protocol != "codex" {
-                ai_providers::store_key(&profile.id, &key)
+                crate::credentials::store_key(root, &profile.id, &key)
                     .map_err(|e| fail("credential_error", &e))?;
             }
             let saved = (|| -> StorageResult<()> {
@@ -319,7 +325,7 @@ impl DatabaseWorker {
                 Ok(())
             })();
             if let Err(e) = saved {
-                let _ = ai_providers::delete_key(&profile.id);
+                let _ = crate::credentials::delete_key(root, &profile.id);
                 return Err(e);
             }
             Ok(profile)
@@ -327,12 +333,12 @@ impl DatabaseWorker {
     }
     pub fn ai_delete_profile(&self, profile: String) -> StorageResult<()> {
         identifier(&profile)?;
-        self.call(move|db,_|{
+        self.call(move|db,root|{
   let running:bool=db.query_row("SELECT EXISTS(SELECT 1 FROM ai_tasks WHERE profile_id=?1 AND status='running')",[&profile],|r|r.get(0))?;if running{return Err(fail("conflict","请先取消该服务正在运行的任务"))}
   db.execute("UPDATE ai_preferences SET default_profile_id=NULL WHERE default_profile_id=?1",[&profile])?;
   // Keep task provenance, but remove the credential; profile itself is hidden from new selection.
   let raw:Option<String>=db.query_row("SELECT profile_json FROM ai_profiles WHERE id=?1",[&profile],|r|r.get(0)).optional()?;
-  if let Some(raw)=raw{let p:Profile=serde_json::from_str(&raw)?;if p.protocol!="codex"{ai_providers::delete_key(&profile).map_err(|e|fail("credential_error",&e))?;}db.execute("UPDATE ai_profiles SET profile_json=json_set(profile_json,'$.label',?2) WHERE id=?1",params![profile,format!("[已停用] {}",p.label)])?;}Ok(())
+  if let Some(raw)=raw{let p:Profile=serde_json::from_str(&raw)?;if p.protocol!="codex"{crate::credentials::delete_key(root, &profile).map_err(|e|fail("credential_error",&e))?;}db.execute("UPDATE ai_profiles SET profile_json=json_set(profile_json,'$.label',?2) WHERE id=?1",params![profile,format!("[已停用] {}",p.label)])?;}Ok(())
  })
     }
     pub fn ai_create_conversation(&self, date: String, timezone: String) -> StorageResult<String> {
@@ -581,6 +587,11 @@ impl AiRunner {
             input.request_id.clone(),
             input.selection.clone(),
         )?;
+        let key = if profile.protocol == "codex" {
+            None
+        } else {
+            Some(db.ai_key(profile.id.clone())?)
+        };
         let effective = if profile.protocol == "codex" {
             Some(if frozen {
                 profile
@@ -655,6 +666,7 @@ impl AiRunner {
             let summary_cancel = cancel.clone();
             let generate = ai_providers::generate_with_summary(
                 &profile,
+                key.as_deref(),
                 messages,
                 cancel.clone(),
                 move |delta| {

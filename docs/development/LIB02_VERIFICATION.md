@@ -12,7 +12,7 @@
 
 ## 迁移与接口
 
-schema 1 → 2 前使用 SQLite backup 生成受管理目录内的快照，完成并同步文件后才执行编号迁移。事务失败保留旧 schema 和内容，拒绝高版本写入。迁移文件为 [002_records.sql](../../src-tauri/migrations/002_records.sql)，传输类型与 IPC 见 [api.ts](../../src/features/library/api.ts) 和 Rust commands/records；契约不再平行复制于 docs。
+schema 1 → 2 前使用 SQLite backup 生成受管理目录内的快照，完成并同步文件后才执行编号迁移。事务失败保留旧 schema 和内容，拒绝高版本写入。迁移文件为 [002_records.sql](../../src-tauri/migrations/002_records.sql)，传输类型与 IPC 见 [records.ts](../../src/services/records.ts) 和 Rust commands/records；契约不再平行复制于 docs。
 
 保存回执存于 record_save_receipts，关联内容版本与记录，清理版本或彻底删除记录时需同时清理其中的输入副本。LIB-04/07 激活保留期限与清理前必须覆盖该关联。
 

@@ -1,5 +1,7 @@
 # 技术选型提案
 
+2026-10-27 前端页面架构修订：DEC-17 已确认，页面导航采用 React Router Data Mode + Hash 路由，视图与会话分离；当前实施与验收见 [前端页面与导航架构](FRONTEND_NAVIGATION.md) 和 TASK-09。本文早期提案中的“未实施”表述仅代表当时阶段，当前事实以 STATUS.md 为准。
+
 编写日期：2026-10-14。确认日期：2026-10-15。状态：DEC-12 已由用户确认；具体依赖版本仍需兼容性核实与锁定。选择理由是针对本产品的工程判断，不代表市场排名。
 
 ## 推荐组合
@@ -15,7 +17,7 @@
 | 数据 | SQLite + rusqlite（bundled/backup） | 事务、稳定版本、多对多引用与可验证备份；统一打包数据库实现 |
 | 模型 HTTP 调用 | reqwest + Rust 异步任务 | 自配端点、认证、流式接收、超时、取消及错误处理 |
 | 本机 AI 工具 | Codex App Server，Rust 管理 stdio 子进程 | 使用官方协议；不靠 UI 自动化，也不读取工具私有凭据 |
-| API Key | keyring 的平台原生存储 | macOS Keychain / Windows 原生凭据存储；前端不提供读取密钥接口 |
+| API Key | 应用私有目录的明文 JSON 文件 | 按应用数据目录隔离，不进入数据库、备份或导出；前端不提供读取密钥接口 |
 | 前端测试 | Vitest | 与 Vite 配套，验证关键状态和交互规则 |
 | 核心测试 | Rust 单元与集成测试 | 事务、迁移、引用、附件一致性、取消与结果校验 |
 | 桌面端到端 | WebdriverIO Tauri service，测试专用 embedded provider | 当前官方文档提供双平台路径；测试插件只进入专用测试构建 |
@@ -23,7 +25,7 @@
 
 Tokio、Serde 等 Rust 运行时/序列化依赖随 Tauri 与实际实现选择兼容版本，不在本阶段抄用示例版本号。样式与组件已确定 Tailwind CSS + shadcn/ui；路由库按实际需要决定。
 
-2026-10-15 集成：Tailwind/@tailwindcss/vite 4.3.3、shadcn CLI 4.21.5、Radix UI 1.8.1；CLI 配置为 radix-nova，CSS 位于 src/app/app.css，组件源码位于 src/components/ui。当前仅加入 Button/Badge，按需扩展；默认控件样式不等于正式产品视觉方向已确认。
+2026-10-15 集成：Tailwind/@tailwindcss/vite 4.3.3、shadcn CLI 4.21.5、Radix UI 1.8.1；CLI 配置为 radix-nova，CSS 入口现位于 src/styles/globals.css（DEC-19），主题在 src/styles/theme.css，组件源码位于 src/components/ui。当前仅加入 Button/Badge，按需扩展；默认控件样式不等于正式产品视觉方向已确认。
 
 Tailwind 通过官方 Vite 插件构建，使用 v4 CSS 入口与语义主题变量。[官方 Vite 集成](https://tailwindcss.com/docs/installation/using-vite)。shadcn 通过 components.json 和 TypeScript/Vite 的 @ 路径别名定位组件。[官方 Vite 说明](https://ui.shadcn.com/docs/installation/vite)
 
@@ -50,7 +52,7 @@ Tiptap 文档 JSON 是编辑状态的保存格式，另生成可检索纯文本�
 
 rusqlite 的 bundled 功能用于统一 SQLite 构建，backup 功能用于数据库快照。实际锁定版本需验证 FTS5、事务与备份启用情况。[rusqlite 官方项目](https://github.com/rusqlite/rusqlite)
 
-keyring 必须明确选用系统原生后端，失败就提示，不降级为明文文件或示例存储。它保护密钥，不自动加密日记资料。[keyring 官方项目](https://github.com/open-source-cooperative/keyring-rs)
+2026-10-27 DEC-18 覆盖此前原生凭据选型：用户明确不使用钥匙串，确认 API Key 明文保存在应用私有目录 `private-credentials/<profileId>.json`；重启可用，不进入数据库、备份或导出。旧系统凭据不自动读取、迁移或删除，已有配置须重新填写密钥。Unix 目录/文件权限为 0700/0600；明文文件不提供加密保护。
 
 ## 双平台交付
 

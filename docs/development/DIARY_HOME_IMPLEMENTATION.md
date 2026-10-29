@@ -1,5 +1,7 @@
 # 日记首页与详情实施规格
 
+2026-10-27 页面架构修订（TASK-09 / DEC-17）：当前页面、导航与会话生命周期以 [前端页面与导航架构](../architecture/FRONTEND_NAVIGATION.md) 为准；本文历史实现记录中的页面状态/整页隐藏方式已被统一路由取代，业务验收要求继续保留。实际验证见 STATUS.md。
+
 后续修订：UX-13 已将日记与聊天文字搜索移至 [全局命令菜单](GLOBAL_COMMAND_IMPLEMENTATION.md)，首页仅保留组合筛选。以下搜索框行为为 UX-12 阶段记录，由该修订替代。
 
 2026-10-23；TASK-08 / UX-12；关联 REQ-01/02/14。用户已确认方案并授权实施；源码和针对性自动化检查完成，界面效果待用户验收。此次修订替代日记常驻列表/编辑器分栏，后续功能开发需求与顺序不变。
@@ -23,11 +25,11 @@
 |---|---|---|
 | 1. 月历只读查询 | `src-tauri/src/library_query.rs` 复用现有过滤和条目映射；`commands.rs`、`lib.rs`、`build.rs`、权限表注册 IPC | 已实施 |
 | 2. 视图与查询状态 | `src/features/library/api.ts` 添加查询类型；`useLibraryQuery.ts` 分开列表分页与月历查询、忽略过期响应 | 已实施 |
-| 3. 首页布局 | `LibraryBrowser.tsx` 全宽工具栏、表格、月历和当天弹层；官方 `table.tsx`、`popover.tsx`；`src/app/app.css` 滚动区域样式 | 已实施 |
+| 3. 首页布局 | `LibraryBrowser.tsx` 全宽工具栏、表格、月历和当天弹层；官方 `table.tsx`、`popover.tsx`；`src/features/library/browser.css` 滚动区域样式（DEC-19 按职责归属） | 已实施 |
 | 4. 详情导航与保护 | `LibraryWorkspace.tsx` 首页/详情及会话结束；`src/app/App.tsx` 全局日记返回首页、聊天来源导航 | 已实施 |
 | 5. 行为回归与文档 | 浏览器/工作区/App 交互测试与 Rust 查询测试，规格、设计约束及跟进同步 | 自动化完成，用户界面验收待执行 |
 
-继续使用已安装的 shadcn/Radix、Tailwind 与编辑器；仅添加官方 Table/Popover 源码，无新增运行依赖、路由库、日历库或全局状态库。Context7 两次文档请求均因网络 fetch failed 未取得内容；组件通过项目已安装的官方 shadcn CLI 添加，未自行实现同名替代组件。
+继续使用已安装的 shadcn/Radix、Tailwind 与编辑器；UX-12 阶段仅添加官方 Table/Popover 源码，当时未新增路由依赖；TASK-09 已追加 React Router 并将首页/详情/历史迁移为独立路由，未引入额外全局状态库。Context7 两次文档请求均因网络 fetch failed 未取得内容；组件通过项目已安装的官方 shadcn CLI 添加，未自行实现同名替代组件。
 
 ## 月历查询契约
 

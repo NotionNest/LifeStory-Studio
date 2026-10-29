@@ -1,0 +1,28 @@
+{
+  "date": "2026-10-28",
+  "platform": "macOS arm64",
+  "frontend": "Vite production / React 19.3.1",
+  "native": "Tauri 2.12.4 debug application bundle",
+  "roundsPerVariant": 5,
+  "window": [
+    1120,
+    760
+  ],
+  "windowAlwaysOnTop": true,
+  "metricsPort": 1438,
+  "data": "independent fresh bundle identifiers; 0 to 4 synthetic empty diaries at startup per variant",
+  "OSCache": "not purged; each run is a fresh app process, not guaranteed cold OS/WebKit cache",
+  "sourceHashes": {
+    "src/main.tsx": "5999e1f3efc6e1a722905480bde1bb8b3ecf3ff2adeaa28533aae8f405c9a6d2",
+    "src/app/App.tsx": "45fa85fe658d8a58697b153b131d2121f7278c75407b517657599f90cea0e68f",
+    "src/app/AppProviders.tsx": "6fab50f041d2eda33585e0298d340b44d5d4612ebf4c494987e9f95abfa962ea",
+    "src/router/router.tsx": "58c871bdc86c6afdd1fe220ef7e350b421b9acb1389a4ca4930d2d811bb8af47",
+    "src/layouts/DiaryChatDock.tsx": "c79fb0cc8ca7e2dfc528ea5c91955fed52a4a09d6d3da2164dcfc51ea6dab34a",
+    "src/features/settings/SettingsSessionProvider.tsx": "c7e7967d5b799e80b78cb9e47835c6b8ac38550901f883f26def7f2c3ee7fca3",
+    "src-tauri/tauri.conf.json": "1c23de3a43f15680555531b1303c2886c9e9269fcda0f022eedc903bf840c27b",
+    "package-lock.json": "e0648385d2b5a6fb9040e806e7e97d168b9938d46ecdc0d37a3738c88fd02927"
+  },
+  "macOS": "26.5.2",
+  "startupProbe": "process launch to loaded diary home followed by two animation frames",
+  "firstEntrySource": "data-independent fresh process; OS caches not flushed"
+}

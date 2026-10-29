@@ -1,0 +1,1086 @@
+[
+  {
+    "name": "assets/index-T_6Dp1Kw.js",
+    "isEntry": true,
+    "bytes": 388573,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/errors-B52EvlWB.js",
+      "assets/records-DVRQqeUp.js",
+      "assets/trash-DBS6Obmz.js",
+      "assets/paths-Bn_ni5e7.js",
+      "assets/components-_9jCcxre.js",
+      "assets/dist-CKd3oG5J.js",
+      "assets/dialog-RPqYS1g9.js",
+      "assets/dropdown-menu-BE6yfuFA.js",
+      "assets/field-fuNRRc-c.js",
+      "assets/ChatSessionProvider-BAfWswjv.js",
+      "assets/ChatMessagesPage-Da5F_JJa.js",
+      "assets/createLucideIcon-GuM9n2fY.js",
+      "assets/native-select-DxLpnC40.js",
+      "assets/PageActions-DvSngdTd.js",
+      "assets/refresh-cw-CmqdFHUD.js",
+      "assets/trash-0oy4x-g0.js",
+      "assets/input-DXH68e0N.js",
+      "assets/DiaryActions-CQAbLysZ.js",
+      "assets/input-group-HdavlZvd.js",
+      "assets/modelProfiles-CCcWntKW.js",
+      "assets/WorkspaceContext-_mtI5kKf.js",
+      "assets/DeleteRecordDialog-ceOpuniO.js",
+      "assets/cli-CpXWKWrD.js",
+      "assets/ChatDiaryPreviewPage-WfysLMbd.js"
+    ],
+    "dynamicImports": [
+      "assets/DiaryDetailLayout-DxjuTm18.js",
+      "assets/DiaryEditorPage-Oml1xGFI.js",
+      "assets/DiaryHistoryPage-COBKdXo7.js",
+      "assets/index-T_6Dp1Kw.js",
+      "assets/ChatMessagesPage-Da5F_JJa.js",
+      "assets/ChatDiaryPreviewPage-WfysLMbd.js",
+      "assets/SettingsLayout-CSHzSYWM.js",
+      "assets/SettingsPages-CsPX7PNf.js",
+      "assets/ModelsLayout-DRoUcyaE.js"
+    ],
+    "modules": [
+      "\u0000vite/modulepreload-polyfill.js",
+      "/private/tmp/lifestory-startup-bench/instrument.ts",
+      "node_modules/scheduler/cjs/scheduler.production.js",
+      "node_modules/scheduler/index.js",
+      "node_modules/react-dom/cjs/react-dom-client.production.js",
+      "node_modules/react-dom/client.js",
+      "node_modules/react-router/dist/production/lib/dom/ssr/markup.js",
+      "node_modules/react-router/dist/production/lib/dom/dom.js",
+      "node_modules/react-router/dist/production/lib/dom/lib.js",
+      "node_modules/react-router/dist/production/lib/dom-export/dom-router-provider.js",
+      "node_modules/@radix-ui/react-collapsible/dist/index.mjs",
+      "node_modules/@radix-ui/react-accordion/dist/index.mjs",
+      "node_modules/@radix-ui/react-tabs/dist/index.mjs",
+      "src/features/library/DiaryCreation.tsx",
+      "node_modules/lucide-react/dist/esm/icons/arrow-left.mjs",
+      "node_modules/lucide-react/dist/esm/icons/arrow-right.mjs",
+      "node_modules/lucide-react/dist/esm/icons/calendar-days.mjs",
+      "node_modules/lucide-react/dist/esm/icons/chevron-left.mjs",
+      "node_modules/lucide-react/dist/esm/icons/chevron-right.mjs",
+      "node_modules/lucide-react/dist/esm/icons/chevron-up.mjs",
+      "node_modules/lucide-react/dist/esm/icons/eye-off.mjs",
+      "node_modules/lucide-react/dist/esm/icons/eye.mjs",
+      "node_modules/lucide-react/dist/esm/icons/feather.mjs",
+      "node_modules/lucide-react/dist/esm/icons/image.mjs",
+      "node_modules/lucide-react/dist/esm/icons/list.mjs",
+      "node_modules/lucide-react/dist/esm/icons/message-circle.mjs",
+      "node_modules/lucide-react/dist/esm/icons/panel-left-close.mjs",
+      "node_modules/lucide-react/dist/esm/icons/panel-left-open.mjs",
+      "node_modules/lucide-react/dist/esm/icons/plug.mjs",
+      "node_modules/lucide-react/dist/esm/icons/settings.mjs",
+      "node_modules/lucide-react/dist/esm/icons/tag.mjs",
+      "src/components/ui/badge.tsx",
+      "src/components/ui/tabs.tsx",
+      "src/components/ui/table.tsx",
+      "node_modules/date-fns/locale/_lib/buildFormatLongFn.js",
+      "node_modules/date-fns/locale/_lib/buildLocalizeFn.js",
+      "node_modules/date-fns/locale/_lib/buildMatchFn.js",
+      "node_modules/date-fns/locale/_lib/buildMatchPatternFn.js",
+      "node_modules/date-fns/constants.js",
+      "node_modules/date-fns/constructFrom.js",
+      "node_modules/date-fns/_lib/normalizeDates.js",
+      "node_modules/date-fns/_lib/defaultOptions.js",
+      "node_modules/date-fns/toDate.js",
+      "node_modules/date-fns/startOfWeek.js",
+      "node_modules/date-fns/isSameWeek.js",
+      "node_modules/date-fns/locale/en-US/_lib/formatDistance.js",
+      "node_modules/date-fns/locale/en-US/_lib/formatRelative.js",
+      "node_modules/date-fns/locale/en-US/_lib/localize.js",
+      "node_modules/date-fns/locale/en-US/_lib/match.js",
+      "node_modules/date-fns/locale/en-US/_lib/formatLong.js",
+      "node_modules/date-fns/locale/en-US.js",
+      "node_modules/date-fns/locale/zh-CN/_lib/formatDistance.js",
+      "node_modules/date-fns/locale/zh-CN/_lib/formatLong.js",
+      "node_modules/date-fns/locale/zh-CN/_lib/formatRelative.js",
+      "node_modules/date-fns/locale/zh-CN/_lib/localize.js",
+      "node_modules/date-fns/locale/zh-CN/_lib/match.js",
+      "node_modules/date-fns/locale/zh-CN.js",
+      "node_modules/@date-fns/tz/tzName/index.js",
+      "node_modules/@date-fns/tz/tzOffset/index.js",
+      "node_modules/@date-fns/tz/date/mini.js",
+      "node_modules/@date-fns/tz/date/index.js",
+      "node_modules/@date-fns/tz/tz/index.js",
+      "node_modules/@date-fns/tz/index.js",
+      "node_modules/date-fns/addDays.js",
+      "node_modules/date-fns/addMonths.js",
+      "node_modules/date-fns/addWeeks.js",
+      "node_modules/date-fns/addYears.js",
+      "node_modules/date-fns/_lib/getTimezoneOffsetInMilliseconds.js",
+      "node_modules/date-fns/startOfDay.js",
+      "node_modules/date-fns/differenceInCalendarDays.js",
+      "node_modules/date-fns/differenceInCalendarMonths.js",
+      "node_modules/date-fns/_lib/normalizeInterval.js",
+      "node_modules/date-fns/eachMonthOfInterval.js",
+      "node_modules/date-fns/eachYearOfInterval.js",
+      "node_modules/date-fns/endOfWeek.js",
+      "node_modules/date-fns/endOfISOWeek.js",
+      "node_modules/date-fns/endOfMonth.js",
+      "node_modules/date-fns/endOfYear.js",
+      "node_modules/date-fns/startOfYear.js",
+      "node_modules/date-fns/getDayOfYear.js",
+      "node_modules/date-fns/startOfISOWeek.js",
+      "node_modules/date-fns/getISOWeekYear.js",
+      "node_modules/date-fns/startOfISOWeekYear.js",
+      "node_modules/date-fns/getISOWeek.js",
+      "node_modules/date-fns/getWeekYear.js",
+      "node_modules/date-fns/startOfWeekYear.js",
+      "node_modules/date-fns/getWeek.js",
+      "node_modules/date-fns/_lib/addLeadingZeros.js",
+      "node_modules/date-fns/_lib/format/lightFormatters.js",
+      "node_modules/date-fns/_lib/format/formatters.js",
+      "node_modules/date-fns/_lib/format/longFormatters.js",
+      "node_modules/date-fns/_lib/protectedTokens.js",
+      "node_modules/date-fns/isDate.js",
+      "node_modules/date-fns/isValid.js",
+      "node_modules/date-fns/format.js",
+      "node_modules/date-fns/getMonth.js",
+      "node_modules/date-fns/getYear.js",
+      "node_modules/date-fns/isAfter.js",
+      "node_modules/date-fns/isBefore.js",
+      "node_modules/date-fns/isSameDay.js",
+      "node_modules/date-fns/isSameMonth.js",
+      "node_modules/date-fns/isSameYear.js",
+      "node_modules/date-fns/max.js",
+      "node_modules/date-fns/min.js",
+      "node_modules/date-fns/getDaysInMonth.js",
+      "node_modules/date-fns/setMonth.js",
+      "node_modules/date-fns/setYear.js",
+      "node_modules/date-fns/startOfMonth.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getBroadcastWeeksInMonth.js",
+      "node_modules/react-day-picker/dist/esm/helpers/startOfBroadcastWeek.js",
+      "node_modules/react-day-picker/dist/esm/helpers/endOfBroadcastWeek.js",
+      "node_modules/react-day-picker/dist/esm/locale/en-US.js",
+      "node_modules/react-day-picker/dist/esm/classes/DateLib.js",
+      "node_modules/react-day-picker/dist/esm/locale/zh-CN.js",
+      "node_modules/react-day-picker/dist/esm/classes/CalendarDay.js",
+      "node_modules/react-day-picker/dist/esm/classes/CalendarMonth.js",
+      "node_modules/react-day-picker/dist/esm/classes/CalendarWeek.js",
+      "node_modules/react-day-picker/dist/esm/components/CaptionLabel.js",
+      "node_modules/react-day-picker/dist/esm/components/Chevron.js",
+      "node_modules/react-day-picker/dist/esm/components/Day.js",
+      "node_modules/react-day-picker/dist/esm/components/DayButton.js",
+      "node_modules/react-day-picker/dist/esm/UI.js",
+      "node_modules/react-day-picker/dist/esm/useDayPicker.js",
+      "node_modules/react-day-picker/dist/esm/components/Dropdown.js",
+      "node_modules/react-day-picker/dist/esm/components/DropdownNav.js",
+      "node_modules/react-day-picker/dist/esm/components/Footer.js",
+      "node_modules/react-day-picker/dist/esm/components/Month.js",
+      "node_modules/react-day-picker/dist/esm/components/MonthCaption.js",
+      "node_modules/react-day-picker/dist/esm/components/MonthGrid.js",
+      "node_modules/react-day-picker/dist/esm/components/Months.js",
+      "node_modules/react-day-picker/dist/esm/components/MonthsDropdown.js",
+      "node_modules/react-day-picker/dist/esm/components/Nav.js",
+      "node_modules/react-day-picker/dist/esm/components/NextMonthButton.js",
+      "node_modules/react-day-picker/dist/esm/components/Option.js",
+      "node_modules/react-day-picker/dist/esm/components/PreviousMonthButton.js",
+      "node_modules/react-day-picker/dist/esm/components/Root.js",
+      "node_modules/react-day-picker/dist/esm/components/Select.js",
+      "node_modules/react-day-picker/dist/esm/components/Week.js",
+      "node_modules/react-day-picker/dist/esm/components/Weekday.js",
+      "node_modules/react-day-picker/dist/esm/components/Weekdays.js",
+      "node_modules/react-day-picker/dist/esm/components/WeekNumber.js",
+      "node_modules/react-day-picker/dist/esm/components/WeekNumberHeader.js",
+      "node_modules/react-day-picker/dist/esm/components/Weeks.js",
+      "node_modules/react-day-picker/dist/esm/components/YearsDropdown.js",
+      "node_modules/react-day-picker/dist/esm/components/custom-components.js",
+      "node_modules/react-day-picker/dist/esm/utils/rangeIncludesDate.js",
+      "node_modules/react-day-picker/dist/esm/utils/typeguards.js",
+      "node_modules/react-day-picker/dist/esm/utils/dateMatchModifiers.js",
+      "node_modules/react-day-picker/dist/esm/helpers/createGetModifiers.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getClassNamesForModifiers.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getComponents.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getDataAttributes.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getDefaultClassNames.js",
+      "node_modules/react-day-picker/dist/esm/formatters/formatCaption.js",
+      "node_modules/react-day-picker/dist/esm/formatters/formatDay.js",
+      "node_modules/react-day-picker/dist/esm/formatters/formatMonthDropdown.js",
+      "node_modules/react-day-picker/dist/esm/formatters/formatWeekdayName.js",
+      "node_modules/react-day-picker/dist/esm/formatters/formatWeekNumber.js",
+      "node_modules/react-day-picker/dist/esm/formatters/formatWeekNumberHeader.js",
+      "node_modules/react-day-picker/dist/esm/formatters/formatYearDropdown.js",
+      "node_modules/react-day-picker/dist/esm/formatters/index.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getFormatters.js",
+      "node_modules/react-day-picker/dist/esm/labels/labelDayButton.js",
+      "node_modules/react-day-picker/dist/esm/labels/labelGrid.js",
+      "node_modules/react-day-picker/dist/esm/labels/labelGridcell.js",
+      "node_modules/react-day-picker/dist/esm/labels/labelMonthDropdown.js",
+      "node_modules/react-day-picker/dist/esm/labels/labelNav.js",
+      "node_modules/react-day-picker/dist/esm/labels/labelNext.js",
+      "node_modules/react-day-picker/dist/esm/labels/labelPrevious.js",
+      "node_modules/react-day-picker/dist/esm/labels/labelWeekday.js",
+      "node_modules/react-day-picker/dist/esm/labels/labelWeekNumber.js",
+      "node_modules/react-day-picker/dist/esm/labels/labelWeekNumberHeader.js",
+      "node_modules/react-day-picker/dist/esm/labels/labelYearDropdown.js",
+      "node_modules/react-day-picker/dist/esm/labels/index.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getLabels.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getMonthOptions.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getStyleForModifiers.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getWeekdays.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getYearOptions.js",
+      "node_modules/react-day-picker/dist/esm/noonDateLib.js",
+      "node_modules/react-day-picker/dist/esm/useAnimation.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getDates.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getDays.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getDisplayMonths.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getInitialMonth.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getMonths.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getNavMonth.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getNextMonth.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getPreviousMonth.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getWeeks.js",
+      "node_modules/react-day-picker/dist/esm/helpers/useControlledValue.js",
+      "node_modules/react-day-picker/dist/esm/useCalendar.js",
+      "node_modules/react-day-picker/dist/esm/helpers/calculateFocusTarget.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getFocusableDate.js",
+      "node_modules/react-day-picker/dist/esm/helpers/getNextFocus.js",
+      "node_modules/react-day-picker/dist/esm/useFocus.js",
+      "node_modules/react-day-picker/dist/esm/selection/useMulti.js",
+      "node_modules/react-day-picker/dist/esm/utils/addToRange.js",
+      "node_modules/react-day-picker/dist/esm/utils/rangeContainsDayOfWeek.js",
+      "node_modules/react-day-picker/dist/esm/utils/rangeOverlaps.js",
+      "node_modules/react-day-picker/dist/esm/utils/rangeContainsModifiers.js",
+      "node_modules/react-day-picker/dist/esm/selection/useRange.js",
+      "node_modules/react-day-picker/dist/esm/selection/useSingle.js",
+      "node_modules/react-day-picker/dist/esm/useSelection.js",
+      "node_modules/react-day-picker/dist/esm/utils/toTimeZone.js",
+      "node_modules/react-day-picker/dist/esm/utils/convertMatchersToTimeZone.js",
+      "node_modules/react-day-picker/dist/esm/DayPicker.js",
+      "src/components/ui/calendar.tsx",
+      "src/components/date-filter/DateFilterContent.tsx",
+      "src/features/library/DateFilter.tsx",
+      "src/features/library/TagFilter.tsx",
+      "src/features/library/LibraryBrowser.tsx",
+      "src/features/library/DiaryBrowserSession.tsx",
+      "src/features/library/DiaryHomePage.tsx",
+      "src/features/library/diaryLoader.ts",
+      "src/router/RouteError.tsx",
+      "src/router/router.tsx",
+      "src/hooks/useDesktopLifecycle.ts",
+      "src/router/useHistoryControls.ts",
+      "src/layouts/StudioTitlebar.tsx",
+      "src/features/search/GlobalCommand.tsx",
+      "src/features/search/WorkspaceCommand.tsx",
+      "src/layouts/StudioRail.tsx",
+      "src/features/chat/ChatWorkspace.tsx",
+      "src/hooks/useChatDockWidth.ts",
+      "src/layouts/DiaryChatDock.tsx",
+      "src/layouts/StudioLayout.tsx",
+      "src/hooks/useAppearance.ts",
+      "src/contexts/AppearanceContext.tsx",
+      "src/features/settings/providerPresets.ts",
+      "src/features/settings/AiSettings.tsx",
+      "src/assets/cli-logos/claudecode-color.svg",
+      "src/assets/cli-logos/codex-color.svg",
+      "src/assets/cli-logos/cursor.svg",
+      "src/assets/cli-logos/geminicli-color.svg",
+      "src/assets/cli-logos/kimi-color.svg",
+      "src/components/ui/accordion.tsx",
+      "src/features/settings/LocalCliSettings.tsx",
+      "src/features/settings/SettingsSessionProvider.tsx",
+      "src/app/AppProviders.tsx",
+      "src/styles/globals.css",
+      "src/app/App.tsx",
+      "src/main.tsx",
+      "index.html"
+    ]
+  },
+  {
+    "name": "assets/AttachmentImage-d_jr6wKi.js",
+    "isEntry": false,
+    "bytes": 3447,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/errors-B52EvlWB.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/services/attachments.ts",
+      "src/components/attachments/AttachmentImage.tsx"
+    ]
+  },
+  {
+    "name": "assets/ChatDiaryPreviewPage-WfysLMbd.js",
+    "isEntry": false,
+    "bytes": 3151,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/field-fuNRRc-c.js",
+      "assets/ChatSessionProvider-BAfWswjv.js",
+      "assets/input-DXH68e0N.js",
+      "assets/textarea-DbR_Vt43.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/features/chat/ChatDiaryPreviewPage.tsx"
+    ]
+  },
+  {
+    "name": "assets/ChatMessagesPage-Da5F_JJa.js",
+    "isEntry": false,
+    "bytes": 56836,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/errors-B52EvlWB.js",
+      "assets/dialog-RPqYS1g9.js",
+      "assets/dropdown-menu-BE6yfuFA.js",
+      "assets/separator-C7hPNm76.js",
+      "assets/ChatSessionProvider-BAfWswjv.js",
+      "assets/createLucideIcon-GuM9n2fY.js",
+      "assets/native-select-DxLpnC40.js",
+      "assets/refresh-cw-CmqdFHUD.js",
+      "assets/input-DXH68e0N.js",
+      "assets/textarea-DbR_Vt43.js",
+      "assets/input-group-HdavlZvd.js",
+      "assets/modelProfiles-CCcWntKW.js",
+      "assets/AttachmentImage-d_jr6wKi.js",
+      "assets/cli-CpXWKWrD.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/components/SearchHighlight.tsx",
+      "node_modules/lucide-react/dist/esm/icons/arrow-down.mjs",
+      "node_modules/lucide-react/dist/esm/icons/arrow-up.mjs",
+      "node_modules/lucide-react/dist/esm/icons/book-open.mjs",
+      "node_modules/lucide-react/dist/esm/icons/check.mjs",
+      "node_modules/lucide-react/dist/esm/icons/copy.mjs",
+      "node_modules/lucide-react/dist/esm/icons/square.mjs",
+      "node_modules/cmdk/dist/chunk-NZJY6EH4.mjs",
+      "node_modules/cmdk/dist/index.mjs",
+      "src/components/ui/command.tsx",
+      "src/features/chat/MessageDetails.tsx",
+      "src/components/ui/message.tsx",
+      "src/components/ui/bubble.tsx",
+      "node_modules/@shadcn/react/dist/chunk-HBS6WEDP.js",
+      "node_modules/@shadcn/react/dist/message-scroller/index.js",
+      "src/components/ui/message-scroller.tsx",
+      "src/features/chat/ChatMessageList.tsx",
+      "src/features/chat/ChatModelControls.tsx",
+      "src/features/chat/ChatQueue.tsx",
+      "src/features/chat/ChatMaterialPicker.tsx",
+      "src/features/chat/ChatComposer.tsx",
+      "src/features/chat/ChatMessagesPage.tsx"
+    ]
+  },
+  {
+    "name": "assets/ChatSessionProvider-BAfWswjv.js",
+    "isEntry": false,
+    "bytes": 24545,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/errors-B52EvlWB.js",
+      "assets/records-DVRQqeUp.js",
+      "assets/trash-DBS6Obmz.js",
+      "assets/paths-Bn_ni5e7.js",
+      "assets/DiaryActions-CQAbLysZ.js",
+      "assets/modelProfiles-CCcWntKW.js",
+      "assets/WorkspaceContext-_mtI5kKf.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/lib/localDate.ts",
+      "src/services/search.ts",
+      "src/features/library/dateConditions.ts",
+      "src/features/library/useLibraryQuery.ts",
+      "src/contexts/ModelProfilesContext.tsx",
+      "src/features/search/SearchLocationContext.tsx",
+      "src/services/aiTasks.ts",
+      "src/services/chats.ts",
+      "src/features/chat/useChatState.ts",
+      "src/features/chat/useChatTask.ts",
+      "src/features/chat/useChatQueue.ts",
+      "src/services/diaryPreviews.ts",
+      "src/features/chat/useChatPreview.ts",
+      "src/features/chat/useChatSession.ts",
+      "src/features/chat/ChatSessionProvider.tsx"
+    ]
+  },
+  {
+    "name": "assets/DeleteRecordDialog-ceOpuniO.js",
+    "isEntry": false,
+    "bytes": 2707,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/errors-B52EvlWB.js",
+      "assets/trash-DBS6Obmz.js",
+      "assets/recordLabels-CoK0Juvu.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/components/dialogs/DeleteRecordDialog.tsx"
+    ]
+  },
+  {
+    "name": "assets/DiaryActions-CQAbLysZ.js",
+    "isEntry": false,
+    "bytes": 3927,
+    "imports": [
+      "assets/button-D-rY1WXA.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/components/date-filter/dateConditions.ts",
+      "src/components/date-filter/useResolvedDateCondition.ts",
+      "src/features/library/DiaryActions.tsx"
+    ]
+  },
+  {
+    "name": "assets/DiaryDetailLayout-DxjuTm18.js",
+    "isEntry": false,
+    "bytes": 14120,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/errors-B52EvlWB.js",
+      "assets/records-DVRQqeUp.js",
+      "assets/trash-DBS6Obmz.js",
+      "assets/paths-Bn_ni5e7.js",
+      "assets/components-_9jCcxre.js",
+      "assets/RecordEditor-CJk1heEk.js",
+      "assets/DiaryActions-CQAbLysZ.js",
+      "assets/recordLabels-CoK0Juvu.js",
+      "assets/DeleteRecordDialog-ceOpuniO.js",
+      "assets/AttachmentImage-d_jr6wKi.js",
+      "assets/DiarySessionContext-DPuFK187.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/features/library/ImageImportSync.tsx",
+      "src/features/library/RecoveryPreview.tsx",
+      "src/features/library/LibraryContentPreview.tsx",
+      "src/features/library/useDiaryLeaveProtection.ts",
+      "src/features/library/useDiaryEditing.ts",
+      "src/features/library/DiarySessionProvider.tsx",
+      "src/features/library/DiaryDetailLayout.tsx"
+    ]
+  },
+  {
+    "name": "assets/DiaryEditorPage-Oml1xGFI.js",
+    "isEntry": false,
+    "bytes": 2633,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/paths-Bn_ni5e7.js",
+      "assets/dropdown-menu-BE6yfuFA.js",
+      "assets/ChatSessionProvider-BAfWswjv.js",
+      "assets/createLucideIcon-GuM9n2fY.js",
+      "assets/RecordEditor-CJk1heEk.js",
+      "assets/PageActions-DvSngdTd.js",
+      "assets/trash-0oy4x-g0.js",
+      "assets/WorkspaceContext-_mtI5kKf.js",
+      "assets/index-T_6Dp1Kw.js",
+      "assets/DiarySessionContext-DPuFK187.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/lucide-react/dist/esm/icons/rotate-ccw-clock.mjs",
+      "src/features/library/DiaryEditorPage.tsx"
+    ]
+  },
+  {
+    "name": "assets/DiaryHistoryPage-COBKdXo7.js",
+    "isEntry": false,
+    "bytes": 11049,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/errors-B52EvlWB.js",
+      "assets/records-DVRQqeUp.js",
+      "assets/paths-Bn_ni5e7.js",
+      "assets/createLucideIcon-GuM9n2fY.js",
+      "assets/rotate-ccw-cuDmvbHV.js",
+      "assets/AttachmentImage-d_jr6wKi.js",
+      "assets/index-T_6Dp1Kw.js",
+      "assets/DiarySessionContext-DPuFK187.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/lucide-react/dist/esm/icons/bookmark.mjs",
+      "node_modules/lucide-react/dist/esm/icons/circle.mjs",
+      "src/services/history.ts",
+      "src/features/library/HistoryPage.tsx",
+      "src/features/library/DiaryHistoryPage.tsx"
+    ]
+  },
+  {
+    "name": "assets/DiarySessionContext-DPuFK187.js",
+    "isEntry": false,
+    "bytes": 410966,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/AttachmentImage-d_jr6wKi.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/orderedmap/dist/index.js",
+      "node_modules/prosemirror-model/dist/index.js",
+      "node_modules/prosemirror-transform/dist/index.js",
+      "node_modules/prosemirror-state/dist/index.js",
+      "node_modules/use-sync-external-store/cjs/use-sync-external-store-shim.production.js",
+      "node_modules/use-sync-external-store/shim/index.js",
+      "node_modules/@tiptap/core/dist/rolldown-runtime-D7D4PA-g.js",
+      "node_modules/prosemirror-commands/dist/index.js",
+      "node_modules/prosemirror-schema-list/dist/index.js",
+      "node_modules/prosemirror-view/dist/index.js",
+      "node_modules/w3c-keyname/index.js",
+      "node_modules/prosemirror-keymap/dist/index.js",
+      "node_modules/rope-sequence/dist/index.js",
+      "node_modules/prosemirror-history/dist/index.js",
+      "node_modules/@tiptap/core/dist/index.js",
+      "node_modules/fast-equals/dist/es/index.mjs",
+      "node_modules/use-sync-external-store/cjs/use-sync-external-store-shim/with-selector.production.js",
+      "node_modules/use-sync-external-store/shim/with-selector.js",
+      "node_modules/@tiptap/react/dist/index.js",
+      "node_modules/@tiptap/core/dist/jsx-runtime/jsx-runtime.js",
+      "node_modules/@tiptap/extension-blockquote/dist/index.js",
+      "node_modules/@tiptap/extension-bold/dist/index.js",
+      "node_modules/@tiptap/extension-code/dist/index.js",
+      "node_modules/@tiptap/extension-code-block/dist/index.js",
+      "node_modules/@tiptap/extension-document/dist/index.js",
+      "node_modules/@tiptap/extension-hard-break/dist/index.js",
+      "node_modules/@tiptap/extension-heading/dist/index.js",
+      "node_modules/@tiptap/extension-horizontal-rule/dist/index.js",
+      "node_modules/@tiptap/extension-italic/dist/index.js",
+      "node_modules/linkifyjs/dist/linkify.mjs",
+      "node_modules/@tiptap/extension-link/dist/index.js",
+      "node_modules/@tiptap/extension-list/dist/index.js",
+      "node_modules/@tiptap/extension-paragraph/dist/index.js",
+      "node_modules/@tiptap/extension-strike/dist/index.js",
+      "node_modules/@tiptap/extension-text/dist/index.js",
+      "node_modules/@tiptap/extension-underline/dist/index.js",
+      "node_modules/prosemirror-dropcursor/dist/index.js",
+      "node_modules/prosemirror-gapcursor/dist/index.js",
+      "node_modules/@tiptap/extensions/dist/index.js",
+      "node_modules/@tiptap/starter-kit/dist/index.js",
+      "src/features/library/attachmentExtensions.tsx",
+      "src/features/library/imageDocument.ts",
+      "src/features/library/DiarySessionContext.ts"
+    ]
+  },
+  {
+    "name": "assets/ModelsLayout-DRoUcyaE.js",
+    "isEntry": false,
+    "bytes": 555,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/paths-Bn_ni5e7.js",
+      "assets/components-_9jCcxre.js",
+      "assets/SettingsLink-D0OMs6BP.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/layouts/ModelsLayout.tsx"
+    ]
+  },
+  {
+    "name": "assets/PageActions-DvSngdTd.js",
+    "isEntry": false,
+    "bytes": 2033,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/dropdown-menu-BE6yfuFA.js",
+      "assets/createLucideIcon-GuM9n2fY.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/lucide-react/dist/esm/icons/ellipsis.mjs",
+      "node_modules/lucide-react/dist/esm/icons/pen-line.mjs",
+      "src/layouts/PageActions.tsx"
+    ]
+  },
+  {
+    "name": "assets/RecordEditor-CJk1heEk.js",
+    "isEntry": false,
+    "bytes": 16712,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/errors-B52EvlWB.js",
+      "assets/records-DVRQqeUp.js",
+      "assets/dialog-RPqYS1g9.js",
+      "assets/createLucideIcon-GuM9n2fY.js",
+      "assets/DiaryActions-CQAbLysZ.js",
+      "assets/input-group-HdavlZvd.js",
+      "assets/AttachmentImage-d_jr6wKi.js",
+      "assets/index-T_6Dp1Kw.js",
+      "assets/DiarySessionContext-DPuFK187.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/lucide-react/dist/esm/icons/bold.mjs",
+      "node_modules/lucide-react/dist/esm/icons/heading-2.mjs",
+      "node_modules/lucide-react/dist/esm/icons/italic.mjs",
+      "src/features/library/useRecordPersistence.ts",
+      "src/services/tags.ts",
+      "src/features/library/TagManager.tsx",
+      "src/features/library/RecordEditor.tsx"
+    ]
+  },
+  {
+    "name": "assets/SettingsLayout-CSHzSYWM.js",
+    "isEntry": false,
+    "bytes": 1652,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/paths-Bn_ni5e7.js",
+      "assets/components-_9jCcxre.js",
+      "assets/WorkspaceContext-_mtI5kKf.js",
+      "assets/index-T_6Dp1Kw.js",
+      "assets/SettingsLink-D0OMs6BP.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/layouts/SettingsLayout.tsx"
+    ]
+  },
+  {
+    "name": "assets/SettingsLink-D0OMs6BP.js",
+    "isEntry": false,
+    "bytes": 526,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/paths-Bn_ni5e7.js",
+      "assets/index-T_6Dp1Kw.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/components/SettingsLink.tsx"
+    ]
+  },
+  {
+    "name": "assets/SettingsPages-CsPX7PNf.js",
+    "isEntry": false,
+    "bytes": 5730,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/errors-B52EvlWB.js",
+      "assets/trash-DBS6Obmz.js",
+      "assets/paths-Bn_ni5e7.js",
+      "assets/field-fuNRRc-c.js",
+      "assets/native-select-DxLpnC40.js",
+      "assets/refresh-cw-CmqdFHUD.js",
+      "assets/rotate-ccw-cuDmvbHV.js",
+      "assets/trash-0oy4x-g0.js",
+      "assets/recordLabels-CoK0Juvu.js",
+      "assets/index-T_6Dp1Kw.js",
+      "assets/SettingsLink-D0OMs6BP.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/features/settings/AppearanceSettings.tsx",
+      "src/features/settings/TrashPanel.tsx",
+      "src/features/settings/SettingsPages.tsx"
+    ]
+  },
+  {
+    "name": "assets/WorkspaceContext-_mtI5kKf.js",
+    "isEntry": false,
+    "bytes": 408,
+    "imports": [
+      "assets/button-D-rY1WXA.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/contexts/WorkspaceContext.tsx"
+    ]
+  },
+  {
+    "name": "assets/button-D-rY1WXA.js",
+    "isEntry": false,
+    "bytes": 100040,
+    "imports": [],
+    "dynamicImports": [],
+    "modules": [
+      "\u0000rolldown/runtime.js",
+      "node_modules/react/cjs/react.production.js",
+      "node_modules/react/index.js",
+      "node_modules/react-dom/cjs/react-dom.production.js",
+      "node_modules/react-dom/index.js",
+      "node_modules/clsx/dist/clsx.mjs",
+      "node_modules/class-variance-authority/dist/index.mjs",
+      "node_modules/cn/dist/tables.js",
+      "node_modules/cn/dist/engine.js",
+      "node_modules/cn/dist/index.js",
+      "node_modules/@radix-ui/react-compose-refs/dist/index.mjs",
+      "node_modules/@radix-ui/react-slot/dist/index.mjs",
+      "node_modules/react/cjs/react-jsx-runtime.production.js",
+      "node_modules/react/jsx-runtime.js",
+      "node_modules/@radix-ui/react-primitive/dist/index.mjs",
+      "node_modules/@radix-ui/react-visually-hidden/dist/index.mjs",
+      "node_modules/@radix-ui/react-context/dist/index.mjs",
+      "node_modules/@radix-ui/react-use-layout-effect/dist/index.mjs",
+      "node_modules/@radix-ui/primitive/dist/index.mjs",
+      "node_modules/@radix-ui/react-use-effect-event/dist/index.mjs",
+      "node_modules/@radix-ui/react-use-controllable-state/dist/index.mjs",
+      "node_modules/@radix-ui/react-presence/dist/index.mjs",
+      "node_modules/@radix-ui/react-id/dist/index.mjs",
+      "node_modules/@radix-ui/react-use-callback-ref/dist/index.mjs",
+      "node_modules/@radix-ui/react-dismissable-layer/dist/index.mjs",
+      "node_modules/@radix-ui/react-focus-scope/dist/index.mjs",
+      "node_modules/@radix-ui/react-portal/dist/index.mjs",
+      "node_modules/@radix-ui/react-use-size/dist/index.mjs",
+      "node_modules/@floating-ui/utils/dist/floating-ui.utils.mjs",
+      "node_modules/@floating-ui/core/dist/floating-ui.core.mjs",
+      "node_modules/@floating-ui/utils/dist/floating-ui.utils.dom.mjs",
+      "node_modules/@floating-ui/dom/dist/floating-ui.dom.mjs",
+      "node_modules/@floating-ui/react-dom/dist/floating-ui.react-dom.mjs",
+      "node_modules/@radix-ui/react-popper/dist/index.mjs",
+      "node_modules/@radix-ui/react-tooltip/dist/index.mjs",
+      "src/components/ui/tooltip.tsx",
+      "src/components/ui/button.tsx"
+    ]
+  },
+  {
+    "name": "assets/cli-CpXWKWrD.js",
+    "isEntry": false,
+    "bytes": 348,
+    "imports": [
+      "assets/errors-B52EvlWB.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/services/cli.ts"
+    ]
+  },
+  {
+    "name": "assets/components-_9jCcxre.js",
+    "isEntry": false,
+    "bytes": 14841,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/paths-Bn_ni5e7.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/react-router/dist/production/lib/dom/ssr/invariant.js",
+      "node_modules/react-router/dist/production/lib/dom/ssr/single-fetch.js",
+      "\u0000vite/preload-helper.js",
+      "node_modules/react-router/dist/production/lib/dom/ssr/routeModules.js",
+      "node_modules/react-router/dist/production/lib/dom/ssr/links.js",
+      "node_modules/react-router/dist/production/lib/server-runtime/warnings.js",
+      "node_modules/react-router/dist/production/lib/dom/ssr/components.js",
+      "node_modules/react-router/dist/production/lib/components.js"
+    ]
+  },
+  {
+    "name": "assets/createLucideIcon-GuM9n2fY.js",
+    "isEntry": false,
+    "bytes": 3083,
+    "imports": [
+      "assets/button-D-rY1WXA.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/lucide-react/dist/esm/shared/src/utils/toKebabCase.mjs",
+      "node_modules/lucide-react/dist/esm/shared/src/utils/toLucideIconData.mjs",
+      "node_modules/lucide-react/dist/esm/shared/src/utils/toCamelCase.mjs",
+      "node_modules/lucide-react/dist/esm/shared/src/utils/toPascalCase.mjs",
+      "node_modules/lucide-react/dist/esm/shared/src/utils/mergeClasses.mjs",
+      "node_modules/lucide-react/dist/esm/shared/src/build/defaultAttributes.mjs",
+      "node_modules/lucide-react/dist/esm/shared/src/build/buildLucideIconNode.mjs",
+      "node_modules/lucide-react/dist/esm/shared/src/build/buildLucideIconForReact.mjs",
+      "node_modules/lucide-react/dist/esm/shared/src/utils/hasA11yProp.mjs",
+      "node_modules/lucide-react/dist/esm/context.mjs",
+      "node_modules/lucide-react/dist/esm/Icon.mjs",
+      "node_modules/lucide-react/dist/esm/createLucideIcon.mjs"
+    ]
+  },
+  {
+    "name": "assets/dialog-RPqYS1g9.js",
+    "isEntry": false,
+    "bytes": 30730,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/dist-CKd3oG5J.js",
+      "assets/createLucideIcon-GuM9n2fY.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/@radix-ui/react-focus-guards/dist/index.mjs",
+      "node_modules/tslib/tslib.es6.mjs",
+      "node_modules/react-remove-scroll-bar/dist/es2015/constants.js",
+      "node_modules/use-callback-ref/dist/es2015/assignRef.js",
+      "node_modules/use-callback-ref/dist/es2015/useRef.js",
+      "node_modules/use-callback-ref/dist/es2015/useMergeRef.js",
+      "node_modules/use-sidecar/dist/es2015/medium.js",
+      "node_modules/use-sidecar/dist/es2015/exports.js",
+      "node_modules/react-remove-scroll/dist/es2015/medium.js",
+      "node_modules/react-remove-scroll/dist/es2015/UI.js",
+      "node_modules/get-nonce/dist/es2015/index.js",
+      "node_modules/react-style-singleton/dist/es2015/singleton.js",
+      "node_modules/react-style-singleton/dist/es2015/hook.js",
+      "node_modules/react-style-singleton/dist/es2015/component.js",
+      "node_modules/react-style-singleton/dist/es2015/index.js",
+      "node_modules/react-remove-scroll-bar/dist/es2015/utils.js",
+      "node_modules/react-remove-scroll-bar/dist/es2015/component.js",
+      "node_modules/react-remove-scroll-bar/dist/es2015/index.js",
+      "node_modules/react-remove-scroll/dist/es2015/aggresiveCapture.js",
+      "node_modules/react-remove-scroll/dist/es2015/handleScroll.js",
+      "node_modules/react-remove-scroll/dist/es2015/SideEffect.js",
+      "node_modules/react-remove-scroll/dist/es2015/sidecar.js",
+      "node_modules/react-remove-scroll/dist/es2015/Combination.js",
+      "node_modules/aria-hidden/dist/es2015/index.js",
+      "node_modules/@radix-ui/react-dialog/dist/index.mjs",
+      "node_modules/@radix-ui/react-use-is-hydrated/dist/index.mjs",
+      "node_modules/@radix-ui/react-roving-focus/dist/index.mjs",
+      "node_modules/@radix-ui/react-popover/dist/index.mjs",
+      "node_modules/lucide-react/dist/esm/icons/image-plus.mjs",
+      "node_modules/lucide-react/dist/esm/icons/plus.mjs",
+      "node_modules/lucide-react/dist/esm/icons/search.mjs",
+      "node_modules/lucide-react/dist/esm/icons/x.mjs",
+      "src/components/ui/popover.tsx",
+      "src/components/ui/dialog.tsx"
+    ]
+  },
+  {
+    "name": "assets/dist-CKd3oG5J.js",
+    "isEntry": false,
+    "bytes": 8600,
+    "imports": [
+      "assets/button-D-rY1WXA.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/@radix-ui/react-collection/dist/index.mjs",
+      "node_modules/@radix-ui/react-direction/dist/index.mjs"
+    ]
+  },
+  {
+    "name": "assets/dropdown-menu-BE6yfuFA.js",
+    "isEntry": false,
+    "bytes": 14187,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/dist-CKd3oG5J.js",
+      "assets/dialog-RPqYS1g9.js",
+      "assets/createLucideIcon-GuM9n2fY.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/@radix-ui/react-menu/dist/index.mjs",
+      "node_modules/@radix-ui/react-dropdown-menu/dist/index.mjs",
+      "node_modules/lucide-react/dist/esm/icons/pencil.mjs",
+      "src/components/ui/dropdown-menu.tsx"
+    ]
+  },
+  {
+    "name": "assets/errors-B52EvlWB.js",
+    "isEntry": false,
+    "bytes": 1226,
+    "imports": [],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/@tauri-apps/api/external/tslib/tslib.es6.js",
+      "node_modules/@tauri-apps/api/core.js",
+      "src/lib/errors.ts"
+    ]
+  },
+  {
+    "name": "assets/event-D91RLsad.js",
+    "isEntry": false,
+    "bytes": 1317,
+    "imports": [
+      "assets/errors-B52EvlWB.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/@tauri-apps/api/event.js"
+    ]
+  },
+  {
+    "name": "assets/field-fuNRRc-c.js",
+    "isEntry": false,
+    "bytes": 3000,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/separator-C7hPNm76.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/@radix-ui/react-label/dist/index.mjs",
+      "src/components/ui/label.tsx",
+      "src/components/ui/field.tsx"
+    ]
+  },
+  {
+    "name": "assets/input-DXH68e0N.js",
+    "isEntry": false,
+    "bytes": 850,
+    "imports": [
+      "assets/button-D-rY1WXA.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/components/ui/input.tsx"
+    ]
+  },
+  {
+    "name": "assets/input-group-HdavlZvd.js",
+    "isEntry": false,
+    "bytes": 3593,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/input-DXH68e0N.js",
+      "assets/textarea-DbR_Vt43.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/components/ui/input-group.tsx"
+    ]
+  },
+  {
+    "name": "assets/modelProfiles-CCcWntKW.js",
+    "isEntry": false,
+    "bytes": 626,
+    "imports": [
+      "assets/errors-B52EvlWB.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/services/modelProfiles.ts"
+    ]
+  },
+  {
+    "name": "assets/native-select-DxLpnC40.js",
+    "isEntry": false,
+    "bytes": 1549,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/createLucideIcon-GuM9n2fY.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/lucide-react/dist/esm/icons/chevron-down.mjs",
+      "src/components/ui/native-select.tsx"
+    ]
+  },
+  {
+    "name": "assets/paths-Bn_ni5e7.js",
+    "isEntry": false,
+    "bytes": 77021,
+    "imports": [
+      "assets/button-D-rY1WXA.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/react-router/dist/production/lib/router/url.js",
+      "node_modules/react-router/dist/production/lib/router/history.js",
+      "node_modules/react-router/dist/production/lib/router/utils.js",
+      "node_modules/react-router/dist/production/lib/router/instrumentation.js",
+      "node_modules/react-router/dist/production/lib/router/matcher.js",
+      "node_modules/react-router/dist/production/lib/router/matcher-route-pattern.preload.js",
+      "node_modules/react-router/dist/production/lib/router/navigation.js",
+      "node_modules/react-router/dist/production/lib/router/router.js",
+      "node_modules/react-router/dist/production/lib/context.js",
+      "node_modules/react-router/dist/production/lib/errors.js",
+      "node_modules/react-router/dist/production/lib/hooks.js",
+      "src/router/paths.ts"
+    ]
+  },
+  {
+    "name": "assets/recordLabels-CoK0Juvu.js",
+    "isEntry": false,
+    "bytes": 74,
+    "imports": [],
+    "dynamicImports": [],
+    "modules": [
+      "src/lib/recordLabels.ts"
+    ]
+  },
+  {
+    "name": "assets/records-DVRQqeUp.js",
+    "isEntry": false,
+    "bytes": 672,
+    "imports": [
+      "assets/errors-B52EvlWB.js",
+      "assets/event-D91RLsad.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/services/records.ts"
+    ]
+  },
+  {
+    "name": "assets/refresh-cw-CmqdFHUD.js",
+    "isEntry": false,
+    "bytes": 361,
+    "imports": [
+      "assets/createLucideIcon-GuM9n2fY.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/lucide-react/dist/esm/icons/refresh-cw.mjs"
+    ]
+  },
+  {
+    "name": "assets/rotate-ccw-cuDmvbHV.js",
+    "isEntry": false,
+    "bytes": 240,
+    "imports": [
+      "assets/createLucideIcon-GuM9n2fY.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/lucide-react/dist/esm/icons/rotate-ccw.mjs"
+    ]
+  },
+  {
+    "name": "assets/separator-C7hPNm76.js",
+    "isEntry": false,
+    "bytes": 840,
+    "imports": [
+      "assets/button-D-rY1WXA.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/@radix-ui/react-separator/dist/index.mjs",
+      "src/components/ui/separator.tsx"
+    ]
+  },
+  {
+    "name": "assets/textarea-DbR_Vt43.js",
+    "isEntry": false,
+    "bytes": 725,
+    "imports": [
+      "assets/button-D-rY1WXA.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "src/components/ui/textarea.tsx"
+    ]
+  },
+  {
+    "name": "assets/trash-0oy4x-g0.js",
+    "isEntry": false,
+    "bytes": 386,
+    "imports": [
+      "assets/createLucideIcon-GuM9n2fY.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/lucide-react/dist/esm/icons/trash.mjs"
+    ]
+  },
+  {
+    "name": "assets/trash-DBS6Obmz.js",
+    "isEntry": false,
+    "bytes": 19125,
+    "imports": [
+      "assets/button-D-rY1WXA.js",
+      "assets/errors-B52EvlWB.js",
+      "assets/event-D91RLsad.js",
+      "assets/paths-Bn_ni5e7.js"
+    ],
+    "dynamicImports": [],
+    "modules": [
+      "node_modules/@tauri-apps/api/dpi.js",
+      "node_modules/@tauri-apps/api/image.js",
+      "node_modules/@tauri-apps/api/window.js",
+      "src/services/desktop.ts",
+      "src/router/useRouteBlocker.ts",
+      "src/components/dialogs/LeaveConfirmDialogs.tsx",
+      "src/contexts/LeaveProtectionContext.tsx",
+      "src/services/trash.ts"
+    ]
+  }
+]

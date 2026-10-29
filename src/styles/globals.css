@@ -1,0 +1,136 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import 'shadcn/tailwind.css';
+@import './theme.css';
+@import '../layouts/layout.css';
+@import '../features/settings/settings.css';
+@import '../features/library/editor.css';
+@import '../features/library/browser.css';
+
+@custom-variant dark (&:is(.dark *));
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+
+  /* Both desktop webviews support these selectors; keep native scrolling and thumb dragging. */
+  :where(
+    .studio-shell,
+    .studio-shell *,
+    [data-slot='popover-content'],
+    [data-slot='popover-content'] *,
+    [data-slot='dialog-content'],
+    [data-slot='dialog-content'] *
+  )::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+    background: transparent;
+  }
+  :where(
+    .studio-shell,
+    .studio-shell *,
+    [data-slot='popover-content'],
+    [data-slot='popover-content'] *,
+    [data-slot='dialog-content'],
+    [data-slot='dialog-content'] *
+  )::-webkit-scrollbar-track,
+  :where(
+    .studio-shell,
+    .studio-shell *,
+    [data-slot='popover-content'],
+    [data-slot='popover-content'] *,
+    [data-slot='dialog-content'],
+    [data-slot='dialog-content'] *
+  )::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  :where(
+    .studio-shell,
+    .studio-shell *,
+    [data-slot='popover-content'],
+    [data-slot='popover-content'] *,
+    [data-slot='dialog-content'],
+    [data-slot='dialog-content'] *
+  )::-webkit-scrollbar-thumb {
+    min-width: 28px;
+    min-height: 28px;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-color: var(--scrollbar-thumb);
+    background-clip: padding-box;
+  }
+  :where(
+      .studio-shell,
+      .studio-shell *,
+      [data-slot='popover-content'],
+      [data-slot='popover-content'] *,
+      [data-slot='dialog-content'],
+      [data-slot='dialog-content'] *
+    )::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+  :where(
+      .studio-shell,
+      .studio-shell *,
+      [data-slot='popover-content'],
+      [data-slot='popover-content'] *,
+      [data-slot='dialog-content'],
+      [data-slot='dialog-content'] *
+    )::-webkit-scrollbar-thumb:active {
+    background-color: var(--scrollbar-thumb-active);
+  }
+  @media (forced-colors: active) {
+    :where(
+      .studio-shell,
+      .studio-shell *,
+      [data-slot='popover-content'],
+      [data-slot='popover-content'] *,
+      [data-slot='dialog-content'],
+      [data-slot='dialog-content'] *
+    )::-webkit-scrollbar-thumb,
+    :where(
+        .studio-shell,
+        .studio-shell *,
+        [data-slot='popover-content'],
+        [data-slot='popover-content'] *,
+        [data-slot='dialog-content'],
+        [data-slot='dialog-content'] *
+      )::-webkit-scrollbar-thumb:hover,
+    :where(
+        .studio-shell,
+        .studio-shell *,
+        [data-slot='popover-content'],
+        [data-slot='popover-content'] *,
+        [data-slot='dialog-content'],
+        [data-slot='dialog-content'] *
+      )::-webkit-scrollbar-thumb:active {
+      background-color: CanvasText;
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-shell *,
+  dialog * {
+    transition-duration: 0s !important;
+    animation-duration: 0s !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@layer components {
+  dialog {
+    color-scheme: inherit;
+  }
+}
+
+dialog::backdrop {
+  background: var(--overlay);
+}

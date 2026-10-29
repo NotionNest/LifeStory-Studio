@@ -1,0 +1,8 @@
+@layer components {
+  .diary-browser-scroll [data-slot='table-container'] {
+    overflow: visible;
+  }
+  .diary-browser-scroll [data-slot='table-header'] {
+    z-index: 1;
+  }
+}

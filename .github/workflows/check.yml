@@ -55,6 +55,10 @@ jobs:
           node-version-file: '.node-version'
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - run: npm run check:architecture
+      - run: npm run test:architecture
+      - run: npm run lint
+      - run: npm run format:check
       - run: npm run build
       - run: npm run test:ui
   rust:

@@ -1,5 +1,9 @@
 # 架构与技术选型
 
+2026-10-27 DEC-19 / TASK-11：应用入口与职责归属已获用户确认；src/app 只做入口/依赖装配，具体结构见 [APP_STRUCTURE.md](APP_STRUCTURE.md)。不沿用此前未确认的全项目目录提案。
+
+2026-10-27 前端页面架构修订：DEC-17 已确认，页面导航采用 React Router Data Mode + Hash 路由，视图与会话分离；当前实施与验收见 [前端页面与导航架构](FRONTEND_NAVIGATION.md) 和 TASK-09。本文早期提案中的“未实施”表述仅代表当时阶段，当前事实以 STATUS.md 为准。
+
 日期：2026-10-14。状态：DEC-12～DEC-15 已于 2026-10-15 由用户确认，待实现验证。Tauri 与产品范围已由用户确认，具体技术推荐见 [TECH_STACK.md](TECH_STACK.md)，数据与任务契约见 [DATA_AND_AI.md](DATA_AND_AI.md)。
 
 ## 1. 目标与决策顺序
@@ -69,7 +73,7 @@ flowchart TD
 | 编辑器 | 原文保存、段落定位、撤销与格式互通 | Tiptap 开源核心；应用维护版本与证据 |
 | 本地数据库 | 事务、中文检索、版本和多对多引用、可验证备份 | SQLite + rusqlite；专用数据库线程 |
 | AI 协议与客户端 | 取消、流式、结构化结果、费用和隐私 | Rust reqwest HTTP 适配器 + Codex App Server stdio 适配器 |
-| 凭据与加密 | 平台支持、恢复与用户操作成本 | keyring 系统原生存储保护 API Key；资料加密另行决定 |
+| 凭据与加密 | 平台支持、恢复与用户操作成本 | 应用私有明文文件保存 API Key（DEC-18），不进入备份/导出；资料加密另行决定 |
 | 测试与发行 | 真实桌面交互、迁移恢复、安装升级、签名 | Rust + Vitest + WebdriverIO Tauri service；双平台发行验证 |
 
 应用主体采用单体桌面架构，Rust 侧以模块组织职责。无需产品云端、常驻本地 HTTP 服务或跨进程业务微服务。Codex 是用户安装并授权使用的外部子进程，不作为默认随应用打包的模型运行时。
@@ -82,7 +86,7 @@ flowchart TD
 
 推荐先明确支持 OpenAI Chat Completions 兼容的文字协议，配置服务地址、模型与 API Key；这是协议提案，其他原生协议按用户实际服务名单补齐。兼容性必须逐服务验证，不能承诺所有服务仅修改地址即可使用。[官方协议参考](https://developers.openai.com/api/reference/resources/chat/subresources/completions/methods/create)
 
-HTTP 调用在 Rust 内完成，系统凭据不返回前端。端点更改需重新确认；禁止把认证请求自动重定向到不同目标，限制输出大小并处理流分片、超时、拒绝与截断。外部服务请求不开放模型工具调用，也不上传图片附件。网络失败仅报告，用户决定重试或换入口。[reqwest 配置依据](https://github.com/seanmonstar/reqwest)
+HTTP 调用在 Rust 内完成，本机密钥不返回前端。端点更改需重新确认；禁止把认证请求自动重定向到不同目标，限制输出大小并处理流分片、超时、拒绝与截断。外部服务请求不开放模型工具调用，也不上传图片附件。网络失败仅报告，用户决定重试或换入口。[reqwest 配置依据](https://github.com/seanmonstar/reqwest)
 
 ### 本机 Codex 等工具
 
