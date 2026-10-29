@@ -28,10 +28,35 @@
     box-shadow: var(--workspace-shadow);
   }
   .workspace-sidebar {
-    @apply flex w-64 shrink-0 flex-col overflow-y-auto border-r border-border/60;
+    --workspace-sidebar-width: 16rem;
+    @apply shrink-0 overflow-hidden border-r border-border/60;
+    width: var(--workspace-sidebar-width);
     background: var(--sidebar);
+    transition:
+      width 260ms cubic-bezier(0.25, 1, 0.5, 1),
+      border-right-width 260ms cubic-bezier(0.25, 1, 0.5, 1);
   }
-  .workspace-sidebar[hidden],
+  .workspace-sidebar-content {
+    @apply flex h-full min-h-0 flex-col overflow-y-auto;
+    width: calc(var(--workspace-sidebar-width) - 1px);
+    opacity: 1;
+    transform: translateX(0);
+    transition:
+      opacity 180ms ease-out 50ms,
+      transform 260ms cubic-bezier(0.25, 1, 0.5, 1);
+  }
+  .workspace-sidebar[data-state='closed'] {
+    width: 0;
+    border-right-width: 0;
+    pointer-events: none;
+  }
+  .workspace-sidebar[data-state='closed'] .workspace-sidebar-content {
+    opacity: 0;
+    transform: translateX(-8px);
+    transition:
+      opacity 110ms ease-out,
+      transform 260ms cubic-bezier(0.25, 1, 0.5, 1);
+  }
   .studio-frame [hidden] {
     display: none !important;
   }
@@ -67,7 +92,7 @@
 
 @media (max-width: 900px) {
   .workspace-sidebar {
-    width: 13rem;
+    --workspace-sidebar-width: 13rem;
   }
   .studio-body {
     padding: 0;
@@ -89,4 +114,11 @@ html.native-material,
 .native-material .studio-shell,
 .native-material .studio-titlebar {
   background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-sidebar,
+  .workspace-sidebar .workspace-sidebar-content {
+    transition: none;
+  }
 }

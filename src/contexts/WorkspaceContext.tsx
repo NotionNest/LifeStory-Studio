@@ -1,6 +1,7 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
+import { createContext, useContext, useRef, useState, type ReactNode, type RefObject } from 'react'
 
 export interface WorkspaceState {
+  sidebarTrigger: RefObject<HTMLButtonElement | null>
   sidebarOpen: boolean
   setSidebarOpen: (value: boolean) => void
   titlebarTarget: HTMLElement | null
@@ -9,10 +10,13 @@ export interface WorkspaceState {
 export const WorkspaceContext = createContext<WorkspaceState | null>(null)
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
+  const sidebarTrigger = useRef<HTMLButtonElement>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [titlebarTarget, setTitlebarTarget] = useState<HTMLDivElement | null>(null)
   return (
-    <WorkspaceContext value={{ sidebarOpen, setSidebarOpen, titlebarTarget, setTitlebarTarget }}>
+    <WorkspaceContext
+      value={{ sidebarTrigger, sidebarOpen, setSidebarOpen, titlebarTarget, setTitlebarTarget }}
+    >
       {children}
     </WorkspaceContext>
   )

@@ -10,7 +10,7 @@ export function StudioTitlebar({ macTitlebar }: { macTitlebar: boolean }) {
   const location = useLocation()
   const { working } = useLeaveProtection()
   const history = useHistoryControls(working)
-  const { sidebarOpen, setSidebarOpen, setTitlebarTarget } = useWorkspace()
+  const { sidebarTrigger, sidebarOpen, setSidebarOpen, setTitlebarTarget } = useWorkspace()
   const isDiary = location.pathname.startsWith('/diaries')
   const isSettings = location.pathname.startsWith('/settings')
   return (
@@ -41,10 +41,14 @@ export function StudioTitlebar({ macTitlebar }: { macTitlebar: boolean }) {
         <Button
           size="icon-sm"
           variant="ghost"
+          ref={sidebarTrigger}
           aria-label={sidebarOpen ? '收起侧栏' : '展开侧栏'}
           aria-expanded={sidebarOpen}
           aria-controls={isSettings ? 'settings-sidebar' : 'chat-sidebar'}
-          onClick={() => setSidebarOpen(!sidebarOpen)}
+          onClick={(event) => {
+            event.currentTarget.focus()
+            setSidebarOpen(!sidebarOpen)
+          }}
         >
           {sidebarOpen ? <PanelLeftCloseIcon /> : <PanelLeftOpenIcon />}
         </Button>

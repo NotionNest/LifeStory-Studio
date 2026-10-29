@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react'
 import { Outlet, useLocation } from 'react-router'
 import { Button } from '@/components/ui/button'
+import { Toaster } from '@/components/ui/sonner'
+import { useAppearanceContext } from '@/contexts/AppearanceContext'
 import { useLeaveProtection } from '@/contexts/LeaveProtectionContext'
 import { useModelProfiles } from '@/contexts/ModelProfilesContext'
 import { useDesktopLifecycle } from '@/hooks/useDesktopLifecycle'
@@ -9,6 +11,7 @@ import { StudioRail } from './StudioRail'
 import { DiaryChatDock } from './DiaryChatDock'
 
 export function StudioLayout() {
+  const { dark } = useAppearanceContext()
   const location = useLocation()
   const leave = useLeaveProtection()
   const models = useModelProfiles()
@@ -19,7 +22,9 @@ export function StudioLayout() {
     const isDiary = location.pathname.startsWith('/diaries')
     document.title = `${isSettings ? '设置' : isDiary ? '日记' : '聊天'} · LifeStory Studio`
     if (isSettings) {
-      const heading = content.current?.querySelector<HTMLElement>('h1')
+      const heading = [...(content.current?.querySelectorAll<HTMLElement>('h1') ?? [])].find(
+        (element) => !element.closest('[inert], [hidden]'),
+      )
       if (heading) {
         heading.tabIndex = -1
         heading.focus({ preventScroll: true })
@@ -57,6 +62,12 @@ export function StudioLayout() {
           </DiaryChatDock>
         </div>
       </div>
+      <Toaster
+        theme={dark ? 'dark' : 'light'}
+        position="top-right"
+        duration={4000}
+        containerAriaLabel="通知"
+      />
     </main>
   )
 }

@@ -4,6 +4,8 @@ import { act, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { expect, it, vi } from 'vitest'
 import { AiSettings } from './AiSettings'
+import { toast } from 'sonner'
+vi.mock('sonner', () => ({ toast: { success: vi.fn() } }))
 vi.mock('@/services/modelProfiles', async (original) => ({
   ...(await original<typeof import('@/services/modelProfiles')>()),
   modelProfilesApi: {
@@ -20,6 +22,13 @@ vi.mock('@/services/modelProfiles', async (original) => ({
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
 const saved: AiProfile = {
   id: 'saved',
+  hasKey: true,
+  keyScope: {
+    protocol: 'chat',
+    baseUrl: 'https://synthetic.example/v1',
+    service: 'custom',
+    downstream: null,
+  },
   label: '合成服务',
   service: 'custom',
   protocol: 'chat',
@@ -35,10 +44,24 @@ async function setup(profiles: AiProfile[] = []) {
   vi.mocked(modelProfilesApi.configure).mockImplementation(async (profile) => ({
     ...profile,
     id: 'created',
+    hasKey: true,
+    keyScope: {
+      protocol: profile.protocol,
+      baseUrl: profile.baseUrl,
+      service: profile.service,
+      downstream: profile.downstream,
+    },
   }))
   vi.mocked(modelProfilesApi.updateProfile).mockImplementation(async (profile) => ({
     ...profile,
     id: 'updated',
+    hasKey: true,
+    keyScope: {
+      protocol: profile.protocol,
+      baseUrl: profile.baseUrl,
+      service: profile.service,
+      downstream: profile.downstream,
+    },
   }))
   vi.mocked(modelProfilesApi.setDefault).mockResolvedValue(undefined)
   vi.mocked(modelProfilesApi.removeProfile).mockResolvedValue(undefined)
@@ -110,8 +133,7 @@ it('selects provider presets without network calls and protects a dirty form unt
     expect(ui.host.querySelector<HTMLInputElement>('[aria-label="AI API Key"]')!.type).toBe(
       'password',
     )
-    await ui.click('显示 API Key')
-    expect(ui.host.querySelector<HTMLInputElement>('[aria-label="AI API Key"]')!.type).toBe('text')
+    expect(ui.host.querySelector('[aria-label="显示 API Key"]')).toBeNull()
     const provider = [
       ...ui.host.querySelectorAll<HTMLButtonElement>('[aria-label="API 提供商预设"] button'),
     ].find((button) => button.textContent === 'OpenAI')!
@@ -158,7 +180,10 @@ it('keeps multiple saved configurations accessible, creates explicitly and clear
       expect.objectContaining({ label: '第三配置', model: 'third-model', service: 'custom' }),
       'synthetic-not-real',
     )
-    expect(ui.host.querySelector<HTMLInputElement>('[aria-label="AI API Key"]')!.value).toBe('')
+    expect(ui.host.querySelector<HTMLInputElement>('[aria-label="AI API Key"]')!.value).toBe(
+      '••••••••',
+    )
+    expect(ui.host.textContent).toContain('密钥已保存')
     expect(ui.dirty).toHaveBeenLastCalledWith(false)
     await ui.click('停用')
     expect(modelProfilesApi.removeProfile).toHaveBeenCalledWith('created')
@@ -211,6 +236,7 @@ it('cancels only the explicit API test and keeps its configuration intact', asyn
     )
     expect(modelProfilesApi.test).toHaveBeenCalledTimes(1)
     expect(ui.host.querySelector('[role="alert"]')?.textContent).toContain('合成测试已取消')
+    expect(toast.success).not.toHaveBeenCalled()
     expect(ui.host.querySelector<HTMLInputElement>('[aria-label="AI 配置名称"]')!.value).toBe(
       '合成服务',
     )
@@ -284,6 +310,110 @@ it('ignores stale catalog results after changing the address and never reuses a 
     expect(ui.host.querySelector<HTMLInputElement>('[aria-label="AI 模型 ID"]')!.value).toBe(
       'test-model',
     )
+  } finally {
+    await ui.close()
+  }
+})
+
+it('retains a masked saved key when editing other settings, allows testing and restores it after cancelling replacement', async () => {
+  const ui = await setup([saved])
+  try {
+    const keyInput = () => ui.host.querySelector<HTMLInputElement>('[aria-label="AI API Key"]')!
+    expect(keyInput().value).toBe('••••••••')
+    expect(keyInput().readOnly).toBe(true)
+    expect(ui.host.querySelector('[aria-label="显示 API Key"]')).toBeNull()
+    await ui.click('测试连接')
+    expect(modelProfilesApi.test).toHaveBeenCalledWith('saved', expect.any(String))
+    expect(toast.success).toHaveBeenCalledWith(`${saved.label} 连接测试成功`)
+    expect(ui.host.textContent).not.toContain('连接测试成功')
+    await ui.set('AI 配置名称', '重命名')
+    await ui.click('保存服务配置')
+    expect(modelProfilesApi.updateProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ label: '重命名' }),
+      '',
+    )
+    expect(keyInput().value).toBe('••••••••')
+    await ui.click('更换密钥')
+    expect(keyInput().value).toBe('')
+    expect(keyInput().readOnly).toBe(false)
+    expect(keyInput().type).toBe('password')
+    await ui.set('AI API Key', 'synthetic-replacement')
+    await ui.click('取消本次修改')
+    expect(keyInput().value).toBe('••••••••')
+    expect(modelProfilesApi.updateProfile).toHaveBeenCalledTimes(1)
+    await ui.click('更换密钥')
+    await ui.set('AI API Key', 'synthetic-replacement')
+    await ui.click('保存服务配置')
+    expect(modelProfilesApi.updateProfile).toHaveBeenLastCalledWith(
+      expect.anything(),
+      'synthetic-replacement',
+    )
+    expect(keyInput().value).toBe('••••••••')
+    expect(ui.host.innerHTML).not.toContain('synthetic-replacement')
+  } finally {
+    await ui.close()
+  }
+})
+it('shows missing credentials honestly and requires a new key for a changed destination', async () => {
+  const ui = await setup([saved, { ...saved, id: 'missing', label: '缺少密钥', hasKey: false }])
+  try {
+    await ui.set('已配置服务', 'missing')
+    expect(ui.host.querySelector<HTMLInputElement>('[aria-label="AI API Key"]')!.value).toBe('')
+    expect(
+      [...ui.host.querySelectorAll<HTMLButtonElement>('button')].find(
+        (b) => b.textContent === '测试连接',
+      )!.disabled,
+    ).toBe(true)
+    await ui.set('已配置服务', 'saved')
+    expect(ui.host.querySelector<HTMLInputElement>('[aria-label="AI API Key"]')!.value).toBe(
+      '••••••••',
+    )
+    await ui.set('AI 服务地址', 'https://changed.synthetic.example/v1')
+    const keyInput = ui.host.querySelector<HTMLInputElement>('[aria-label="AI API Key"]')!
+    expect(keyInput.value).toBe('')
+    expect(keyInput.required).toBe(true)
+    expect(ui.host.textContent).toContain('连接目标已改变')
+    await ui.click('保存服务配置')
+    expect(modelProfilesApi.updateProfile).not.toHaveBeenCalled()
+    await ui.set('AI API Key', 'synthetic-new-host')
+    await ui.click('保存服务配置')
+    expect(modelProfilesApi.updateProfile).toHaveBeenCalledWith(
+      expect.objectContaining({ baseUrl: 'https://changed.synthetic.example/v1' }),
+      'synthetic-new-host',
+    )
+  } finally {
+    await ui.close()
+  }
+})
+it('keeps replacement input on save failure and can return to the saved credential', async () => {
+  const ui = await setup([saved])
+  try {
+    await ui.click('更换密钥')
+    await ui.set('AI API Key', 'synthetic-unsaved')
+    vi.mocked(modelProfilesApi.updateProfile).mockRejectedValueOnce({ message: '合成保存失败' })
+    await ui.click('保存服务配置')
+    expect(ui.host.querySelector('[role="alert"]')?.textContent).toContain('合成保存失败')
+    expect(ui.host.querySelector<HTMLInputElement>('[aria-label="AI API Key"]')!.value).toBe(
+      'synthetic-unsaved',
+    )
+    await ui.click('取消本次修改')
+    expect(ui.host.querySelector<HTMLInputElement>('[aria-label="AI API Key"]')!.value).toBe(
+      '••••••••',
+    )
+  } finally {
+    await ui.close()
+  }
+})
+
+it('uses the credential binding fields supplied by the backend instead of a frontend field list', async () => {
+  const ui = await setup([{ ...saved, keyScope: { ...saved.keyScope, model: saved.model } }])
+  try {
+    await ui.set('AI 模型 ID', 'changed-model')
+    const input = ui.host.querySelector<HTMLInputElement>('[aria-label="AI API Key"]')!
+    expect(input.value).toBe('')
+    expect(input.required).toBe(true)
+    await ui.click('保存服务配置')
+    expect(modelProfilesApi.updateProfile).not.toHaveBeenCalled()
   } finally {
     await ui.close()
   }

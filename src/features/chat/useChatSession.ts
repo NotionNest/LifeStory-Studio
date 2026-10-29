@@ -584,6 +584,7 @@ export function useChatSession() {
       id,
       active,
       titlebarTarget,
+      sidebarTrigger: studio.sidebarTrigger,
       sidebarOpen,
       onClose,
       setChatAddress,

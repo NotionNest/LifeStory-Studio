@@ -51,12 +51,7 @@ fn setup() -> (Workspace, DatabaseWorker, String) {
         model: "synthetic-model".into(),
         context_chars: 32000,
         max_output_tokens: 1000,
-        downstream: None,
-        codex_path: None,
-        output_token_parameter: None,
-        cli_model_mode: None,
-        reasoning_effort: None,
-        cli_version: None,
+        ..Default::default()
     };
     sql.execute(
         "INSERT INTO ai_profiles VALUES('test-profile',?1,0)",

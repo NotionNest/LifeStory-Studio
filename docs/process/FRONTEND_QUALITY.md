@@ -39,7 +39,7 @@
 
 `.prettierrc.json` 使用两空格缩进、单引号、无行尾分号、100 列目标宽度与 LF；其余使用固定版本的默认规则。`printWidth` 是排版目标，不是删除功能或拆分函数的行数门槛。格式化不排序 Tailwind 类名，也不改业务实现。
 
-命令覆盖 src、架构检查器、CI 路由策略脚本、根 TS/JSON 配置、eslint.config.mjs 及 common 检查工作流。`.prettierignore` 保留 shadcn 源码 `src/components/ui/` 的上游格式与 npm 锁文件格式；组件库继续完全不编写或运行组件测试。文档、Rust、生成物和本地资料不在本轮格式化命令范围内。后续新增的自维护前端文件自动纳入相同基线。
+命令覆盖 src、架构检查器、CI 路由策略脚本、根 TS/JSON 配置、eslint.config.mjs 及 common 检查工作流。`.prettierignore` 保留 shadcn 生成源码与 npm 锁文件格式；2026-10-29 用户要求将已定制的 `src/components/ui/sonner.tsx` 单独纳入项目格式，其他 UI 组件继续保留上游格式；组件库继续完全不编写或运行组件测试。文档、Rust、生成物和本地资料不在本轮格式化命令范围内。后续新增的自维护前端文件自动纳入相同基线。
 
 ## CI 接入
 
@@ -49,7 +49,7 @@
 
 ## ESLint 规则选择（2026-10-28）
 
-使用 eslint.config.mjs Flat Config，启用 ESLint recommended、typescript-eslint recommended 、react-hooks/rules-of-hooks 和 react-hooks/exhaustive-deps，全部作为 error；lint 使用 --max-warnings 0。检查 src 下生产与业务测试 TS/TSX、根 TS 配置、自维护 scripts 下 MJS 及 ESLint 配置本身。浏览器源码使用 browser globals，Node 工具使用 node globals；TS 未使用参数仅允许明确的下划线前缀，未使用变量仍报错。src/components/ui 参与静态 lint，不编写或执行其组件测试，也不改变其上游格式。
+使用 eslint.config.mjs Flat Config，启用 ESLint recommended、typescript-eslint recommended 、react-hooks/rules-of-hooks 和 react-hooks/exhaustive-deps，全部作为 error；lint 使用 --max-warnings 0。检查 src 下生产与业务测试 TS/TSX、根 TS 配置、自维护 scripts 下 MJS 及 ESLint 配置本身。浏览器源码使用 browser globals，Node 工具使用 node globals；TS 未使用参数仅允许明确的下划线前缀，未使用变量仍报错。src/components/ui 参与静态 lint，不编写或执行其组件测试，其他生成组件仍保留上游格式，Sonner 采用上述单独约定。
 
 eslint-config-prettier 放在最后，关闭与 Prettier 冲突的格式规则；不在 ESLint 内再次运行 Prettier，不添加重复缩进、分号或类名排序规则。保留已有两空格、单引号、无分号、100 列目标与 LF。
 

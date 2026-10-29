@@ -2,6 +2,21 @@
   .settings-sidebar {
     @apply gap-1 p-3;
   }
+  .settings-navigation {
+    @apply flex flex-col gap-1;
+  }
+  .settings-compact-navigation {
+    @apply h-12;
+  }
+  .settings-compact-navigation .settings-navigation {
+    @apply h-full flex-row items-center gap-2 overflow-x-auto px-5;
+  }
+  .settings-compact-navigation .sidebar-heading {
+    display: contents;
+  }
+  .settings-compact-navigation .settings-navigation > a {
+    @apply w-auto;
+  }
   .settings-sidebar .sidebar-heading {
     @apply px-2;
   }

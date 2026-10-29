@@ -476,7 +476,16 @@ pub async fn ai_test(
     profile_id: String,
     request_id: String,
 ) -> Result<(), RecordError> {
-    let profiles = record_task(&database, |db| db.ai_profiles()).await?;
+    test_connection(&runner, &database, profile_id, request_id).await
+}
+
+async fn test_connection(
+    runner: &crate::ai::AiRunner,
+    database: &DatabaseWorker,
+    profile_id: String,
+    request_id: String,
+) -> Result<(), RecordError> {
+    let profiles = record_task(database, |db| db.ai_profiles()).await?;
     let profile = profiles
         .into_iter()
         .find(|p| p.id == profile_id && !p.label.starts_with("[已停用]"))
@@ -490,19 +499,32 @@ pub async fn ai_test(
             code: "conflict",
             message: e.to_string(),
         })?;
+    let key = if profile.protocol == "codex" {
+        None
+    } else {
+        Some(
+            record_task(database, {
+                let id = profile.id.clone();
+                move |db| db.ai_key(id)
+            })
+            .await?,
+        )
+    };
     let work = async {
         let profile = if profile.protocol == "codex" {
             crate::ai_providers::resolve_cli_profile(profile).await?
         } else {
             profile
         };
-        crate::ai_providers::generate(
+        crate::ai_providers::generate_with_summary(
             &profile,
+            key.as_deref(),
             vec![crate::ai_providers::Message {
                 role: "user".into(),
                 text: "这是一条合成连接测试，不包含私人资料。请仅回复：连接成功。".into(),
             }],
             test.cancelled.clone(),
+            |_| {},
             |_| {},
         )
         .await
@@ -514,7 +536,7 @@ pub async fn ai_test(
     };
     let check = result.clone();
     let pid = profile_id.clone();
-    record_task(&database, move |db| db.ai_record_check(pid, check)).await?;
+    record_task(database, move |db| db.ai_record_check(pid, check)).await?;
     result.map_err(|message| RecordError {
         code: "provider_error",
         message,
@@ -724,12 +746,8 @@ pub async fn ai_codex_models(path: String) -> Result<Vec<String>, String> {
         model: String::new(),
         context_chars: 32000,
         max_output_tokens: 4096,
-        downstream: None,
         codex_path: Some(path),
-        output_token_parameter: None,
-        cli_model_mode: None,
-        reasoning_effort: None,
-        cli_version: None,
+        ..Default::default()
     };
     crate::ai_providers::codex_models(&profile).await
 }
@@ -782,12 +800,9 @@ fn codex_profile(path: String) -> crate::ai_providers::Profile {
         model: String::new(),
         context_chars: 32000,
         max_output_tokens: 4096,
-        downstream: None,
         codex_path: Some(path),
-        output_token_parameter: None,
         cli_model_mode: Some("inherit".into()),
-        reasoning_effort: None,
-        cli_version: None,
+        ..Default::default()
     }
 }
 
@@ -816,4 +831,81 @@ pub async fn ai_chat_search(
         db.ai_chat_search(crate::ai_experience::ChatQuery { keyword, offset })
     })
     .await
+}
+
+#[cfg(test)]
+mod connection_tests {
+    use super::*;
+
+    #[test]
+    fn saved_api_key_reaches_connection_test_after_restart() {
+        let root = std::env::temp_dir().join(format!(
+            "lifestory-connection-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let profile = serde_json::from_value(serde_json::json!({
+            "id":"synthetic", "label":"DeepSeek", "service":"deepseek", "protocol":"chat",
+            "baseUrl":format!("https://{}", listener.local_addr().unwrap()),
+            "model":"synthetic-model", "contextChars":32000, "maxOutputTokens":1000,
+            "downstream":null, "codexPath":null
+        }))
+        .unwrap();
+        let db = DatabaseWorker::start(root.clone()).unwrap();
+        let saved = db
+            .ai_configure(profile, "synthetic-not-real".into())
+            .unwrap();
+        drop(db);
+        let db = DatabaseWorker::start(root.clone()).unwrap();
+        // Reject TLS locally: reaching this socket proves the saved key passed the credential gate.
+        let server = std::thread::spawn(move || {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            loop {
+                match listener.accept() {
+                    Ok((socket, _)) => {
+                        drop(socket);
+                        return true;
+                    }
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        if std::time::Instant::now() >= deadline {
+                            return false;
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
+                    Err(e) => panic!("{e}"),
+                }
+            }
+        });
+        let runner = crate::ai::AiRunner::default();
+        let result = tauri::async_runtime::block_on(test_connection(
+            &runner,
+            &db,
+            saved.id.clone(),
+            "synthetic-test".into(),
+        ));
+        let reached_server = server.join().unwrap();
+        assert!(
+            reached_server,
+            "connection test stopped before the local transport"
+        );
+        let error = result.unwrap_err();
+        assert_eq!(error.code, "provider_error");
+        assert!(error.message.contains("服务连接失败或超时"));
+        crate::credentials::delete_key(&root, &saved.id).unwrap();
+        let error = tauri::async_runtime::block_on(test_connection(
+            &runner,
+            &db,
+            saved.id,
+            "synthetic-missing-key".into(),
+        ))
+        .unwrap_err();
+        assert_eq!(error.code, "credential_error");
+        drop(db);
+        std::fs::remove_dir_all(root).unwrap();
+    }
 }

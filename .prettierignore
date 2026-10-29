@@ -1,4 +1,5 @@
-# shadcn 生成源码保留上游格式。
-src/components/ui/
+# shadcn 生成源码保留上游格式；已自定义的 Sonner 使用项目格式。
+src/components/ui/*
+!src/components/ui/sonner.tsx
 # npm 管理锁文件格式。
 package-lock.json

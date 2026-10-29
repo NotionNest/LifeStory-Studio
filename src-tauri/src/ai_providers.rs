@@ -13,9 +13,13 @@ use std::{
 const MAX_RESPONSE: usize = 4 * 1024 * 1024;
 const MAX_EVENT: usize = 256 * 1024;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Profile {
+    #[serde(default, skip_deserializing)]
+    pub has_key: bool,
+    #[serde(default, skip_deserializing)]
+    pub key_scope: Option<ConnectionTarget>,
     pub id: String,
     pub label: String,
     pub service: String,
@@ -34,6 +38,24 @@ pub struct Profile {
     pub reasoning_effort: Option<String>,
     #[serde(default)]
     pub cli_version: Option<String>,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionTarget {
+    protocol: String,
+    base_url: String,
+    service: String,
+    downstream: Option<String>,
+}
+impl Profile {
+    pub fn connection_target(&self) -> ConnectionTarget {
+        ConnectionTarget {
+            protocol: self.protocol.clone(),
+            base_url: self.base_url.clone(),
+            service: self.service.clone(),
+            downstream: self.downstream.clone(),
+        }
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
@@ -1238,12 +1260,8 @@ for line in sys.stdin:
             model: "synthetic-model".into(),
             context_chars: 1000,
             max_output_tokens: 100,
-            downstream: None,
-            output_token_parameter: None,
-            cli_model_mode: None,
-            reasoning_effort: None,
-            cli_version: None,
             codex_path: Some(path.to_str().unwrap().into()),
+            ..Default::default()
         };
         (dir, profile)
     }
@@ -1865,12 +1883,7 @@ mod request_contract_tests {
             model: "synthetic-model".into(),
             context_chars: 1000,
             max_output_tokens: 100,
-            downstream: None,
-            codex_path: None,
-            output_token_parameter: None,
-            cli_model_mode: None,
-            reasoning_effort: None,
-            cli_version: None,
+            ..Default::default()
         }
     }
     #[test]

@@ -46,9 +46,9 @@ HTMLDialogElement.prototype.showModal = function () {
   this.open = true
 }
 
-async function setup() {
-  vi.stubGlobal('matchMedia', () => ({
-    matches: false,
+async function setup(reducedMotion = true) {
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    matches: reducedMotion && query.includes('prefers-reduced-motion'),
     addEventListener() {},
     removeEventListener() {},
   }))
@@ -59,7 +59,9 @@ async function setup() {
   const click = async (label: string, selector = 'button,a') =>
     act(async () => {
       const button = [...host.querySelectorAll<HTMLButtonElement>(selector)].find(
-        (element) => element.getAttribute('aria-label') === label || element.textContent === label,
+        (element) =>
+          !element.closest('[inert], [aria-hidden="true"]') &&
+          (element.getAttribute('aria-label') === label || element.textContent === label),
       )
       expect(button).toBeTruthy()
       if (button!.getAttribute('role') === 'tab')
@@ -88,7 +90,10 @@ async function setup() {
   }
 }
 it('keeps an API settings draft while switching settings categories and collapsing the sidebar', async () => {
-  const ui = await setup()
+  const ui = await setup(false)
+  const unrelatedTrigger = document.createElement('button')
+  unrelatedTrigger.setAttribute('aria-controls', 'settings-sidebar')
+  document.body.prepend(unrelatedTrigger)
   try {
     await ui.click('设置')
     expect(ui.host.querySelector('nav [aria-current="page"]')?.getAttribute('aria-label')).toBe(
@@ -98,14 +103,28 @@ it('keeps an API settings draft while switching settings categories and collapsi
     await ui.click('API 提供商', 'a')
     await ui.set('AI 配置名称', '尚未保存的合成配置')
     await ui.click('外观', 'aside a')
+    ui.host.querySelector<HTMLAnchorElement>('#settings-sidebar a')!.focus()
     await ui.click('收起侧栏')
-    expect(ui.host.querySelector<HTMLElement>('#settings-sidebar')).toBeNull()
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('展开侧栏')
+    expect(ui.host.querySelector('#settings-sidebar')!.getAttribute('aria-hidden')).toBe('true')
+    expect(ui.host.querySelector('#settings-sidebar')!.hasAttribute('inert')).toBe(true)
+    expect(ui.host.querySelectorAll('[aria-label="设置导航"]')).toHaveLength(1)
+    expect(ui.host.querySelectorAll('[aria-label="设置导航"] a')).toHaveLength(3)
+    expect(ui.host.querySelector('#settings-sidebar nav')).toBeNull()
+    expect(ui.host.querySelectorAll('.settings-compact-navigation nav')).toHaveLength(1)
+    expect(ui.host.querySelectorAll('[aria-label="设置导航"] a')).toHaveLength(3)
+
     await ui.click('展开侧栏')
+    expect(ui.host.querySelector('#settings-sidebar')!.getAttribute('aria-hidden')).toBe('false')
+    expect(ui.host.querySelector('#settings-sidebar')!.hasAttribute('inert')).toBe(false)
+    expect(ui.host.querySelectorAll('#settings-sidebar nav')).toHaveLength(1)
+    expect(ui.host.querySelectorAll('[aria-label="设置导航"]')).toHaveLength(1)
     await ui.click('模型与提供商', 'aside a')
     expect(ui.host.querySelector<HTMLInputElement>('[aria-label="AI 配置名称"]')!.value).toBe(
       '尚未保存的合成配置',
     )
   } finally {
+    unrelatedTrigger.remove()
     await ui.close()
   }
 })
@@ -162,6 +181,8 @@ it('opens trash as a settings page with diary and chat categories and preserves 
     expect(trashApi.trashList).toHaveBeenCalledTimes(2)
     await ui.click('收起侧栏')
     await ui.click('外观', '[aria-label="设置页面"] a')
+    expect(document.activeElement?.tagName).toBe('H1')
+    expect(document.activeElement?.closest('[inert]')).toBeNull()
     await ui.click('回收站', '[aria-label="设置页面"] a')
     expect(ui.host.querySelector('[aria-label="聊天回收站"]')).not.toBeNull()
     await ui.click('返回主界面')
