@@ -17,6 +17,11 @@
   --accent-foreground: #26272b;
   --destructive: oklch(0.577 0.245 27.325);
   --success: #16804a;
+  --review-error: #d14c57;
+  --review-repeat: #ae5ab7;
+  --review-wordy: #bd7815;
+  --review-flow: #347fc1;
+  --review-check: #298f78;
   --border: #e7e8ec;
   --input: #dedfe5;
   --ring: #4c7de9;
@@ -112,6 +117,11 @@
   --accent-foreground: #ececef;
   --destructive: #ff9299;
   --success: #73d6a1;
+  --review-error: #ff8791;
+  --review-repeat: #e69bef;
+  --review-wordy: #f3bf62;
+  --review-flow: #89bfff;
+  --review-check: #70d6ba;
   --border: #35353d;
   --input: #45454f;
   --ring: #92b3ff;

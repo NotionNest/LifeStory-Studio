@@ -680,6 +680,7 @@ it('keeps diary chat drafts separate and resumes the same sent conversation afte
   const text = () => ui.host.querySelector<HTMLTextAreaElement>('[aria-label="聊天输入"]')!.value
   try {
     await act(() => ui.root.render(<ChatWorkspace {...props} />))
+    expect(ui.host.querySelector('[aria-label="聊天历史"]')).not.toBeNull()
     await act(() => ui.set('聊天输入', '普通聊天草稿'))
     await act(() =>
       ui.root.render(
@@ -692,6 +693,7 @@ it('keeps diary chat drafts separate and resumes the same sent conversation afte
         />,
       ),
     )
+    expect(ui.host.querySelector('[aria-label="聊天历史"]')).toBeNull()
     await act(() => ui.set('聊天输入', '日记 A 的草稿'))
     await act(() =>
       ui.root.render(
@@ -717,7 +719,6 @@ it('keeps diary chat drafts separate and resumes the same sent conversation afte
       ),
     )
     expect(text()).toBe('日记 A 的草稿')
-    await act(async () => ui.click('关闭侧边聊天'))
     expect(ui.host.querySelector('[aria-label="关闭侧边聊天"]')).toBeNull()
     expect(chatsApi.send).not.toHaveBeenCalled()
     await act(async () =>

@@ -1017,6 +1017,10 @@ it('opens diary chat without leaving the editor and synchronizes external change
       host.querySelector<HTMLButtonElement>('[aria-label="聊聊这篇日记"]')!.click(),
     )
     expect(locationChanged).toHaveBeenCalledWith(dockPath(record.id, null))
+    await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="文案审查"]')!.click())
+    expect(locationChanged).toHaveBeenLastCalledWith(`${paths.diary(record.id)}?review`)
+    await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="文案审查"]')!.click())
+    expect(locationChanged).toHaveBeenLastCalledWith(paths.diary(record.id))
     expect(input().value).toBe(record.title)
     expect(input().readOnly).toBe(false)
     expect(recordsApi.end).not.toHaveBeenCalled()
