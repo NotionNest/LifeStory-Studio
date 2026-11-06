@@ -21,7 +21,7 @@ test('only approved integration routes are allowed', () => {
 })
 test('daily PRs select lightweight checks by content; full validation is explicit', () => {
   const empty = { common: false, rust: false, desktop: false, images: false }
-  assert.deepEqual(classify(['docs/product/PRD.md']), empty)
+  assert.deepEqual(classify(['docs/PRODUCT.md']), empty)
   for (const file of [
     'src/App.tsx',
     'public/runtime.js',

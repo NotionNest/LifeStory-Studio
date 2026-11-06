@@ -4,13 +4,9 @@
 
 2026-10-27，DEC-17 / TASK-09；关联 REQ-01/02/03/11/12/13/14。用户已确认路由重构及统一前进/后退、可定位地址、日记预览一并迁移。实现与验证状态以 STATUS.md 为准。
 
-## 目标与问题
-
-原实现使用 App.page、设置分类状态、LibraryWorkspace.mode 和 ChatIntent + nonce 切换页面，整页常驻以保留草稿。页面身份、返回目标、业务写入与组件生命周期耦合，架构文档没有定义边界。本次替换为统一路由与显式会话；视觉占满工作区不再作为页面架构完成依据。
-
 ## 路由及页面
 
-采用锁定版本 React Router 8.5.0 的 Data Mode、createHashRouter 与 RouterProvider，沿用 Vite/Tauri，无服务器框架。Hash 内路径不需要服务器重写。生产使用 Hash 历史，集成测试使用同类 Data Router 的内存历史。
+采用 React Router Data Mode、createHashRouter 与 RouterProvider（版本以锁文件为准），沿用 Vite/Tauri，无服务器框架。Hash 内路径不需要服务器重写。生产使用 Hash 历史，集成测试使用同类 Data Router 的内存历史。
 
 | Hash 内路径 | 页面 |
 |---|---|
@@ -79,15 +75,3 @@
 ## 验收
 
 真实 Router 集成验证地址、push/replace/POP、导航取消、连续请求、保存与历史、卸载后的草稿保留、预览归属、迟到结果、队列恢复及退出；组件库不增加测试。类型/生产构建与前端套件通过后，分别记录 macOS/Windows 的 Hash 地址、快捷键、关闭、中文输入法与刷新提示检查，未运行的平台不得标为通过。
-
-## 文档依据
-
-Context7 CLI 在默认沙箱外返回 fetch failed，未静默使用记忆作为 API 依据。已核对官方文档：[Hash Router](https://reactrouter.com/api/data-routers/createHashRouter)、[Data Mode](https://reactrouter.com/start/modes)、[嵌套路由](https://reactrouter.com/start/data/routing)、[useBlocker 的保护范围](https://reactrouter.com/api/hooks/useBlocker)。
-
-2026-10-27 设置页布局修正：模型路由父布局统一 CLI/API 子页内容宽度和边距；模型与回收站横向分类使用两列等宽网格，避免侧栏全宽链接在横向 flex 中叠加宽度。页面内容边距由父布局持有，子页不重复设置。
-
-分类栏视觉约定（2026-10-27 用户参考图）：模型与回收站使用全宽胶囊分段导航，共用灰色底槽、等宽居中选项，选中项显示背景色胶囊。选中状态由 NavLink 的 aria-current 驱动，继续使用独立路由与导航保护。
-
-## 2026-10-28 内部职责调整
-
-日记路由分别导入 diaryLoader、DiaryDetailLayout、DiaryEditorPage 和 DiaryHistoryPage。详情布局只做入口装配，DiarySessionProvider 持有同一记录会话，useDiaryEditing 管理编辑事务，useDiaryLeaveProtection 连接离开检查/聊天采用/原生保存。页面只消费专属视图契约；记录 key、编辑器 session key、历史往返及保存边界保持既有要求。聊天队列与预览 Hook 各自拥有领域状态，通过明确动作与主会话协作，窗口级唯一性及分区订阅不变。具体边界见 [应用结构](APP_STRUCTURE.md)。

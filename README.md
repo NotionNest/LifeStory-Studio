@@ -4,7 +4,7 @@
 
 前端技术：React + TypeScript + Vite + Tailwind CSS + shadcn/ui；长文编辑使用 Tiptap。
 
-当前阶段：文字记录与单一自动保存已实现，保存边界修复 PR #12 与 CI 分层优化 PR #13 已合入 develop。历史管理（LIB-04）已有本地成果。图片管理（LIB-05）已按 2026-10-20 确认修订为正文图片、撤销与记录历史，不设独立图片恢复；已合入 develop；LIB-06 时间线、日历与搜索筛选已验收并合入 develop，LIB-07 记录回收站与来源失效已验收并合入 develop（PR #19），LIB-08 已按用户确认重构为日记、独立聊天与设置，预览采用后才创建/补充日记；LIB-08/09 已通过 PR #20 合入 develop，LIB-09 已按用户确认收尾。约定的 Codex、API、日记采用/补充、取消/恢复及 Windows 主链路已获用户确认，未逐项确认的专项与兼容范围继续保留。TASK-08 已完成本轮外壳、日记、聊天、模型设置、回收站及历史独立页面的 UI/UX 集中改善；2026-10-27 用户明确本轮告一阶段，后续随功能开发逐步完善。未完成的快捷键与专项验证保留跟踪，不宣称全部验收。2026-10-27 用户确认先实施页面路由与会话架构重构（TASK-09 / DEC-17），见 [前端页面架构](docs/architecture/FRONTEND_NAVIGATION.md)。完成后按已确认顺序推进“写作与风格”，先细化文案审查，再规划练习与风格档案，见 [下一阶段工作](docs/development/WRITING_AND_STYLE_NEXT.md)。证据与限制见 [项目跟进](docs/tracking/STATUS.md)。
+当前阶段：资料库与 AI/对话的本轮交付已收尾，约定主链路已获用户确认；部分平台和专项仍待验证。下一阶段先细化文案审查，再推进写作练习和个人风格。最新进度及验证限制见 [项目跟进](docs/STATUS.md)。
 
 ## 启动开发
 
@@ -13,33 +13,36 @@ npm ci
 npm run desktop:dev
 ```
 
-开发命令、目录职责与验证边界见 [开发环境说明](docs/development/ENVIRONMENT.md)。当前窗口可新建文字记录、编辑标题/日期/标签，内容统一自动保存到本机，无常驻保存按钮；正常重开直接读取最新内容，旧版遗留草稿仍可预览。最新保存行为与验证见 [保存模型调整](docs/development/SAVING_MODEL_REVISION.md)，原 LIB-03 记录保留为阶段证据。
+开发命令、目录职责与验证边界见 [开发环境说明](docs/DEVELOPMENT.md)。当前窗口可新建文字记录、编辑标题/日期/标签，内容统一自动保存到本机，无常驻保存按钮；正常重开直接读取最新内容，旧版遗留草稿仍可预览。当前验证范围见 [当前版本验证与验收](docs/VERIFICATION.md)。
 
 ## 阅读入口
 
 第一次使用这套协作体系，先看 [人类使用手册](docs/人类使用手册.md)：说明你如何审阅、决策、反馈和继续工作。
 
-日常关注三个入口，与人类使用手册一致：
+日常入口：
 
-1. [正式产品文档](docs/product/PRD.md)：产品范围、需求编号及验收条件。
-2. [待决策事项](docs/product/DECISIONS.md)：已确认的方向与需要进一步确定的内容。
-3. [项目跟进](docs/tracking/STATUS.md)：已完成成果、当前任务、验证限制与下一步。
+1. [产品与决策](docs/PRODUCT.md)：产品范围、需求及确认边界。
+2. [项目跟进](docs/STATUS.md)：当前进度、验证限制与下一步。
+3. [架构与技术边界](docs/ARCHITECTURE.md)：技术组合、数据和 AI 边界。
+4. [开发与协作](docs/DEVELOPMENT.md)：启动、测试、Git 和开发约定。
+5. [当前版本验证与验收](docs/VERIFICATION.md)：当前版本功能、修复、验证结果及未验收范围。
 
 ## 按需查阅的细化资料
 
-[资料库与日常记录规格](docs/features/LIBRARY_AND_RECORDING.md)记录已确认行为；[资料库页面流程与任务拆解](docs/features/LIBRARY_REVIEW.md)细化页面与完整流程、确认边界及 LIB-01—09 任务依赖。它们是 PRD 下属资料，当前进度统一查看项目跟进。
+[日记与资料库](docs/features/DIARY.md)、[聊天与日记整理](docs/features/CHAT.md)和[模型设置](docs/features/MODEL_SETTINGS.md)记录已确认行为；当前进度统一查看项目跟进。
 
-[产品开发工作流](docs/process/WORKFLOW.md)供执行时参考；[原始对话整理](docs/产品需求与对话整理.md)保留需求来源。
+[完整文档索引](docs/README.md)按问题列出产品、功能、架构、开发与研究资料。
+
+其他资料按用途组织：[设计基线](docs/DESIGN.md)记录现行交互与视觉约束，`docs/features/` 为功能规格，`docs/research/` 为调研与测量。聊天的模型、答复和队列行为见[聊天交互](docs/features/CHAT.md)。
 
 ## 架构方案入口
 
-- [架构与数据流](docs/architecture/ARCHITECTURE.md)
+- [架构与数据流](docs/ARCHITECTURE.md)
 - [应用入口与目录职责](docs/architecture/APP_STRUCTURE.md)
-- [技术选型与取舍](docs/architecture/TECH_STACK.md)
 - [数据、IPC 与 AI 契约](docs/architecture/DATA_AND_AI.md)
-- [开发环境与实施顺序](docs/architecture/DEVELOPMENT_PLAN.md)
+- [开发环境与协作](docs/DEVELOPMENT.md)
 
-项目协作规则见 [AGENTS.md](AGENTS.md)。功能规格与决策记录模板见 [templates](docs/templates/)。
+项目协作规则见 [AGENTS.md](AGENTS.md)。功能规格与决策记录模板见 [templates](docs/templates)。
 
 远程仓库：[NotionNest/LifeStory-Studio](https://github.com/NotionNest/LifeStory-Studio)（公开）。日常使用 develop 集成、release/<版本> 预发布、main 正式基线；main、develop、release/* 已启用 PR、CI Gate、禁止强推与删除保护。分支、提交、PR 和 CI 约定见 [Git 流程](docs/process/GIT_WORKFLOW.md)。
 
