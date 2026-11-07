@@ -21,7 +21,9 @@
 | 独立聊天、预览采用、队列和长聊天 | [聊天与日记整理](features/CHAT.md) |
 | Codex/API 配置、模型目录、密钥和连接测试 | [模型与提供商设置](features/MODEL_SETTINGS.md) |
 | 记录、附件、迁移、恢复及引用的底层契约 | [资料库实施契约](features/LIBRARY_IMPLEMENTATION.md)；其中历史阶段描述以当前规格及源码为准 |
-| 写作与风格、Vlog 和生活回顾 | 先看 [产品需求](PRODUCT.md)及[当前进度](STATUS.md)；这些功能的细化规格尚待开展 |
+| 文案审查 | [基础校对需求](features/COPY_REVIEW.md)；需求和 UI/UX 已确认，真实链路已接入，用户报告桌面用例 1～8 通过，专项待验证 |
+| 文案审查实施任务 | [REQ-04 实施方案](superpowers/plans/2026-11-06-copy-review.md)；真实链路已接入，用户已完成部分桌面验收，专项待验证 |
+| 写作练习、个人风格、Vlog 和生活回顾 | 先看 [产品需求](PRODUCT.md)及[当前进度](STATUS.md)；细化规格尚待开展 |
 
 ## 开发时查阅
 

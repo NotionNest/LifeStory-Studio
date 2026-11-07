@@ -2,6 +2,7 @@ import { useEffectEvent, useLayoutEffect, useRef } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router'
 import {
   ArrowLeftIcon,
+  FileSearchIcon,
   HistoryIcon,
   MessageCircleIcon,
   PenLineIcon,
@@ -49,12 +50,32 @@ export function DiaryEditorPage() {
   const disabled = working || creating || session.blocked
   const actions: PageAction[] = [
     {
+      id: 'review',
+      label: '文案审查',
+      icon: FileSearchIcon,
+      primary: true,
+      pressed: new URLSearchParams(location.search).has('review'),
+      disabled,
+      onSelect: () =>
+        void navigate(
+          location.search.includes('review')
+            ? paths.diary(recordId!)
+            : `${paths.diary(recordId!)}?review`,
+        ),
+    },
+    {
       id: 'chat',
       label: '聊聊这篇日记',
       icon: MessageCircleIcon,
       primary: true,
+      pressed: new URLSearchParams(location.search).has('chat'),
       disabled,
-      onSelect: () => void navigate(chatAddress(recordId!)),
+      onSelect: () =>
+        void navigate(
+          new URLSearchParams(location.search).has('chat')
+            ? paths.diary(recordId!)
+            : chatAddress(recordId!),
+        ),
     },
     {
       id: 'rename',

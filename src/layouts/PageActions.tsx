@@ -19,6 +19,7 @@ export interface PageAction {
   disabled?: boolean
   primary?: boolean
   destructive?: boolean
+  pressed?: boolean
 }
 
 export function PageActions({
@@ -39,9 +40,11 @@ export function PageActions({
         .map((action) => (
           <Button
             key={action.id}
-            variant="ghost"
+            variant={action.pressed ? 'secondary' : 'ghost'}
             size="icon-sm"
             aria-label={action.label}
+            aria-pressed={action.pressed}
+            title={action.label}
             disabled={action.disabled}
             onClick={action.onSelect}
           >

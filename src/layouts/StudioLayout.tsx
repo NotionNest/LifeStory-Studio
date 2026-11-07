@@ -8,7 +8,7 @@ import { useModelProfiles } from '@/contexts/ModelProfilesContext'
 import { useDesktopLifecycle } from '@/hooks/useDesktopLifecycle'
 import { StudioTitlebar } from './StudioTitlebar'
 import { StudioRail } from './StudioRail'
-import { DiaryChatDock } from './DiaryChatDock'
+import { DiarySidebarLayout } from './DiarySidebarLayout'
 
 export function StudioLayout() {
   const { dark } = useAppearanceContext()
@@ -55,11 +55,11 @@ export function StudioLayout() {
               {leave.error}
             </div>
           )}
-          <DiaryChatDock>
+          <DiarySidebarLayout>
             <div ref={content} className="min-h-0 min-w-0 flex-1">
               <Outlet />
             </div>
-          </DiaryChatDock>
+          </DiarySidebarLayout>
         </div>
       </div>
       <Toaster

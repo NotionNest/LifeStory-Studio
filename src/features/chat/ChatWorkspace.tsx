@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react'
-import { Outlet } from 'react-router'
+import { Outlet, useLocation } from 'react-router'
 import { PageActions, type PageAction } from '@/layouts/PageActions'
 import {
   Dialog,
@@ -8,7 +8,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { BookOpenIcon, PenLineIcon, Trash2Icon, PencilIcon, XIcon } from 'lucide-react'
+import { BookOpenIcon, PenLineIcon, Trash2Icon, PencilIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { WorkspaceSidebar } from '@/components/WorkspaceSidebar'
@@ -17,7 +17,14 @@ import { DeleteRecordDialog } from '@/components/dialogs/DeleteRecordDialog'
 import { useChatView } from './ChatSessionProvider'
 import { ChatMessagesPage } from './ChatMessagesPage'
 import { ChatDiaryPreviewPage } from './ChatDiaryPreviewPage'
-export function ChatWorkspace({ children }: { children?: ReactNode }) {
+import { chatRoute } from '@/router/paths'
+export function ChatWorkspace({
+  children,
+  docked = false,
+}: {
+  children?: ReactNode
+  docked?: boolean
+}) {
   const {
     id,
     active,
@@ -136,46 +143,48 @@ export function ChatWorkspace({ children }: { children?: ReactNode }) {
       {active && (
         <PageActions target={onClose ? localActions : titlebarTarget} actions={pageActions} />
       )}
-      <WorkspaceSidebar
-        returnFocusRef={sidebarTrigger}
-        id="chat-sidebar"
-        label="聊天历史"
-        open={sidebarOpen}
-        className="gap-3 p-3"
-      >
-        <div className="flex items-center justify-between gap-2">
-          <h1 className="font-semibold">聊天</h1>
-          <Button size="sm" variant="outline" disabled={busy} onClick={() => switchChat(null)}>
-            <PenLineIcon data-icon="inline-start" aria-hidden="true" />
-            新对话
-          </Button>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {loading && !chats.length && (
-            <p className="p-2 text-xs text-muted-foreground">正在读取…</p>
-          )}
-          {!loading && !chats.length && (
-            <p className="p-2 text-sm text-muted-foreground">暂无聊天</p>
-          )}
-          {chats.map((chat) => (
-            <Button
-              key={chat.id}
-              variant={id === chat.id ? 'secondary' : 'ghost'}
-              aria-current={id === chat.id ? 'true' : undefined}
-              className="mb-1 h-auto w-full justify-start whitespace-normal py-3 text-left"
-              disabled={busy}
-              onClick={() => switchChat(chat.id)}
-            >
-              {chat.title || '新的对话'}
+      {!docked && (
+        <WorkspaceSidebar
+          returnFocusRef={sidebarTrigger}
+          id="chat-sidebar"
+          label="聊天历史"
+          open={sidebarOpen}
+          className="gap-3 p-3"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <h1 className="font-semibold">聊天</h1>
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => switchChat(null)}>
+              <PenLineIcon data-icon="inline-start" aria-hidden="true" />
+              新对话
             </Button>
-          ))}
-          {next !== null && (
-            <Button variant="ghost" disabled={loading} onClick={() => void refreshChats(next)}>
-              更多聊天
-            </Button>
-          )}
-        </div>
-      </WorkspaceSidebar>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {loading && !chats.length && (
+              <p className="p-2 text-xs text-muted-foreground">正在读取…</p>
+            )}
+            {!loading && !chats.length && (
+              <p className="p-2 text-sm text-muted-foreground">暂无聊天</p>
+            )}
+            {chats.map((chat) => (
+              <Button
+                key={chat.id}
+                variant={id === chat.id ? 'secondary' : 'ghost'}
+                aria-current={id === chat.id ? 'true' : undefined}
+                className="mb-1 h-auto w-full justify-start whitespace-normal py-3 text-left"
+                disabled={busy}
+                onClick={() => switchChat(chat.id)}
+              >
+                {chat.title || '新的对话'}
+              </Button>
+            ))}
+            {next !== null && (
+              <Button variant="ghost" disabled={loading} onClick={() => void refreshChats(next)}>
+                更多聊天
+              </Button>
+            )}
+          </div>
+        </WorkspaceSidebar>
+      )}
       <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="聊天工作区">
         <header className="workspace-toolbar gap-2">
           <div className="min-w-0">
@@ -192,17 +201,6 @@ export function ChatWorkspace({ children }: { children?: ReactNode }) {
                 onClick={() => switchChat(null)}
               >
                 <PenLineIcon aria-hidden="true" />
-              </Button>
-            )}
-            {onClose && (
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label="关闭侧边聊天"
-                disabled={busy}
-                onClick={onClose}
-              >
-                <XIcon aria-hidden="true" />
               </Button>
             )}
           </div>
@@ -286,7 +284,10 @@ export function ChatWorkspace({ children }: { children?: ReactNode }) {
 }
 export function ChatSurface() {
   const { previewOpen } = useChatView('navigation')
+  const docked = chatRoute(useLocation()).docked
   return (
-    <ChatWorkspace>{previewOpen ? <ChatDiaryPreviewPage /> : <ChatMessagesPage />}</ChatWorkspace>
+    <ChatWorkspace docked={docked}>
+      {previewOpen ? <ChatDiaryPreviewPage /> : <ChatMessagesPage />}
+    </ChatWorkspace>
   )
 }

@@ -5,6 +5,9 @@ import {
   type EditingSession,
 } from '@/services/records'
 import { createContext, useContext, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { DiarySidebarContext } from '@/layouts/DiarySidebarContext'
+import { ConnectedCopyReviewPanel } from './ConnectedCopyReviewPanel'
 import {
   BoldIcon,
   ItalicIcon,
@@ -242,6 +245,7 @@ export function RecordEditor(props: Props) {
 }
 export function RecordEditorView() {
   const session = useContext(RecordEditorContext)
+  const reviewTarget = useContext(DiarySidebarContext)
   if (!session) throw new Error('缺少会话上下文')
   const {
     record,
@@ -275,225 +279,233 @@ export function RecordEditorView() {
     importFiles,
   } = session
   return (
-    <AttachmentSurface
-      scope={{
-        recordId: record.id,
-        revisionId: null,
-        attachments: record.attachments,
-        editable: !readOnly,
-        imageIds: imageIds(editor?.getJSON() ?? record.document),
-      }}
-    >
-      <article
-        ref={article}
-        aria-busy={readOnly}
-        onBeforeInputCapture={guardInput}
-        onPasteCapture={(event) => {
-          guardInput(event)
-          if (!locked.current) {
-            const files = Array.from(event.clipboardData.files)
+    <>
+      {reviewTarget &&
+        editor &&
+        createPortal(
+          <ConnectedCopyReviewPanel editor={editor} recordId={record.id} readOnly={readOnly} />,
+          reviewTarget,
+        )}
+      <AttachmentSurface
+        scope={{
+          recordId: record.id,
+          revisionId: null,
+          attachments: record.attachments,
+          editable: !readOnly,
+          imageIds: imageIds(editor?.getJSON() ?? record.document),
+        }}
+      >
+        <article
+          ref={article}
+          aria-busy={readOnly}
+          onBeforeInputCapture={guardInput}
+          onPasteCapture={(event) => {
+            guardInput(event)
+            if (!locked.current) {
+              const files = Array.from(event.clipboardData.files)
+              if (files.length) {
+                event.preventDefault()
+                event.stopPropagation()
+                importFiles(files, editor?.state.selection.to ?? 0)
+              }
+            }
+          }}
+          onDragOver={(event) => {
+            if (event.dataTransfer.types.includes('Files')) event.preventDefault()
+          }}
+          onDropCapture={(event) => {
+            guardInput(event)
+            if (locked.current) return
+            const files = Array.from(event.dataTransfer.files)
             if (files.length) {
               event.preventDefault()
               event.stopPropagation()
-              importFiles(files, editor?.state.selection.to ?? 0)
+              importFiles(
+                files,
+                editor?.view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ??
+                  editor?.state.doc.content.size ??
+                  0,
+              )
             }
-          }
-        }}
-        onDragOver={(event) => {
-          if (event.dataTransfer.types.includes('Files')) event.preventDefault()
-        }}
-        onDropCapture={(event) => {
-          guardInput(event)
-          if (locked.current) return
-          const files = Array.from(event.dataTransfer.files)
-          if (files.length) {
-            event.preventDefault()
-            event.stopPropagation()
-            importFiles(
-              files,
-              editor?.view.posAtCoords({ left: event.clientX, top: event.clientY })?.pos ??
-                editor?.state.doc.content.size ??
-                0,
-            )
-          }
-        }}
-        onCompositionStart={persistence.compositionStart}
-        onCompositionEnd={persistence.compositionEnd}
-        className="flex min-w-0 flex-1 flex-col bg-card"
-      >
-        <header className="flex flex-wrap items-center justify-between gap-3 px-6 py-2">
-          <div>
-            <span role="status" className="text-xs text-muted-foreground">
-              {status}
-            </span>
-          </div>
-        </header>
-        <div className="editor-document">
-          {(error || persistence.error) && (
-            <p
-              role="alert"
-              className="rounded border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-            >
-              {error || persistence.error}{' '}
-              <Button variant="ghost" size="sm" disabled={busy} onClick={() => void save()}>
-                立即重试
-              </Button>
-            </p>
-          )}
-          <input
-            aria-label="记录标题"
-            className="w-full bg-transparent text-2xl font-semibold outline-none placeholder:text-muted-foreground/60"
-            placeholder="无标题记录"
-            maxLength={240}
-            readOnly={readOnly}
-            value={title}
-            onChange={(e) => {
-              if (locked.current) return
-              setTitle(e.target.value)
-              changed()
-            }}
-          />
-          <div className="record-format" role="toolbar" aria-label="日记编辑工具">
-            <Popover
-              open={dateOpen && !readOnly}
-              onOpenChange={(open) => {
-                if (!locked.current) setDateOpen(open)
-              }}
-            >
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" aria-label="记录日期" disabled={readOnly}>
-                  <CalendarDaysIcon aria-hidden="true" />
-                  {date ? date.replace(/-/g, '/') : '选择日期'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                align="start"
-                className="w-80 max-w-[calc(100vw-2rem)] p-3"
-                aria-label="选择记录日期"
+          }}
+          onCompositionStart={persistence.compositionStart}
+          onCompositionEnd={persistence.compositionEnd}
+          className="flex min-w-0 flex-1 flex-col bg-card"
+        >
+          <header className="flex flex-wrap items-center justify-between gap-3 px-6 py-2">
+            <div>
+              <span role="status" className="text-xs text-muted-foreground">
+                {status}
+              </span>
+            </div>
+          </header>
+          <div className="editor-document">
+            {(error || persistence.error) && (
+              <p
+                role="alert"
+                className="rounded border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
               >
-                <DateFilterContent
-                  value={date ? { ...blankDateCondition, start: date } : null}
-                  capabilities={{
-                    fields: [{ value: 'start', label: '记录日期' }],
-                    operators: ['is'],
-                    shortcuts: [],
-                  }}
-                  onChange={(condition) => {
-                    if (locked.current) return
-                    const next = resolveDateConstraint(condition).dateFrom ?? ''
-                    if (next !== date) {
-                      setDate(next)
-                      changed()
-                    }
-                  }}
-                />
-              </PopoverContent>
-            </Popover>
-            <span aria-hidden="true" className="mx-1 h-4 shrink-0 border-l" />
-            {(
-              [
-                ['bold', '粗体', BoldIcon],
-                ['italic', '斜体', ItalicIcon],
-                ['heading', '标题', Heading2Icon],
-                ['list', '列表', ListIcon],
-              ] as const
-            ).map(([action, text, Icon]) => (
-              <Button
-                key={action}
-                variant="ghost"
-                size="icon-sm"
-                aria-label={text}
-                title={text}
-                disabled={readOnly}
-                onClick={() => format(action)}
-              >
-                <Icon aria-hidden="true" />
-              </Button>
-            ))}
-            {onImport && (
-              <>
-                <input
-                  ref={picker}
-                  aria-label="选择图片文件"
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  multiple
-                  className="sr-only"
-                  disabled={readOnly}
-                  onChange={(event) => {
-                    const files = Array.from(event.target.files ?? [])
-                    event.target.value = ''
-                    importFiles(files)
-                  }}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={readOnly || tagBusy}
-                  onClick={() => picker.current?.click()}
-                >
-                  <ImagePlusIcon data-icon="inline-start" aria-hidden="true" />
-                  插入图片
+                {error || persistence.error}{' '}
+                <Button variant="ghost" size="sm" disabled={busy} onClick={() => void save()}>
+                  立即重试
                 </Button>
-              </>
+              </p>
             )}
-
-            <TagManager
-              recordId={record.id}
-              tags={tags}
-              disabled={readOnly}
-              onBusy={(value) => {
-                setTagBusy(value)
-                onBusy(value)
-              }}
-              onChange={(next) => {
+            <input
+              aria-label="记录标题"
+              className="w-full bg-transparent text-2xl font-semibold outline-none placeholder:text-muted-foreground/60"
+              placeholder="无标题记录"
+              maxLength={240}
+              readOnly={readOnly}
+              value={title}
+              onChange={(e) => {
                 if (locked.current) return
-                setTags(next)
+                setTitle(e.target.value)
                 changed()
               }}
             />
-          </div>
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-2" aria-label="已选标签">
-              {tags.map((tag) => (
-                <span key={tag.id} className="rounded bg-secondary px-2 py-1 text-xs">
-                  #{tag.name}
-                </span>
-              ))}
-            </div>
-          )}
-          <EditorContent
-            className="record-editor flex-1"
-            editor={editor}
-            onFocus={() => {
-              lastPosition.current = editor?.state.selection.to ?? null
-            }}
-            onKeyUp={() => {
-              lastPosition.current = editor?.state.selection.to ?? null
-            }}
-            onMouseUp={() => {
-              lastPosition.current = editor?.state.selection.to ?? null
-            }}
-          />
-          {importReport && (
-            <div role="status" className="text-xs leading-6">
-              {importReport.messages.map((line, index) => (
-                <p key={index}>{line}</p>
-              ))}
-              {importReport.retry.length > 0 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={readOnly}
-                  onClick={() => importFiles(importReport.retry)}
+            <div className="record-format" role="toolbar" aria-label="日记编辑工具">
+              <Popover
+                open={dateOpen && !readOnly}
+                onOpenChange={(open) => {
+                  if (!locked.current) setDateOpen(open)
+                }}
+              >
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" aria-label="记录日期" disabled={readOnly}>
+                    <CalendarDaysIcon aria-hidden="true" />
+                    {date ? date.replace(/-/g, '/') : '选择日期'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="start"
+                  className="w-80 max-w-[calc(100vw-2rem)] p-3"
+                  aria-label="选择记录日期"
                 >
-                  重试未成功图片
+                  <DateFilterContent
+                    value={date ? { ...blankDateCondition, start: date } : null}
+                    capabilities={{
+                      fields: [{ value: 'start', label: '记录日期' }],
+                      operators: ['is'],
+                      shortcuts: [],
+                    }}
+                    onChange={(condition) => {
+                      if (locked.current) return
+                      const next = resolveDateConstraint(condition).dateFrom ?? ''
+                      if (next !== date) {
+                        setDate(next)
+                        changed()
+                      }
+                    }}
+                  />
+                </PopoverContent>
+              </Popover>
+              <span aria-hidden="true" className="mx-1 h-4 shrink-0 border-l" />
+              {(
+                [
+                  ['bold', '粗体', BoldIcon],
+                  ['italic', '斜体', ItalicIcon],
+                  ['heading', '标题', Heading2Icon],
+                  ['list', '列表', ListIcon],
+                ] as const
+              ).map(([action, text, Icon]) => (
+                <Button
+                  key={action}
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={text}
+                  title={text}
+                  disabled={readOnly}
+                  onClick={() => format(action)}
+                >
+                  <Icon aria-hidden="true" />
                 </Button>
+              ))}
+              {onImport && (
+                <>
+                  <input
+                    ref={picker}
+                    aria-label="选择图片文件"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    multiple
+                    className="sr-only"
+                    disabled={readOnly}
+                    onChange={(event) => {
+                      const files = Array.from(event.target.files ?? [])
+                      event.target.value = ''
+                      importFiles(files)
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={readOnly || tagBusy}
+                    onClick={() => picker.current?.click()}
+                  >
+                    <ImagePlusIcon data-icon="inline-start" aria-hidden="true" />
+                    插入图片
+                  </Button>
+                </>
               )}
+
+              <TagManager
+                recordId={record.id}
+                tags={tags}
+                disabled={readOnly}
+                onBusy={(value) => {
+                  setTagBusy(value)
+                  onBusy(value)
+                }}
+                onChange={(next) => {
+                  if (locked.current) return
+                  setTags(next)
+                  changed()
+                }}
+              />
             </div>
-          )}
-        </div>
-      </article>
-    </AttachmentSurface>
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-2" aria-label="已选标签">
+                {tags.map((tag) => (
+                  <span key={tag.id} className="rounded bg-secondary px-2 py-1 text-xs">
+                    #{tag.name}
+                  </span>
+                ))}
+              </div>
+            )}
+            <EditorContent
+              className="record-editor flex-1"
+              editor={editor}
+              onFocus={() => {
+                lastPosition.current = editor?.state.selection.to ?? null
+              }}
+              onKeyUp={() => {
+                lastPosition.current = editor?.state.selection.to ?? null
+              }}
+              onMouseUp={() => {
+                lastPosition.current = editor?.state.selection.to ?? null
+              }}
+            />
+            {importReport && (
+              <div role="status" className="text-xs leading-6">
+                {importReport.messages.map((line, index) => (
+                  <p key={index}>{line}</p>
+                ))}
+                {importReport.retry.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={readOnly}
+                    onClick={() => importFiles(importReport.retry)}
+                  >
+                    重试未成功图片
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+        </article>
+      </AttachmentSurface>
+    </>
   )
 }

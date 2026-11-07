@@ -17,7 +17,7 @@ import {
 import { errorMessage } from '@/lib/errors'
 
 type Directory = { models: string[]; catalog?: CliCatalog; loading: boolean; error?: string }
-export function ChatModelControls({
+export function ModelControls({
   active,
   profiles,
   profileId,
@@ -25,7 +25,11 @@ export function ChatModelControls({
   disabled,
   onProfile,
   onSelection,
+  context = '聊天',
+  compact = false,
 }: {
+  context?: '聊天' | '审查'
+  compact?: boolean
   active: boolean
   profiles: AiProfile[]
   profileId: string
@@ -80,30 +84,38 @@ export function ChatModelControls({
     : (profile?.reasoningEffort ?? modelDefaultEffort)
   const effort = selection?.reasoningEffort ?? ''
   return (
-    <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-1">
+    <div
+      className={`${context === '聊天' ? 'ml-auto' : ''} flex min-w-0 flex-wrap items-center justify-end gap-1`}
+    >
       <Popover open={open && active && !disabled} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <Button
             type="button"
             variant="ghost"
-            size="sm"
+            size={compact ? 'icon-sm' : 'sm'}
             role="combobox"
-            aria-label="聊天模型"
+            aria-label={`${context}模型`}
             aria-expanded={open}
             disabled={disabled}
             className="max-w-72 min-w-0 text-muted-foreground"
           >
-            <span className="truncate">
-              {profile
-                ? `${chosen?.displayName ?? model ?? '默认模型'} · ${profile.label}${profile.protocol === 'codex' && (effort || defaultEffort) ? ` · ${effort || defaultEffort}` : ''}`
-                : profileId
-                  ? '原服务不可用，请重新选择'
-                  : '选择模型'}
-            </span>
+            {!compact && (
+              <span className="truncate">
+                {profile
+                  ? `${chosen?.displayName ?? model ?? '默认模型'} · ${profile.label}${profile.protocol === 'codex' && (effort || defaultEffort) ? ` · ${effort || defaultEffort}` : ''}`
+                  : profileId
+                    ? '原服务不可用，请重新选择'
+                    : '选择模型'}
+              </span>
+            )}
             <ChevronDownIcon data-icon="inline-end" />
           </Button>
         </PopoverTrigger>
-        <PopoverContent side="top" align="end" className="w-96 max-w-[calc(100vw-2rem)] p-0">
+        <PopoverContent
+          side={context === '审查' ? 'bottom' : 'top'}
+          align="end"
+          className="w-96 max-w-[calc(100vw-2rem)] p-0"
+        >
           <Command>
             <CommandInput aria-label="搜索模型" placeholder="搜索模型或来源…" />
             <CommandList>
@@ -185,7 +197,7 @@ export function ChatModelControls({
                 <NativeSelect
                   className="w-full"
                   size="sm"
-                  aria-label="聊天推理强度"
+                  aria-label={`${context}推理强度`}
                   disabled={
                     disabled || directory?.loading || !chosen?.supportedReasoningEfforts.length
                   }

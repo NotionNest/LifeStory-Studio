@@ -4,7 +4,7 @@ import { modelProfilesApi, type AiProfile, type ModelSelection } from '@/service
 import { act, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { expect, it, vi } from 'vitest'
-import { ChatModelControls } from './ChatModelControls'
+import { ModelControls } from '@/components/ModelControls'
 vi.mock('@/services/cli', async (original) => ({
   ...(await original<typeof import('@/services/cli')>()),
   cliApi: { codexCatalog: vi.fn() },
@@ -72,7 +72,7 @@ async function setup() {
     const [selection, setSelection] = useState<ModelSelection>(),
       [id, setId] = useState('cli')
     return (
-      <ChatModelControls
+      <ModelControls
         active
         profiles={[profile, api]}
         profileId={id}
@@ -183,7 +183,7 @@ it('ignores directories that arrive after leaving the page', async () => {
   try {
     await act(() =>
       ui.root.render(
-        <ChatModelControls
+        <ModelControls
           active={false}
           profiles={[profile]}
           profileId="cli"
