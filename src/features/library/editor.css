@@ -82,6 +82,11 @@
     --review-mark-color: var(--review-flow);
     text-decoration-style: solid;
   }
+  .copy-review-mark--punctuation {
+    --review-mark-color: var(--review-punctuation);
+    text-decoration-style: wavy;
+    text-decoration-thickness: 1px;
+  }
   .copy-review-mark--review {
     --review-mark-color: var(--review-check);
     text-decoration-style: dotted;

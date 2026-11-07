@@ -7,7 +7,7 @@ import {
 import { createContext, useContext, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { DiarySidebarContext } from '@/layouts/DiarySidebarContext'
-import { CopyReviewPanel } from './CopyReviewPanel'
+import { ConnectedCopyReviewPanel } from './ConnectedCopyReviewPanel'
 import {
   BoldIcon,
   ItalicIcon,
@@ -282,7 +282,10 @@ export function RecordEditorView() {
     <>
       {reviewTarget &&
         editor &&
-        createPortal(<CopyReviewPanel editor={editor} readOnly={readOnly} />, reviewTarget)}
+        createPortal(
+          <ConnectedCopyReviewPanel editor={editor} recordId={record.id} readOnly={readOnly} />,
+          reviewTarget,
+        )}
       <AttachmentSurface
         scope={{
           recordId: record.id,

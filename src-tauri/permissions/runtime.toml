@@ -6,7 +6,7 @@ commands.allow = ["runtime_info"]
 [[permission]]
 identifier = "manage-records"
 description = "Create, read and save local text records and tags."
-commands.allow = ["record_create", "record_read", "record_list", "trash_status", "trash_impact", "trash_move", "trash_list", "trash_restore", "trash_purge", "ai_compare", "ai_models", "ai_codex_inspect", "ai_codex_models", "ai_cli_scan", "ai_codex_catalog", "ai_codex_probe", "ai_test_cli", "ai_cancel_test", "ai_retry_save", "ai_import_image", "ai_profiles",
+commands.allow = ["record_create", "record_read", "record_list", "copy_review_reserve", "copy_review_run", "copy_review_cancel", "trash_status", "trash_impact", "trash_move", "trash_list", "trash_restore", "trash_purge", "ai_compare", "ai_models", "ai_codex_inspect", "ai_codex_models", "ai_cli_scan", "ai_codex_catalog", "ai_codex_probe", "ai_test_cli", "ai_cancel_test", "ai_retry_save", "ai_import_image", "ai_profiles",
   "ai_preferences",
   "ai_set_default",
   "ai_chat_list",

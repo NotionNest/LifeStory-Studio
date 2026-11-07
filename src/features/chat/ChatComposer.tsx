@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { ChatModelControls } from './ChatModelControls'
+import { ModelControls } from '@/components/ModelControls'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -145,7 +145,7 @@ export const ChatComposer = memo(function ChatComposer() {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-            <ChatModelControls
+            <ModelControls
               active={active}
               profiles={profiles}
               profileId={profileId}

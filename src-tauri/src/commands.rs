@@ -352,8 +352,15 @@ pub async fn trash_impact(
 pub async fn trash_move(
     database: State<'_, DatabaseWorker>,
     runner: State<'_, crate::ai::AiRunner>,
+    review_runner: State<'_, crate::copy_review::ReviewRunner>,
     input: crate::trash::TrashRequest,
 ) -> Result<(), RecordError> {
+    let _fence = review_runner
+        .fence_record(&input.record_id)
+        .map_err(|message| RecordError {
+            code: "conflict",
+            message,
+        })?;
     let runner = runner.inner().clone();
     record_task(&database, move |db| runner.move_to_trash(&db, input)).await
 }
@@ -907,6 +914,290 @@ mod connection_tests {
         ))
         .unwrap_err();
         assert_eq!(error.code, "credential_error");
+        drop(db);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+}
+
+#[tauri::command]
+pub async fn copy_review_reserve(
+    runner: State<'_, crate::copy_review::ReviewRunner>,
+    request_id: String,
+    record_id: String,
+) -> Result<(), RecordError> {
+    runner
+        .reserve(&request_id, &record_id)
+        .map_err(|message| RecordError {
+            code: "conflict",
+            message,
+        })
+}
+
+#[tauri::command]
+pub async fn copy_review_cancel(
+    runner: State<'_, crate::copy_review::ReviewRunner>,
+    request_id: String,
+) -> Result<(), RecordError> {
+    runner.cancel(&request_id).map_err(|message| RecordError {
+        code: "conflict",
+        message,
+    })?;
+    let timeout = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
+    loop {
+        if !runner
+            .contains(&request_id)
+            .map_err(|message| RecordError {
+                code: "conflict",
+                message,
+            })?
+        {
+            return Ok(());
+        }
+        if tokio::time::Instant::now() >= timeout {
+            return Err(RecordError {
+                code: "cancel_timeout",
+                message: "无法确认审查已停止".into(),
+            });
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(25)).await;
+    }
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CopyReviewRequest {
+    request_id: String,
+    record_id: String,
+    profile_id: String,
+    selection: Option<crate::ai::ModelSelection>,
+    blocks: Vec<crate::copy_review::TextBlock>,
+}
+
+#[tauri::command]
+pub async fn copy_review_run(
+    runner: State<'_, crate::copy_review::ReviewRunner>,
+    database: State<'_, DatabaseWorker>,
+    input: CopyReviewRequest,
+) -> Result<crate::copy_review::ReviewResult, RecordError> {
+    run_copy_review(&runner, &database, input).await
+}
+
+async fn run_copy_review(
+    runner: &crate::copy_review::ReviewRunner,
+    database: &DatabaseWorker,
+    input: CopyReviewRequest,
+) -> Result<crate::copy_review::ReviewResult, RecordError> {
+    use std::sync::atomic::Ordering;
+    let lease = runner
+        .claim(&input.request_id)
+        .map_err(|message| RecordError {
+            code: "conflict",
+            message,
+        })?;
+    if lease.record_id != input.record_id {
+        return Err(RecordError {
+            code: "validation",
+            message: "审查任务与日记不匹配".into(),
+        });
+    }
+    crate::copy_review::validate_blocks(&input.blocks).map_err(|message| RecordError {
+        code: "validation",
+        message,
+    })?;
+    let record_id = input.record_id.clone();
+    let profile_id = input.profile_id.clone();
+    let selection = input.selection.clone();
+    let source = record_task(database, move |db| {
+        db.copy_review_source(record_id, profile_id, selection)
+    })
+    .await?;
+    if lease.cancelled.load(Ordering::SeqCst) {
+        return Err(RecordError {
+            code: "cancelled",
+            message: "审查已停止".into(),
+        });
+    }
+    let profile = if source.profile.protocol == "codex" {
+        let resolve = crate::ai_providers::resolve_cli_profile(source.profile.clone());
+        tokio::select! {
+            result = resolve => result.map_err(|message| RecordError {
+                code: "provider_error",
+                message,
+            })?,
+            _ = async { while !lease.cancelled.load(Ordering::SeqCst) { tokio::time::sleep(std::time::Duration::from_millis(25)).await; } } => return Err(RecordError { code: "cancelled", message: "审查已停止".into() }),
+        }
+    } else {
+        source.profile.clone()
+    };
+    let record_id = input.record_id.clone();
+    let profile_id = input.profile_id.clone();
+    let current = record_task(database, move |db| {
+        db.copy_review_source(record_id, profile_id, input.selection)
+    })
+    .await?;
+    if serde_json::to_value(&current.profile).ok() != serde_json::to_value(&source.profile).ok()
+        || current.key != source.key
+    {
+        return Err(RecordError {
+            code: "conflict",
+            message: "服务配置已变化，请重新选择".into(),
+        });
+    }
+    if lease.cancelled.load(Ordering::SeqCst) {
+        return Err(RecordError {
+            code: "cancelled",
+            message: "审查已停止".into(),
+        });
+    }
+    let result =
+        crate::copy_review::generate_review(&lease, &profile, source.key.as_deref(), &input.blocks)
+            .await
+            .map_err(|message| RecordError {
+                code: "provider_error",
+                message,
+            })?;
+    let record_id = input.record_id;
+    let state = record_task(database, move |db| db.trash_status(record_id)).await?;
+    if state != "active" || lease.cancelled.load(Ordering::SeqCst) {
+        return Err(RecordError {
+            code: "not_found",
+            message: "日记已失效".into(),
+        });
+    }
+    Ok(result)
+}
+
+#[cfg(all(test, unix))]
+mod copy_review_tests {
+    use super::*;
+    #[tokio::test]
+    async fn copy_review_synthetic_request_runs_without_persisting_content_or_tasks() {
+        let root = std::env::temp_dir().join(format!(
+            "lifestory-review-command-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let (_fixture, mut profile) = crate::ai_providers::codex_tests::fixture("review");
+        profile.context_chars = 32_000;
+        let db = DatabaseWorker::start(root.clone()).unwrap();
+        db.create_record(crate::records::CreateRecord {
+            request_id: "diary".into(),
+            record_date: "2026-10-21".into(),
+            created_timezone: "Asia/Shanghai".into(),
+        })
+        .unwrap();
+        let saved = db.ai_configure(profile, String::new()).unwrap();
+        let runner = crate::copy_review::ReviewRunner::default();
+        runner.reserve("request", "diary").unwrap();
+        let result = run_copy_review(
+            &runner,
+            &db,
+            CopyReviewRequest {
+                request_id: "request".into(),
+                record_id: "diary".into(),
+                profile_id: saved.id,
+                selection: None,
+                blocks: vec![crate::copy_review::TextBlock {
+                    id: "b1".into(),
+                    text: "今天很好很好".into(),
+                }],
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(result.suggestions.len(), 1);
+        assert!(!runner.contains("request").unwrap());
+        let sql = rusqlite::Connection::open(root.join("lifestory.db")).unwrap();
+        let count: i64 = sql
+            .query_row("SELECT count(*) FROM ai_tasks", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
+        let count: i64 = sql
+            .query_row(
+                "SELECT count(*) FROM records WHERE working_text LIKE '%今天很好很好%'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
+        drop(sql);
+        drop(db);
+        for entry in std::fs::read_dir(&root).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_file() {
+                let bytes = std::fs::read(path).unwrap();
+                assert!(
+                    !bytes
+                        .windows("今天很好很好".len())
+                        .any(|part| part == "今天很好很好".as_bytes())
+                );
+            }
+        }
+        std::fs::remove_dir_all(root).unwrap();
+    }
+    #[tokio::test]
+    async fn copy_review_delete_fences_and_cancels_a_running_request() {
+        let root = std::env::temp_dir().join(format!(
+            "lifestory-review-delete-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let (_fixture, mut profile) = crate::ai_providers::codex_tests::fixture("cancel");
+        profile.context_chars = 32_000;
+        let db = DatabaseWorker::start(root.clone()).unwrap();
+        db.create_record(crate::records::CreateRecord {
+            request_id: "diary".into(),
+            record_date: "2026-10-21".into(),
+            created_timezone: "Asia/Shanghai".into(),
+        })
+        .unwrap();
+        let saved = db.ai_configure(profile, String::new()).unwrap();
+        let runner = crate::copy_review::ReviewRunner::default();
+        runner.reserve("request", "diary").unwrap();
+        let worker_runner = runner.clone();
+        let worker_db = db.clone();
+        let work = tokio::spawn(async move {
+            run_copy_review(
+                &worker_runner,
+                &worker_db,
+                CopyReviewRequest {
+                    request_id: "request".into(),
+                    record_id: "diary".into(),
+                    profile_id: saved.id,
+                    selection: None,
+                    blocks: vec![crate::copy_review::TextBlock {
+                        id: "b1".into(),
+                        text: "合成文字".into(),
+                    }],
+                },
+            )
+            .await
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        let fence = runner.fence_record("diary").unwrap();
+        assert!(runner.reserve("next", "diary").is_err());
+        let impact = db.trash_impact("diary".into()).unwrap();
+        db.trash_move(crate::trash::TrashRequest {
+            record_id: "diary".into(),
+            expected_content_version: impact.content_version,
+            expected_impact: impact.impact_token,
+        })
+        .unwrap();
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_secs(5), work)
+                .await
+                .unwrap()
+                .unwrap()
+                .is_err()
+        );
+        assert!(!runner.contains("request").unwrap());
+        drop(fence);
         drop(db);
         std::fs::remove_dir_all(root).unwrap();
     }

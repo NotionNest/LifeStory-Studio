@@ -1410,3 +1410,52 @@ fn chat_user_text_flag_tracks_committed_user_text_across_windows_and_restart() {
             .has_user_text
     );
 }
+
+#[test]
+fn copy_review_source_checks_diary_and_does_not_create_chat_tasks() {
+    let (root, db, _) = setup();
+    let profile = db
+        .ai_configure(
+            Profile {
+                id: "input".into(),
+                label: "审查测试".into(),
+                service: "custom".into(),
+                protocol: "chat".into(),
+                base_url: "https://invalid.example/v1".into(),
+                model: "original".into(),
+                context_chars: 32000,
+                max_output_tokens: 1000,
+                ..Default::default()
+            },
+            "synthetic-secret".into(),
+        )
+        .unwrap();
+    let source = db
+        .copy_review_source(
+            "source".into(),
+            profile.id.clone(),
+            Some(lifestory_studio_lib::ai::ModelSelection {
+                model: Some("chosen".into()),
+                reasoning_effort: None,
+            }),
+        )
+        .unwrap();
+    assert_eq!(source.profile.model, "chosen");
+    assert_eq!(source.key.as_deref(), Some("synthetic-secret"));
+    let tasks: i64 = root
+        .sql()
+        .query_row("SELECT count(*) FROM ai_tasks", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(tasks, 0);
+    let impact = db.trash_impact("source".into()).unwrap();
+    db.trash_move(TrashRequest {
+        record_id: "source".into(),
+        expected_content_version: impact.content_version,
+        expected_impact: impact.impact_token,
+    })
+    .unwrap();
+    assert!(
+        db.copy_review_source("source".into(), profile.id, None)
+            .is_err()
+    );
+}

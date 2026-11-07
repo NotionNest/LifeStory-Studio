@@ -2,6 +2,9 @@ fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
             "runtime_info",
+            "copy_review_reserve",
+            "copy_review_run",
+            "copy_review_cancel",
             "record_create",
             "record_read",
             "record_list",

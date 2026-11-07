@@ -144,7 +144,7 @@ it('does not start a review before the service is connected', async () => {
       (item) => item.textContent === '开始审查',
     )!
     expect(button.disabled).toBe(true)
-    expect(host.textContent).toContain('审查服务尚未接入')
+    expect(host.textContent).not.toContain('审查服务尚未接入')
     expect(host.textContent).not.toContain('模拟状态')
   } finally {
     await act(async () => root.unmount())
@@ -286,6 +286,63 @@ it('shows the actual review failure and permits retry', async () => {
       [...host.querySelectorAll('button')].find((b) => b.textContent === '重试')!.click(),
     )
     expect(host.textContent).toContain('未发现建议')
+  } finally {
+    await act(async () => root.unmount())
+    editor.destroy()
+    host.remove()
+  }
+})
+
+it('does not claim a review stopped when cancellation fails', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  const host = document.createElement('div')
+  document.body.append(host)
+  const editor = new Editor({ extensions: [StarterKit], content: '<p>合成文字</p>' })
+  const root = createRoot(host)
+  const requestReview = (signal: AbortSignal) =>
+    new Promise<typeof suggestions>((_, reject) => {
+      signal.addEventListener('abort', () => reject(new Error('取消失败')))
+    })
+  try {
+    await act(async () =>
+      root.render(
+        <CopyReviewPanel editor={editor} readOnly={false} requestReview={requestReview} />,
+      ),
+    )
+    await act(async () =>
+      [...host.querySelectorAll('button')].find((b) => b.textContent === '开始审查')!.click(),
+    )
+    await act(async () =>
+      [...host.querySelectorAll('button')].find((b) => b.textContent === '停止审查')!.click(),
+    )
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('取消失败')
+    expect(host.textContent).not.toContain('审查已停止')
+  } finally {
+    await act(async () => root.unmount())
+    editor.destroy()
+    host.remove()
+  }
+})
+
+it('enables review after text is added to an empty diary', async () => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true })
+  const host = document.createElement('div')
+  document.body.append(host)
+  const editor = new Editor({ extensions: [StarterKit], content: '<p></p>' })
+  const root = createRoot(host)
+  try {
+    await act(async () =>
+      root.render(
+        <CopyReviewPanel editor={editor} readOnly={false} requestReview={async () => []} />,
+      ),
+    )
+    const button = [...host.querySelectorAll('button')].find(
+      (entry) => entry.textContent === '开始审查',
+    )!
+    expect(button.disabled).toBe(true)
+    expect(host.textContent).toContain('没有可审查文字')
+    await act(async () => editor.commands.insertContent('合成文字'))
+    expect(button.disabled).toBe(false)
   } finally {
     await act(async () => root.unmount())
     editor.destroy()

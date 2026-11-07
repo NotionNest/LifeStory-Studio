@@ -911,7 +911,7 @@ impl CodexSession {
         }
     }
 }
-struct WorkDir(std::path::PathBuf);
+pub(crate) struct WorkDir(std::path::PathBuf);
 impl Drop for WorkDir {
     fn drop(&mut self) {
         let _ = std::fs::remove_dir_all(&self.0);
@@ -1174,10 +1174,10 @@ async fn codex_generate(
 }
 
 #[cfg(all(test, unix))]
-mod codex_tests {
+pub(crate) mod codex_tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
-    fn fixture(mode: &str) -> (WorkDir, Profile) {
+    pub(crate) fn fixture(mode: &str) -> (WorkDir, Profile) {
         static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
         let nonce = format!(
             "{}-{}",
@@ -1243,8 +1243,9 @@ for line in sys.stdin:
    emit({'method':'item/reasoning/textDelta','params':dict(base,itemId='reason',delta='原始内容不能展示')})
    emit({'method':'item/completed','params':dict(base,item={'id':'reason','type':'reasoning','summary':['合成摘要'],'content':['原始内容不能展示']})})
   emit({'method':'item/started','params':dict(base,item={'id':'answer','type':'agentMessage','phase':'final_answer','text':''})})
-  emit({'method':'item/agentMessage/delta','params':dict(base,itemId='answer',delta='合成正文')})
-  emit({'method':'item/completed','params':dict(base,item={'id':'answer','type':'agentMessage','phase':'final_answer','text':'合成正文'})})
+  answer=json.dumps({'version':1,'suggestions':[{'id':'a','category':'repetition','references':[{'blockId':'b1','quote':'很好很好'}],'reason':'重复','replacement':'很好'}]},ensure_ascii=False) if mode=='review' else '合成正文'
+  emit({'method':'item/agentMessage/delta','params':dict(base,itemId='answer',delta=answer)})
+  emit({'method':'item/completed','params':dict(base,item={'id':'answer','type':'agentMessage','phase':'final_answer','text':answer})})
   emit({'method':'turn/completed','params':{'threadId':'thread','turn':{'id':'turn','status':'completed'}}});continue
  else: raise Exception('unexpected method')
  emit({'id':id,'result':result})
@@ -1264,6 +1265,23 @@ for line in sys.stdin:
             ..Default::default()
         };
         (dir, profile)
+    }
+    #[tokio::test]
+    async fn copy_review_synthetic_codex_returns_validated_suggestions() {
+        let (_dir, mut profile) = fixture("review");
+        profile.context_chars = 32000;
+        let runner = crate::copy_review::ReviewRunner::default();
+        runner.reserve("request", "record").unwrap();
+        let lease = runner.claim("request").unwrap();
+        let blocks = vec![crate::copy_review::TextBlock {
+            id: "b1".into(),
+            text: "今天很好很好".into(),
+        }];
+        let result = crate::copy_review::generate_review(&lease, &profile, None, &blocks)
+            .await
+            .unwrap();
+        assert_eq!(result.suggestions.len(), 1);
+        assert_eq!(result.suggestions[0].references[0].quote, "很好很好");
     }
     #[tokio::test]
     async fn public_reasoning_summaries_stay_separate_from_final_text() {
@@ -1884,6 +1902,31 @@ mod request_contract_tests {
             context_chars: 1000,
             max_output_tokens: 100,
             ..Default::default()
+        }
+    }
+    #[test]
+    fn copy_review_api_requests_contain_only_selected_text_and_model() {
+        let blocks = vec![crate::copy_review::TextBlock {
+            id: "b1".into(),
+            text: "合成校对正文".into(),
+        }];
+        for protocol in ["chat", "responses", "messages", "gemini"] {
+            let p = profile(protocol);
+            let messages = crate::copy_review::review_messages(&blocks, p.context_chars).unwrap();
+            let (url, body) = request(&p, messages).unwrap();
+            let encoded = serde_json::to_string(&body).unwrap();
+            assert!(url.starts_with("https://invalid.example/v1"));
+            assert!(encoded.contains("合成校对正文"));
+            assert!(!encoded.contains("attachmentId"));
+            assert!(!encoded.contains("image_url"));
+            if protocol == "gemini" {
+                assert!(url.contains("synthetic-model"));
+            } else {
+                assert_eq!(body["model"], "synthetic-model");
+            }
+            if protocol == "responses" {
+                assert_eq!(body["store"], false);
+            }
         }
     }
     #[test]

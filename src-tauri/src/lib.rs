@@ -5,6 +5,7 @@ pub mod ai_providers;
 pub mod attachments;
 pub mod chat_history;
 mod commands;
+pub mod copy_review;
 pub mod credentials;
 pub mod history;
 pub mod library_query;
@@ -23,6 +24,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(ExitGate(AtomicBool::new(false)))
         .manage(ai::AiRunner::default())
+        .manage(copy_review::ReviewRunner::default())
         .on_menu_event(|app, event| {
             let name = match event.id().as_ref() {
                 "request-exit" | "request-close" => "exit-requested",
@@ -91,6 +93,9 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::runtime_info,
+            commands::copy_review_reserve,
+            commands::copy_review_cancel,
+            commands::copy_review_run,
             commands::record_create,
             commands::record_read,
             commands::record_list,
