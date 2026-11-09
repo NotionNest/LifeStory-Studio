@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { searchApi, type QueryPage } from '@/services/search'
-import { act } from 'react'
+import { act, StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { calendarDates, useLibraryQuery } from './useLibraryQuery'
@@ -109,6 +109,39 @@ function setup() {
     },
   }
 }
+it('does not focus a diary on startup but restores focus after opening one', async () => {
+  const t = setup()
+  try {
+    await act(() =>
+      t.root.render(
+        <StrictMode>
+          <t.Harness />
+        </StrictMode>,
+      ),
+    )
+    const diary = t.host.querySelector<HTMLElement>('[data-record-id="entry"]')!
+    expect(document.activeElement).not.toBe(diary)
+
+    await t.click('合成旅行记录')
+    await act(() =>
+      t.root.render(
+        <StrictMode>
+          <t.Harness active={false} />
+        </StrictMode>,
+      ),
+    )
+    await act(() =>
+      t.root.render(
+        <StrictMode>
+          <t.Harness />
+        </StrictMode>,
+      ),
+    )
+    expect(document.activeElement).toBe(diary)
+  } finally {
+    await t.close()
+  }
+})
 it('shares filters across views and opens a day without replacing the global date range', async () => {
   const t = setup()
   try {

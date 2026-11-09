@@ -226,6 +226,10 @@ export function LibraryBrowser({
     if (element && position) {
       element.scrollTop = position.top
       element.scrollLeft = position.left
+      if (position.id === undefined && position.index === undefined) {
+        restore.current = false
+        return
+      }
       const buttons = [...element.querySelectorAll<HTMLElement>('[data-record-id]')]
       const target =
         buttons.find((button) => button.dataset.recordId === position.id) ??

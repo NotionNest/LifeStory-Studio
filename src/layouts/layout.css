@@ -111,7 +111,10 @@ html.native-material,
   background: transparent;
 }
 
-.native-material .studio-shell,
+.native-material .studio-shell {
+  background: var(--shell-material-tint);
+}
+
 .native-material .studio-titlebar {
   background: transparent;
 }
