@@ -37,6 +37,7 @@
   --scrollbar-thumb-hover: rgb(0 0 0 / 30%);
   --scrollbar-thumb-active: rgb(0 0 0 / 42%);
   --shell: #ececf2;
+  --shell-material-tint: rgb(230 230 230 / 0%);
   --sidebar: #f7f7f9;
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -102,6 +103,7 @@
   --scrollbar-thumb-hover: rgb(255 255 255 / 28%);
   --scrollbar-thumb-active: rgb(255 255 255 / 40%);
   --shell: #151518;
+  --shell-material-tint: transparent;
   --background: #202023;
   --foreground: #ececef;
   --card: #202023;
