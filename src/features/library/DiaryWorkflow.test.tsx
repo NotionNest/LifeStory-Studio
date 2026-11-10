@@ -46,10 +46,13 @@ vi.mock('@/services/search', async (original) => ({
           kind: 'text',
           tags: [],
           hasImages: false,
+          imageIds: [],
+          createdAt: 0,
           matchField: null,
         })),
         total: rows?.length ?? 0,
         nextOffset: null,
+        months: [],
         days: [],
         tags: [],
       }
@@ -75,10 +78,13 @@ beforeEach(() => {
         kind: 'text' as const,
         tags: [],
         hasImages: false,
+        imageIds: [],
+        createdAt: 0,
         matchField: null,
       })),
       total: rows?.length ?? 0,
       nextOffset: null,
+      months: [],
       days: [],
       tags: [],
     }
@@ -145,6 +151,11 @@ it('guards navigation on failure and discards only after explicit choice', async
         .click()
     })
     const input = () => host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!
+    expect(
+      host.querySelector(
+        '[aria-label="编辑工作区"] .workspace-toolbar [aria-label="已保存到本机"]',
+      ),
+    ).not.toBeNull()
     await menuAction(host, '重命名')
     expect(document.activeElement).toBe(input())
     expect(input().selectionEnd).toBe(input().value.length)
@@ -591,6 +602,8 @@ it('preserves the filtered home and defers a global command until saving succeed
     kind: 'text' as const,
     tags: [],
     hasImages: false,
+    imageIds: [],
+    createdAt: 0,
     matchField: null,
   }
   vi.mocked(recordsApi.recoveries).mockResolvedValue([])
@@ -607,6 +620,7 @@ it('preserves the filtered home and defers a global command until saving succeed
     items: [item],
     total: 1,
     nextOffset: null,
+    months: [],
     days: [],
     tags: [],
   })
@@ -701,12 +715,15 @@ it('opens the text editor after resolving recovery from a conversation preview',
     kind: 'text' as const,
     tags: [],
     hasImages: false,
+    imageIds: [],
+    createdAt: 0,
     matchField: null,
   }
   vi.mocked(searchApi.query).mockResolvedValue({
     items: [{ ...item, id: 'conversation', title: '合成对话', kind: 'conversation' }, item],
     total: 2,
     nextOffset: null,
+    months: [],
     days: [],
     tags: [],
   })
@@ -806,11 +823,14 @@ it('reloads an adopted diary when returning from chat through the main navigatio
         kind: 'text',
         tags: [],
         hasImages: false,
+        imageIds: [],
+        createdAt: 0,
         matchField: null,
       },
     ],
     total: 1,
     nextOffset: null,
+    months: [],
     days: [],
     tags: [],
   })
@@ -871,9 +891,12 @@ it('keeps the editor usable when ending its session fails and retries the global
     recoveredTags: [],
   })
   vi.mocked(searchApi.query).mockResolvedValue({
-    items: [{ ...record, excerpt: '', kind: 'text', hasImages: false, matchField: null }],
+    items: [
+      { ...record, excerpt: '', kind: 'text', hasImages: false, imageIds: [], matchField: null },
+    ],
     total: 1,
     nextOffset: null,
+    months: [],
     days: [],
     tags: [],
   })
@@ -934,6 +957,7 @@ it('opens a linked diary with a guarded return to its chat source', async () => 
     items: [],
     total: 0,
     nextOffset: null,
+    months: [],
     days: [],
     tags: [],
   })
@@ -993,6 +1017,7 @@ it('opens diary chat without leaving the editor and synchronizes external change
     items: [],
     total: 0,
     nextOffset: null,
+    months: [],
     days: [],
     tags: [],
   })

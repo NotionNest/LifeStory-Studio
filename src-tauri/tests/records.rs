@@ -51,11 +51,34 @@ fn save(db: &DatabaseWorker, record: &Record) -> SaveRecord {
         session_id: session.session_id,
         edit_sequence: 1,
         title: Some("补写旅行".into()),
+        mood: None,
         record_date: "2024-02-29".into(),
         tag_ids: vec![],
         document: json!({"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"原文：标点，换行"}]},{"type":"paragraph","content":[{"type":"text","text":"下一段"}]}]}),
         attachment_ids: vec![],
     }
+}
+#[test]
+fn rich_text_formats_survive_save_and_reopen() {
+    let root = Workspace::new();
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    let entry = create(&db);
+    let mut input = save(&db, &entry);
+    input.document = json!({"type":"doc","content":[
+        {"type":"paragraph","attrs":{"indent":2,"textAlign":"center"},"content":[{"type":"text","text":"合成内容","marks":[{"type":"underline"},{"type":"textStyle","attrs":{"color":"#aabbcc","backgroundColor":"#0000ff80"}},{"type":"link","attrs":{"href":"https://example.com","target":null,"rel":null,"class":null,"title":null}}]}]},
+        {"type":"taskList","content":[{"type":"taskItem","attrs":{"checked":true},"content":[{"type":"paragraph","attrs":{"indent":0,"textAlign":null},"content":[{"type":"text","text":"任务"}]}]}]}
+    ]});
+    let mut invalid = input.clone();
+    invalid.document["content"][0]["content"][0]["marks"][1]["attrs"]["color"] =
+        json!("url(javascript:bad)");
+    assert!(db.save_record(invalid).is_err());
+    db.save_record(input.clone()).unwrap();
+    drop(db);
+    let reopened = DatabaseWorker::start(root.0.clone()).unwrap();
+    assert_eq!(
+        reopened.read_record(entry.id).unwrap().document,
+        input.document
+    );
 }
 #[test]
 fn save_retry_reopen_tags_and_conflict_preserve_content() {
@@ -293,4 +316,54 @@ fn changing_date_preserves_body_tags_and_search() {
     db.save_record(input).unwrap();
     assert_eq!(db.read_record(entry.id).unwrap().record_date, "2026-10-16");
     drop(external);
+}
+
+#[test]
+fn mood_is_saved_reopened_and_validated() {
+    let root = Workspace::new();
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    let entry = create(&db);
+    let mut input = save(&db, &entry);
+    input.mood = Some("👨‍👩‍👧‍👦".into());
+    db.save_record(input.clone()).unwrap();
+    drop(db);
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    let saved = db.read_record(entry.id.clone()).unwrap();
+    assert_eq!(saved.mood.as_deref(), Some("👨‍👩‍👧‍👦"));
+    let session = db
+        .begin_edit(lifestory_studio_lib::recovery::BeginEdit {
+            record_id: entry.id.clone(),
+            expected_content_version: saved.content_version,
+            recovery: None,
+        })
+        .unwrap();
+    input.session_id = session.session_id;
+    input.base_content_version = Some(session.record.content_version);
+    input.base_revision_id = Some(session.record.revision_id);
+    input.request_id = "save-invalid-mood".into();
+    input.mood = Some("😀😃".into());
+    assert!(db.save_record(input).is_err());
+    assert_eq!(
+        db.read_record(entry.id).unwrap().mood.as_deref(),
+        Some("👨‍👩‍👧‍👦")
+    );
+}
+
+#[test]
+fn schema_seventeen_migrates_existing_diary_without_changing_content() {
+    let root = Workspace::new();
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    let entry = create(&db);
+    let input = save(&db, &entry);
+    db.save_record(input.clone()).unwrap();
+    drop(db);
+    let sql = Connection::open(root.0.join("lifestory.db")).unwrap();
+    sql.execute_batch("ALTER TABLE records DROP COLUMN mood; PRAGMA user_version=17;")
+        .unwrap();
+    drop(sql);
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    let loaded = db.read_record(entry.id).unwrap();
+    assert_eq!(loaded.mood, None);
+    assert_eq!(loaded.title, input.title);
+    assert_eq!(loaded.document, input.document);
 }

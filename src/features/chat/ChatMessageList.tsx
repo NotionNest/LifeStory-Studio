@@ -17,6 +17,10 @@ function ChatHistory({ view }: { view: ChatMessagesView }) {
   const failure = paging.failure
   return (
     <div className="relative min-h-0 flex-1">
+      {(!id || (workspace && workspace.messages.length === 0)) &&
+        !paging.loading &&
+        !failure &&
+        !view.task && <p className="diary-chat-empty">聊聊这篇日记</p>}
       <div
         ref={scroll.viewport}
         {...scroll.events}

@@ -92,6 +92,7 @@ fn changed(record: &Record, input: &SaveRecord) -> bool {
     b.dedup();
     record.document != input.document
         || record.record_date != input.record_date
+        || record.mood != input.mood
         || record.title.as_deref()
             != input
                 .title
@@ -115,6 +116,7 @@ fn draft_for_record(db: &Connection, record: &Record) -> StorageResult<Option<Re
 }
 fn validate(db: &Connection, input: &SaveRecord) -> StorageResult<()> {
     document_text(&input.document)?;
+    crate::records::validate_mood(&input.mood)?;
     if input
         .title
         .as_ref()
@@ -151,7 +153,7 @@ fn put_draft(db: &Connection, input: &SaveRecord) -> StorageResult<()> {
 }
 // A history snapshot is made only when entering an editing session, never by autosave.
 pub(crate) fn checkpoint_on_entry(db: &Connection, record: &Record) -> StorageResult<()> {
-    let snapshot = serde_json::json!({"document":record.document,"title":record.title,"recordDate":record.record_date,"tags":record.tags,"attachmentIds":record.attachments.iter().map(|a|a.id.as_str()).collect::<Vec<_>>()});
+    let snapshot = serde_json::json!({"document":record.document,"title":record.title,"mood":record.mood,"recordDate":record.record_date,"tags":record.tags,"attachmentIds":record.attachments.iter().map(|a|a.id.as_str()).collect::<Vec<_>>()});
     let previous: Option<String> = db.query_row(
         "SELECT snapshot_json FROM record_revisions WHERE id=?1",
         [&record.revision_id],
@@ -160,6 +162,7 @@ pub(crate) fn checkpoint_on_entry(db: &Connection, record: &Record) -> StorageRe
     if let Some(previous) = previous {
         let mut previous: serde_json::Value = serde_json::from_str(&previous)?;
         if let Some(object) = previous.as_object_mut() {
+            object.entry("mood").or_insert(serde_json::Value::Null);
             object
                 .entry("attachmentIds")
                 .or_insert(serde_json::json!([]));
@@ -176,6 +179,7 @@ pub(crate) fn checkpoint_on_entry(db: &Connection, record: &Record) -> StorageRe
         if !edited
             && record.content_version == 0
             && record.title.is_none()
+            && record.mood.is_none()
             && record.tags.is_empty()
             && record.attachments.is_empty()
             && document_text(&record.document)?.is_empty()

@@ -1,29 +1,15 @@
 import { SearchHighlight } from '@/components/SearchHighlight'
 import { searchApi, type SearchItem, type QueryPage } from '@/services/search'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
-import {
-  ChevronLeft,
-  ChevronRight,
-  CalendarDays,
-  List,
-  Image as ImageIcon,
-  PenLine,
-  Plus,
-} from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { ChevronLeft, ChevronRight, CalendarDays, List, PenLine, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import {
-  Table,
-  TableHeader,
-  TableBody,
-  TableRow,
-  TableHead,
-  TableCell,
-} from '@/components/ui/table'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { DateFilter } from './DateFilter'
 import { TagFilter } from './TagFilter'
+import { TimelineImages } from './TimelineImages'
 import { errorMessage } from '@/lib/errors'
 import { localDate } from '@/lib/localDate'
 import { type useLibraryQuery, type Filters, emptyFilters, calendarDates } from './useLibraryQuery'
@@ -55,7 +41,7 @@ function DayEntries({
           to = filters.dateTo && filters.dateTo < date ? filters.dateTo : date
         const next =
           from > to
-            ? { items: [], total: 0, nextOffset: null, days: [], tags: [] }
+            ? { items: [], total: 0, nextOffset: null, days: [], tags: [], months: [] }
             : await searchApi.query({ ...filters, dateFrom: from, dateTo: to, month: null, offset })
         if (request === sequence.current)
           setPage((old) => ({
@@ -108,6 +94,11 @@ function DayEntries({
             disabled={working || loading}
             onClick={() => onOpen(item)}
           >
+            {item.mood && (
+              <span role="img" aria-label={`心情 ${item.mood}`}>
+                {item.mood}
+              </span>
+            )}
             {itemTitle(item)}
           </Button>
         ))}
@@ -147,9 +138,11 @@ export function LibraryBrowser({
   onOpen,
   onCreate,
   positions: storedPositions,
+  titlebarTarget,
 }: {
   browser: ReturnType<typeof useLibraryQuery>
   active?: boolean
+  titlebarTarget?: HTMLElement | null
   working: boolean
   onOpen: (item: SearchItem) => void
   onCreate: (date?: string) => void
@@ -174,6 +167,7 @@ export function LibraryBrowser({
     setMonth,
   } = browser
   const [day, setDay] = useState<string | null>(null)
+  const [activeMonth, setActiveMonth] = useState('')
   const viewport = useRef<HTMLDivElement>(null),
     restore = useRef(true)
   const localPositions = useRef<
@@ -247,6 +241,9 @@ export function LibraryBrowser({
   useEffect(() => {
     setDay(null)
   }, [filters, month, view, active])
+  useEffect(() => {
+    setActiveMonth('')
+  }, [filters])
   useLayoutEffect(() => () => remember(), [remember])
   const open = (item: SearchItem) => {
     remember(day ? `day:${day}` : item.id)
@@ -281,90 +278,115 @@ export function LibraryBrowser({
     filters.kinds.length ||
     filters.tagIds.length,
   )
-  const field =
-    'rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'
+  const toolbar = (
+    <div className="flex w-max items-center gap-1 px-0.5" aria-label="日记首页操作">
+      <TabsList className="bg-transparent">
+        <TabsTrigger
+          value="timeline"
+          className="px-3 hover:bg-sidebar-hover data-[state=active]:!bg-sidebar-accent data-[state=active]:text-sidebar-accent-foreground data-[state=active]:!shadow-none data-[state=active]:hover:!bg-sidebar-accent-hover"
+        >
+          <List aria-hidden="true" />
+          列表
+        </TabsTrigger>
+        <TabsTrigger
+          value="calendar"
+          className="px-3 hover:bg-sidebar-hover data-[state=active]:!bg-sidebar-accent data-[state=active]:text-sidebar-accent-foreground data-[state=active]:!shadow-none data-[state=active]:hover:!bg-sidebar-accent-hover"
+        >
+          <CalendarDays aria-hidden="true" />
+          日历
+        </TabsTrigger>
+      </TabsList>
+      <span aria-hidden="true" className="mx-2 h-5 w-px bg-[var(--workspace-border)]" />
+      <DateFilter
+        condition={browser.dateCondition}
+        active={active}
+        onChange={(condition) => {
+          positions.current = {}
+          browser.setDateCondition(condition)
+        }}
+      />
+      <TagFilter filters={filters} tags={tags} active={active} onChange={change} />
+      {filtered && (
+        <Button
+          size="xs"
+          variant="ghost"
+          onClick={() => {
+            browser.setDateCondition(null)
+            change(emptyFilters)
+          }}
+        >
+          清除全部筛选
+        </Button>
+      )}
+      <span aria-hidden="true" className="mx-2 h-5 w-px bg-[var(--workspace-border)]" />
+      <Button
+        size="sm"
+        className="bg-foreground text-background hover:bg-foreground/85"
+        disabled={working}
+        onClick={() => create()}
+      >
+        <PenLine data-icon="inline-start" aria-hidden="true" />
+        新建日记
+      </Button>
+    </div>
+  )
   return (
     <Tabs value={view} onValueChange={changeView} className="h-full min-h-0 gap-0">
-      <header className="flex shrink-0 flex-col gap-3 border-b border-border/60 px-6 py-3 lg:px-8">
-        <h1 className="sr-only">日记</h1>
-        <div className="flex flex-wrap items-center gap-3">
-          <TabsList variant="line">
-            <TabsTrigger value="timeline">
-              <List aria-hidden="true" />
-              列表
-            </TabsTrigger>
-            <TabsTrigger value="calendar">
-              <CalendarDays aria-hidden="true" />
-              日历
-            </TabsTrigger>
-          </TabsList>
-
-          <div className="ml-auto flex items-center gap-1">
-            <DateFilter
-              condition={browser.dateCondition}
-              active={active}
-              onChange={(condition) => {
-                positions.current = {}
-                browser.setDateCondition(condition)
-              }}
-            />
-            <TagFilter filters={filters} tags={tags} active={active} onChange={change} />
-            {filtered && (
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={() => {
-                  browser.setDateCondition(null)
-                  change(emptyFilters)
+      <h1 className="sr-only">日记</h1>
+      {titlebarTarget === undefined ? (
+        <div className="overflow-x-auto border-b px-6 py-2">{toolbar}</div>
+      ) : (
+        titlebarTarget && createPortal(toolbar, titlebarTarget)
+      )}
+      {view === 'calendar' && (
+        <header className="diary-calendar-header shrink-0 px-6 lg:px-8">
+          {view === 'calendar' && (
+            <div className="flex items-center justify-between gap-3">
+              <input
+                type="month"
+                aria-label="日历月份"
+                value={month}
+                className="diary-calendar-month"
+                onChange={(event) => {
+                  if (event.target.value) setMonth(event.target.value)
                 }}
-              >
-                清除全部筛选
-              </Button>
-            )}
-          </div>
-          <Button size="sm" disabled={working} onClick={() => create()}>
-            <PenLine data-icon="inline-start" aria-hidden="true" />
-            新建日记
-          </Button>
-        </div>
-        {view === 'calendar' && (
-          <div className="flex items-center justify-between gap-3">
-            <input
-              type="month"
-              aria-label="日历月份"
-              value={month}
-              className={field}
-              onChange={(event) => {
-                if (event.target.value) setMonth(event.target.value)
-              }}
-            />
-            <div className="flex items-center gap-1">
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="上个月"
-                onClick={() => changeMonth(-1)}
-              >
-                <ChevronLeft aria-hidden="true" />
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setMonth(today.slice(0, 7))}>
-                今天
-              </Button>
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="下个月"
-                onClick={() => changeMonth(1)}
-              >
-                <ChevronRight aria-hidden="true" />
-              </Button>
+              />
+              <div className="diary-calendar-controls flex items-center gap-1">
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="上个月"
+                  onClick={() => changeMonth(-1)}
+                >
+                  <ChevronLeft aria-hidden="true" />
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setMonth(today.slice(0, 7))}>
+                  今天
+                </Button>
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="下个月"
+                  onClick={() => changeMonth(1)}
+                >
+                  <ChevronRight aria-hidden="true" />
+                </Button>
+              </div>
             </div>
-          </div>
-        )}
-      </header>
+          )}
+        </header>
+      )}
       <div
         ref={viewport}
-        onScroll={() => remember()}
+        onScroll={() => {
+          remember()
+          if (view === 'timeline' && viewport.current) {
+            const top = viewport.current.getBoundingClientRect().top
+            const rows = [...viewport.current.querySelectorAll<HTMLElement>('[data-month]')]
+            const row = rows.find((item) => item.getBoundingClientRect().bottom > top + 12)
+            if (row?.dataset.month) setActiveMonth(row.dataset.month)
+          }
+        }}
         className="diary-browser-scroll min-h-0 flex-1 overflow-auto px-6 pb-8 lg:px-8"
         aria-busy={loading}
       >
@@ -382,60 +404,178 @@ export function LibraryBrowser({
           </p>
         )}
         <TabsContent value="timeline" forceMount hidden={view !== 'timeline'} className="mt-0">
-          <Table>
-            <TableHeader className="sticky top-0 bg-background">
-              <TableRow>
-                <TableHead className="w-3/5">日记</TableHead>
-                <TableHead className="w-36">记录日期</TableHead>
-                <TableHead>标签</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {page.items.map((item) => (
-                <TableRow
+          {page.months.length > 0 &&
+            (() => {
+              const currentMonth = page.months.some((entry) => entry.month === activeMonth)
+                ? activeMonth
+                : (page.items[0]?.recordDate.slice(0, 7) ?? page.months[0].month)
+              const year = currentMonth.slice(0, 4)
+              const years = [...new Set(page.months.map((entry) => entry.month.slice(0, 4)))]
+              const yearIndex = years.indexOf(year)
+              const jump = (value: string) => {
+                remember()
+                const previousPosition = positions.current.timeline
+                positions.current.timeline = { top: 0, left: 0 }
+                void browser.jumpToMonth(value).then((success) => {
+                  if (!success) {
+                    if (previousPosition) positions.current.timeline = previousPosition
+                    return
+                  }
+                  setActiveMonth(value)
+                  if (viewport.current) viewport.current.scrollTop = 0
+                  positions.current.timeline = { top: 0, left: 0 }
+                })
+              }
+              return (
+                <div className="diary-timeline-navigation">
+                  <div className="flex items-center gap-2">
+                    <h2 className="diary-timeline-year">{year} 年</h2>
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      aria-label="较新的年份"
+                      disabled={yearIndex <= 0 || loading}
+                      onClick={() =>
+                        jump(
+                          page.months.find((entry) => entry.month.startsWith(years[yearIndex - 1]))!
+                            .month,
+                        )
+                      }
+                    >
+                      <ChevronLeft aria-hidden="true" />
+                    </Button>
+                    <Button
+                      size="icon-xs"
+                      variant="ghost"
+                      aria-label="较早的年份"
+                      disabled={yearIndex >= years.length - 1 || loading}
+                      onClick={() =>
+                        jump(
+                          page.months.find((entry) => entry.month.startsWith(years[yearIndex + 1]))!
+                            .month,
+                        )
+                      }
+                    >
+                      <ChevronRight aria-hidden="true" />
+                    </Button>
+                  </div>
+                  <nav aria-label="记录月份" className="diary-timeline-months">
+                    {page.months
+                      .filter((entry) => entry.month.startsWith(year))
+                      .map((entry) => (
+                        <Button
+                          key={entry.month}
+                          size="sm"
+                          variant="ghost"
+                          aria-current={entry.month === currentMonth ? 'date' : undefined}
+                          disabled={loading}
+                          onClick={() => jump(entry.month)}
+                        >
+                          {Number(entry.month.slice(5))}月
+                        </Button>
+                      ))}
+                  </nav>
+                </div>
+              )
+            })()}
+          {browser.hasPrevious && (
+            <Button
+              variant="ghost"
+              disabled={loading || working}
+              onClick={() => {
+                remember()
+                restore.current = true
+                void browser.loadPrevious()
+              }}
+            >
+              加载较新记录
+            </Button>
+          )}
+          <div className="diary-timeline">
+            {page.items.map((item, index) => {
+              const date = item.recordDate
+              const month = date.slice(0, 7)
+              const newMonth = index === 0 || page.items[index - 1].recordDate.slice(0, 7) !== month
+              const newDate = index === 0 || page.items[index - 1].recordDate !== date
+              const weekday = new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(
+                new Date(`${date}T12:00:00`),
+              )
+              return (
+                <article
                   key={item.id}
-                  className="cursor-pointer"
-                  onClick={() => {
-                    if (!working && !loading) open(item)
-                  }}
+                  data-month={month}
+                  className={`diary-timeline-entry${newDate ? ' diary-timeline-entry-new-day' : ''}`}
                 >
-                  <TableCell className="max-w-0">
-                    <button
-                      data-record-id={item.id}
-                      disabled={working || loading}
-                      className="flex min-h-10 w-full items-center gap-2 rounded text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  {newMonth && (
+                    <div className="diary-timeline-month-label">{Number(date.slice(5, 7))}月</div>
+                  )}
+                  <div className="diary-timeline-row">
+                    <div className="diary-timeline-date">
+                      {newDate && (
+                        <>
+                          <span>{weekday}</span>
+                          <span
+                            className={`diary-timeline-day diary-timeline-day-${(Number(date.slice(5, 7)) % 3) + 1}`}
+                          >
+                            {Number(date.slice(8, 10))}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                    <div
+                      className="diary-timeline-content"
                       onClick={(event) => {
-                        event.stopPropagation()
-                        open(item)
+                        if (
+                          !working &&
+                          !loading &&
+                          !(event.target as HTMLElement).closest('button')
+                        )
+                          open(item)
                       }}
                     >
-                      <span className="truncate font-medium">
-                        <SearchHighlight text={itemTitle(item)} keyword={filters.keyword} />
-                      </span>
-                      {item.hasImages && (
-                        <ImageIcon
-                          className="size-3.5 shrink-0 text-muted-foreground"
-                          aria-label="含图片"
-                        />
+                      <div className="diary-timeline-heading">
+                        <button
+                          data-record-id={item.id}
+                          disabled={working || loading}
+                          className="diary-timeline-title"
+                          onClick={() => open(item)}
+                        >
+                          <SearchHighlight text={itemTitle(item)} keyword={filters.keyword} />
+                        </button>
+                        <span className="diary-timeline-time">
+                          创建于{' '}
+                          {new Date(item.createdAt).toLocaleTimeString('zh-CN', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
+                      </div>
+                      {item.title && item.excerpt && (
+                        <p className="diary-timeline-excerpt">
+                          <SearchHighlight text={item.excerpt} keyword={filters.keyword} />
+                        </p>
                       )}
-                    </button>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {item.recordDate || '日期待补充'}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {item.tags.map((tag) => (
-                        <Badge variant="secondary" key={tag.id}>
-                          {tag.name}
-                        </Badge>
-                      ))}
+                      {(item.tags.length > 0 || item.mood) && (
+                        <div className="diary-timeline-tags">
+                          {item.tags.map((tag) => (
+                            <Badge variant="secondary" key={tag.id}>
+                              {tag.name}
+                            </Badge>
+                          ))}
+                          {item.mood && (
+                            <span role="img" aria-label={`心情 ${item.mood}`}>
+                              {item.mood}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                      <TimelineImages recordId={item.id} ids={item.imageIds} />
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </div>
+                </article>
+              )
+            })}
+          </div>
           {!loading && !error && page.items.length === 0 && (
             <p role="status" className="py-8 text-sm text-muted-foreground">
               {filtered ? '没有符合条件的记录。' : '暂无记录'}
@@ -462,7 +602,7 @@ export function LibraryBrowser({
             {['周一', '周二', '周三', '周四', '周五', '周六', '周日'].map((label) => (
               <div
                 key={label}
-                className="sticky top-0 border-b bg-background py-3 text-center text-xs text-muted-foreground"
+                className="diary-calendar-weekday sticky top-0 bg-background py-3 text-center text-xs text-muted-foreground"
               >
                 {label}
               </div>
@@ -472,7 +612,7 @@ export function LibraryBrowser({
               return (
                 <div
                   key={date}
-                  className={`group/day flex min-h-36 min-w-0 flex-col gap-1 border-b border-r border-border/70 p-2 [&:nth-child(7n+1)]:border-l ${date.slice(0, 7) !== month ? 'bg-muted/30' : ''}`}
+                  className={`diary-calendar-day group/day flex min-w-0 flex-col gap-1 border-b border-r border-border/70 p-2 [&:nth-child(7n+1)]:border-l ${date.slice(0, 7) !== month ? 'diary-calendar-day-outside' : ''}`}
                 >
                   <div className="flex items-center justify-between">
                     <Popover
@@ -529,10 +669,15 @@ export function LibraryBrowser({
                         data-record-id={item.id}
                         size="sm"
                         variant="ghost"
-                        className="w-full justify-start"
+                        className="diary-calendar-entry w-full justify-start"
                         disabled={working}
                         onClick={() => open(item)}
                       >
+                        {item.mood && (
+                          <span className="shrink-0" role="img" aria-label={`心情 ${item.mood}`}>
+                            {item.mood}
+                          </span>
+                        )}
                         <span className="truncate">
                           <SearchHighlight text={itemTitle(item)} keyword={filters.keyword} />
                         </span>

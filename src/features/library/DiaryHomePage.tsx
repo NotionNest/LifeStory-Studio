@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router'
 import { Button } from '@/components/ui/button'
 import { paths } from '@/router/paths'
 import { useLeaveProtection } from '@/contexts/LeaveProtectionContext'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { desktopAvailable } from '@/services/desktop'
 import { useCreateDiary } from './DiaryCreation'
 import { LibraryBrowser } from './LibraryBrowser'
@@ -15,6 +16,7 @@ export function DiaryHomePage() {
     navigation = useLeaveProtection()
   const reportError = useEffectEvent((cause: unknown) => navigation.setError(errorMessage(cause)))
   const { browser, positions } = useDiaryBrowser()
+  const { titlebarTarget } = useWorkspace()
   const [recoveries, setRecoveries] = useState<RecoverySummary[]>([])
   const { create, working: creating } = useCreateDiary()
   useEffect(() => {
@@ -61,6 +63,7 @@ export function DiaryHomePage() {
       )}
       <LibraryBrowser
         browser={browser}
+        titlebarTarget={titlebarTarget}
         positions={positions}
         working={creating}
         onCreate={(date) => void create(date)}

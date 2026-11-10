@@ -1,13 +1,12 @@
 import { useEditor, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import { AttachmentImageNode } from './attachmentExtensions'
+import { recordExtensions } from './recordExtensions'
 import { AttachmentSurface } from '@/components/attachments/AttachmentImage'
 import { imageIds } from './imageDocument'
 import { kindLabels } from '@/lib/recordLabels'
 import type { ContentPreview } from '@/services/search'
 export function LibraryContentPreview({ content }: { content: ContentPreview }) {
   const editor = useEditor({
-    extensions: [StarterKit.configure({ link: false }), AttachmentImageNode],
+    extensions: recordExtensions,
     content: content.document ?? { type: 'doc', content: [{ type: 'paragraph' }] },
     editable: false,
     editorProps: { attributes: { 'aria-label': '检索内容（只读）' } },

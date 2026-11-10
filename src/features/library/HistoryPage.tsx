@@ -10,15 +10,14 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useSta
 import { Bookmark, ChevronRight, Circle, RotateCcw, ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { EditorContent, useEditor, type JSONContent } from '@tiptap/react'
-import { AttachmentImageNode } from './attachmentExtensions'
+import { recordExtensions } from './recordExtensions'
 import { imageIds } from './imageDocument'
 import { AttachmentSurface } from '@/components/attachments/AttachmentImage'
-import StarterKit from '@tiptap/starter-kit'
 import { errorMessage } from '@/lib/errors'
 
 function HistoryDocument({ document }: { document: JSONContent }) {
   const editor = useEditor({
-    extensions: [StarterKit.configure({ link: false }), AttachmentImageNode],
+    extensions: recordExtensions,
     content: document,
     editable: false,
     editorProps: { attributes: { 'aria-label': '历史正文（只读）' } },
@@ -410,6 +409,9 @@ export const HistoryPage = forwardRef<
                   {preview ? (
                     <>
                       <span>{preview.recordDate || '日期待补充'}</span>
+                      {preview.mood && (
+                        <span aria-label={`心情 ${preview.mood}`}>{preview.mood}</span>
+                      )}
                       {preview.tags.map((tag) => (
                         <span key={tag.id}>#{tag.name}</span>
                       ))}

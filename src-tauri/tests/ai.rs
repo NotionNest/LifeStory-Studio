@@ -565,7 +565,7 @@ fn schema_twelve_upgrade_preserves_drafts_chats_and_preferences_persist() {
     let sql = root.sql();
     sql.execute("UPDATE records SET kind='draft' WHERE id='source'", [])
         .unwrap();
-    sql.execute_batch("DROP TRIGGER chat_user_text_insert; ALTER TABLE ai_tasks DROP COLUMN reasoning_summary; ALTER TABLE ai_tasks DROP COLUMN effective_profile_json; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; PRAGMA user_version=12;").unwrap();
+    sql.execute_batch("DROP TRIGGER chat_user_text_insert; ALTER TABLE ai_tasks DROP COLUMN reasoning_summary; ALTER TABLE ai_tasks DROP COLUMN effective_profile_json; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; ALTER TABLE records DROP COLUMN mood; PRAGMA user_version=12;").unwrap();
     drop(sql);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
     assert!(db.read_record("source".into()).is_ok());

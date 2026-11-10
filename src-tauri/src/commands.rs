@@ -1202,3 +1202,40 @@ mod copy_review_tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 }
+
+#[tauri::command]
+pub async fn show_system_emoji_picker(app: tauri::AppHandle) -> Result<(), String> {
+    let (send, receive) = tokio::sync::oneshot::channel();
+    app.run_on_main_thread(move || {
+        #[cfg(target_os = "macos")]
+        let result = {
+            let marker = objc2::MainThreadMarker::new().ok_or("无法在主线程打开系统表情面板");
+            marker
+                .map(|marker| {
+                    objc2_app_kit::NSApplication::sharedApplication(marker)
+                        .orderFrontCharacterPalette(None)
+                })
+                .map_err(str::to_owned)
+        };
+        #[cfg(target_os = "windows")]
+        let result = (|| {
+            use windows::UI::ViewManagement::Core::{CoreInputView, CoreInputViewKind};
+            let view = CoreInputView::GetForCurrentView().map_err(|e| e.to_string())?;
+            if view
+                .TryShowWithKind(CoreInputViewKind::Emoji)
+                .map_err(|e| e.to_string())?
+            {
+                Ok(())
+            } else {
+                Err("系统未能打开表情面板".to_owned())
+            }
+        })();
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        let result: Result<(), String> = Err("当前系统不支持打开表情面板".to_owned());
+        let _ = send.send(result);
+    })
+    .map_err(|e| e.to_string())?;
+    receive
+        .await
+        .map_err(|_| "系统表情面板无法打开".to_owned())?
+}

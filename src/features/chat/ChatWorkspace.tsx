@@ -185,7 +185,11 @@ export function ChatWorkspace({
           </div>
         </WorkspaceSidebar>
       )}
-      <section className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="聊天工作区">
+      <section
+        className="flex min-h-0 min-w-0 flex-1 flex-col"
+        aria-label="聊天工作区"
+        data-docked={docked || undefined}
+      >
         <header className="workspace-toolbar gap-2">
           <div className="min-w-0">
             <h2 className="truncate text-sm font-medium">{title || '新对话'}</h2>

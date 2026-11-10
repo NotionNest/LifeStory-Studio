@@ -8,6 +8,7 @@ export {
 export const diaryDateCapabilities = {
   fields: [{ value: 'start' as const, label: '记录日期' }],
   operators: ['is', 'before', 'after', 'onOrBefore', 'onOrAfter', 'between', 'relative'] as const,
+  shortcuts: ['today', 'yesterday', 'weekBefore', 'monthBefore'] as const,
 }
 export function resolveDateCondition(condition: DateCondition | null, now = new Date()) {
   if (

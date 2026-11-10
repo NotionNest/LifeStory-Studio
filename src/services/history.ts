@@ -20,6 +20,7 @@ export interface HistorySummary {
 export interface HistorySnapshot {
   document: JSONContent
   title: string | null
+  mood?: string | null
   recordDate: string
   tags: Tag[]
 }

@@ -189,6 +189,7 @@ function mocks() {
     nextOffset: null,
     days: [],
     tags: [],
+    months: [],
   })
 }
 const props = {

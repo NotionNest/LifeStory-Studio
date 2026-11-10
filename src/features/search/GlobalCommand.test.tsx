@@ -24,6 +24,8 @@ const diary = {
   kind: 'text' as const,
   tags: [],
   hasImages: false,
+  imageIds: [],
+  createdAt: 0,
   matchField: null,
 }
 beforeEach(() => {
@@ -34,6 +36,7 @@ beforeEach(() => {
     total: 1,
     days: [],
     tags: [],
+    months: [],
   })
   vi.mocked(searchApi.searchChats).mockResolvedValue({
     items: [
@@ -148,6 +151,7 @@ it('loads each group independently and retries one failed source without losing 
       total: 101,
       days: [],
       tags: [],
+      months: [],
     })
     await act(() => t.trigger.click())
     await t.input('旅行')
@@ -162,6 +166,7 @@ it('loads each group independently and retries one failed source without losing 
       total: 101,
       days: [],
       tags: [],
+      months: [],
     })
     await t.click('加载更多日记')
     expect(document.body.textContent).toContain('另一篇')
@@ -193,6 +198,7 @@ it('ignores stale responses and waits for composition to finish', async () => {
         total: 1,
         days: [],
         tags: [],
+        months: [],
       }),
     )
     expect(document.body.textContent).not.toContain('不应出现的旧结果')

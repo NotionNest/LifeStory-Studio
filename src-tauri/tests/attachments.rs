@@ -110,6 +110,7 @@ fn save(db: &DatabaseWorker, s: &EditingSession, document: Value) -> EditingSess
         session_id: s.session_id.clone(),
         edit_sequence: (s.record.content_version + 10) as u32,
         title: Some("图片合成资料".into()),
+        mood: None,
         record_date: "2026-10-19".into(),
         tag_ids: vec![],
         attachment_ids: ids(&document),
@@ -332,6 +333,7 @@ fn invalid_input_stale_lease_and_transaction_failure_never_report_success_or_des
         session_id: imported.editing.session_id.clone(),
         edit_sequence: (s.record.content_version + 10) as u32,
         title: None,
+        mood: None,
         record_date: "".into(),
         tag_ids: vec![],
         document: fake,
@@ -419,7 +421,7 @@ fn schema7_preserves_attachment_only_reference_and_recycled_images() {
         [&third.attachment_id],
     )
     .unwrap();
-    sql.execute_batch("DROP TRIGGER chat_user_text_insert; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; DROP TABLE ai_source_blocks; DROP TABLE ai_provider_checks; DROP TABLE ai_task_sources; DROP TABLE ai_tasks; DROP TABLE ai_profiles; DROP INDEX records_trash_due; ALTER TABLE record_relations DROP COLUMN unavailable_source_id; DROP TRIGGER library_search_insert; DROP TRIGGER library_search_update; DROP TRIGGER library_search_delete; ALTER TABLE attachment_links DROP COLUMN in_body; PRAGMA user_version=7;")
+    sql.execute_batch("DROP TRIGGER chat_user_text_insert; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; DROP TABLE ai_source_blocks; DROP TABLE ai_provider_checks; DROP TABLE ai_task_sources; DROP TABLE ai_tasks; DROP TABLE ai_profiles; DROP INDEX records_trash_due; ALTER TABLE record_relations DROP COLUMN unavailable_source_id; DROP TRIGGER library_search_insert; DROP TRIGGER library_search_update; DROP TRIGGER library_search_delete; ALTER TABLE attachment_links DROP COLUMN in_body; ALTER TABLE records DROP COLUMN mood; PRAGMA user_version=7;")
         .unwrap();
     drop(sql);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();

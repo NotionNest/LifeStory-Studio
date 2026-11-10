@@ -31,7 +31,7 @@ fn initializes_and_reopens_real_database_without_losing_metadata() {
     let root = Workspace::new();
     let worker = DatabaseWorker::start(root.0.clone()).unwrap();
     let info = worker.inspect().unwrap();
-    assert_eq!(info.schema_version, 17);
+    assert_eq!(info.schema_version, 18);
     assert!(info.fts5_available);
     drop(worker);
 
@@ -45,7 +45,7 @@ fn initializes_and_reopens_real_database_without_losing_metadata() {
     drop(connection);
 
     let reopened = DatabaseWorker::start(root.0.clone()).unwrap();
-    assert_eq!(reopened.inspect().unwrap().schema_version, 17);
+    assert_eq!(reopened.inspect().unwrap().schema_version, 18);
     drop(reopened);
     let connection = Connection::open(root.0.join("lifestory.db")).unwrap();
     let value: String = connection
@@ -101,10 +101,10 @@ fn schema_eleven_without_deletion_fence_upgrades_and_preserves_existing_data() {
     let root = Workspace::new();
     drop(DatabaseWorker::start(root.0.clone()).unwrap());
     let db = Connection::open(root.0.join("lifestory.db")).unwrap();
-    db.execute_batch("DROP TRIGGER chat_user_text_insert; ALTER TABLE ai_tasks DROP COLUMN reasoning_summary; ALTER TABLE ai_tasks DROP COLUMN effective_profile_json; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; DROP TABLE ai_source_blocks; PRAGMA user_version=11; INSERT INTO workspace_metadata VALUES ('upgrade-probe','合成旧资料');").unwrap();
+    db.execute_batch("DROP TRIGGER chat_user_text_insert; ALTER TABLE ai_tasks DROP COLUMN reasoning_summary; ALTER TABLE ai_tasks DROP COLUMN effective_profile_json; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; DROP TABLE ai_source_blocks; ALTER TABLE records DROP COLUMN mood; PRAGMA user_version=11; INSERT INTO workspace_metadata VALUES ('upgrade-probe','合成旧资料');").unwrap();
     drop(db);
     let worker = DatabaseWorker::start(root.0.clone()).unwrap();
-    assert_eq!(worker.inspect().unwrap().schema_version, 17);
+    assert_eq!(worker.inspect().unwrap().schema_version, 18);
     drop(worker);
     let db = Connection::open(root.0.join("lifestory.db")).unwrap();
     assert_eq!(
@@ -129,13 +129,13 @@ fn schema_fourteen_upgrade_preserves_existing_configuration() {
     let root = Workspace::new();
     drop(DatabaseWorker::start(root.0.clone()).unwrap());
     let db = Connection::open(root.0.join("lifestory.db")).unwrap();
-    db.execute_batch("DROP TRIGGER chat_user_text_insert; ALTER TABLE ai_tasks DROP COLUMN reasoning_summary; ALTER TABLE ai_tasks DROP COLUMN effective_profile_json; ALTER TABLE ai_conversations DROP COLUMN cli_profile_json; ALTER TABLE ai_conversations DROP COLUMN has_user_text; PRAGMA user_version=14;").unwrap();
+    db.execute_batch("DROP TRIGGER chat_user_text_insert; ALTER TABLE ai_tasks DROP COLUMN reasoning_summary; ALTER TABLE ai_tasks DROP COLUMN effective_profile_json; ALTER TABLE ai_conversations DROP COLUMN cli_profile_json; ALTER TABLE ai_conversations DROP COLUMN has_user_text; ALTER TABLE records DROP COLUMN mood; PRAGMA user_version=14;").unwrap();
     let raw = r#"{"id":"old-cli","label":"合成旧配置","service":"codex","protocol":"codex","baseUrl":"","model":"fixed-model","contextChars":32000,"maxOutputTokens":4096,"downstream":null,"codexPath":"/synthetic/codex"}"#;
     db.execute("INSERT INTO ai_profiles VALUES('old-cli',?1,0)", [raw])
         .unwrap();
     drop(db);
     let worker = DatabaseWorker::start(root.0.clone()).unwrap();
-    assert_eq!(worker.inspect().unwrap().schema_version, 17);
+    assert_eq!(worker.inspect().unwrap().schema_version, 18);
     let profile = worker.ai_profiles().unwrap().remove(0);
     assert_eq!(profile.model, "fixed-model");
     assert!(profile.cli_model_mode.is_none());
@@ -154,12 +154,12 @@ fn migrates_v15_task_metadata_without_rewriting_existing_data() {
     )
     .unwrap();
     sql.execute_batch(
-        "DROP TRIGGER chat_user_text_insert; ALTER TABLE ai_conversations DROP COLUMN has_user_text; ALTER TABLE ai_tasks DROP COLUMN reasoning_summary; PRAGMA user_version=15;",
+        "DROP TRIGGER chat_user_text_insert; ALTER TABLE ai_conversations DROP COLUMN has_user_text; ALTER TABLE ai_tasks DROP COLUMN reasoning_summary; ALTER TABLE records DROP COLUMN mood; PRAGMA user_version=15;",
     )
     .unwrap();
     drop(sql);
     let worker = DatabaseWorker::start(root.0.clone()).unwrap();
-    assert_eq!(worker.inspect().unwrap().schema_version, 17);
+    assert_eq!(worker.inspect().unwrap().schema_version, 18);
     drop(worker);
     let sql = Connection::open(root.0.join("lifestory.db")).unwrap();
     assert_eq!(
@@ -199,7 +199,7 @@ fn schema_sixteen_backfills_chat_text_flags_and_keeps_a_recoverable_backup() {
         .collect();
     drop(worker);
     let sql = Connection::open(root.0.join("lifestory.db")).unwrap();
-    sql.execute_batch("DROP TRIGGER chat_user_text_insert; ALTER TABLE ai_conversations DROP COLUMN has_user_text; PRAGMA user_version=16;").unwrap();
+    sql.execute_batch("DROP TRIGGER chat_user_text_insert; ALTER TABLE ai_conversations DROP COLUMN has_user_text; ALTER TABLE records DROP COLUMN mood; PRAGMA user_version=16;").unwrap();
     let contents = [
         r#"{"content":[{"text":"合成旧讲述"}]}"#,
         r#"{"text":"","images":["synthetic-image"]}"#,
@@ -223,7 +223,7 @@ fn schema_sixteen_backfills_chat_text_flags_and_keeps_a_recoverable_backup() {
         .collect();
     drop(sql);
     let worker = DatabaseWorker::start(root.0.clone()).unwrap();
-    assert_eq!(worker.inspect().unwrap().schema_version, 17);
+    assert_eq!(worker.inspect().unwrap().schema_version, 18);
     for (i, chat) in chats.iter().enumerate() {
         assert_eq!(
             worker
@@ -250,7 +250,14 @@ fn schema_sixteen_backfills_chat_text_flags_and_keeps_a_recoverable_backup() {
     let backup = fs::read_dir(root.0.join("migration-backups"))
         .unwrap()
         .map(|entry| entry.unwrap().path())
-        .find(|path| !before.contains(path))
+        .find(|path| {
+            !before.contains(path)
+                && path
+                    .file_name()
+                    .unwrap()
+                    .to_string_lossy()
+                    .starts_with("schema-16-")
+        })
         .unwrap();
     let backup = Connection::open(backup).unwrap();
     assert_eq!(
@@ -284,7 +291,7 @@ fn failed_chat_flag_backfill_rolls_back_schema_and_preserves_old_content() {
         .unwrap();
     drop(worker);
     let sql = Connection::open(root.0.join("lifestory.db")).unwrap();
-    sql.execute_batch("DROP TRIGGER chat_user_text_insert; ALTER TABLE ai_conversations DROP COLUMN has_user_text; PRAGMA user_version=16; PRAGMA ignore_check_constraints=ON;").unwrap();
+    sql.execute_batch("DROP TRIGGER chat_user_text_insert; ALTER TABLE ai_conversations DROP COLUMN has_user_text; ALTER TABLE records DROP COLUMN mood; PRAGMA user_version=16; PRAGMA ignore_check_constraints=ON;").unwrap();
     sql.execute("INSERT INTO conversation_messages VALUES('invalid-legacy',?1,0,'user','{','invalid-legacy',1)",[chat]).unwrap();
     drop(sql);
     assert!(DatabaseWorker::start(root.0.clone()).is_err());

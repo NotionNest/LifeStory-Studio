@@ -59,6 +59,7 @@ fn input(s: &EditingSession, text: &str, n: u32) -> SaveRecord {
         edit_sequence: n,
         request_id: format!("save-{}-{n}", s.session_id),
         title: Some(text.into()),
+        mood: None,
         record_date: "2026-10-18".into(),
         tag_ids: vec![],
         document: json!({"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":text}]}]}),
@@ -299,4 +300,28 @@ fn list_is_paged_and_legacy_content_is_previewable_without_invented_metadata() {
     let legacy = db.history_read("entry".into(), "legacy-00".into()).unwrap();
     assert!(legacy.snapshot.is_none());
     assert!(!legacy.summary.restorable);
+}
+
+#[test]
+fn history_restores_mood_with_the_record() {
+    let root = Workspace::new();
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    let s = begin(&db, &create(&db, "mood-entry"));
+    let mut first = input(&s, "第一轮", 1);
+    first.mood = Some("🌸".into());
+    db.save_record(first).unwrap();
+    let s = begin(&db, &db.read_record("mood-entry".into()).unwrap());
+    let checkpoint = s.record.revision_id.clone();
+    let mut second = input(&s, "第二轮", 1);
+    second.mood = Some("🌧️".into());
+    db.save_record(second).unwrap();
+    let current = db.read_record("mood-entry".into()).unwrap();
+    let active = EditingSession {
+        record: current,
+        session_id: s.session_id,
+        recovered: None,
+        recovered_tags: vec![],
+    };
+    let restored = db.history_restore(request(&checkpoint, &active)).unwrap();
+    assert_eq!(restored.record.mood.as_deref(), Some("🌸"));
 }
