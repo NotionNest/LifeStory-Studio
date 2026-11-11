@@ -1,6 +1,6 @@
 # 日记心情与系统表情面板实施方案
 
-关联 REQ-01/02/12、TASK-16；状态：实现和合成数据验证已进行，双平台真实交互与用户验收未完成。
+关联 REQ-01/02/12、TASK-16；状态：已实现，用户报告功能验证通过；系统版本与逐项范围未注明，双平台专项不视为均已通过。
 
 ## 目标与边界
 
@@ -16,8 +16,8 @@
 3. 在编辑页接入入口和系统面板，支持设置、修改和清除；接入当前编辑会话、失败保护与键盘/辅助技术。
 4. 使用合成数据验证保存重开、旧数据迁移、历史恢复、竞态、撤销边界及双平台真实交互；按实际证据更新验收记录。
 
-本机 macOS SDK 声明了 `NSApplication.orderFrontCharacterPalette`，尚未核实 Tauri 集成或实机效果。Windows 入口尚未确认。Context7 命令两次因自动审批未在期限内完成而未执行；不凭此推断接口不可用。
+早期调查时，本机 macOS SDK 已声明 `NSApplication.orderFrontCharacterPalette`，Windows 接口及桌面集成当时尚待核实。
 
 2026-11-10 补充：Context7 已返回 [AppKit 字符面板接口](https://developer.apple.com/documentation/appkit/nsapplication/orderfrontcharacterpalette(_:))；微软文档列出 [CoreInputViewKind.Emoji](https://learn.microsoft.com/en-us/uwp/api/windows.ui.viewmanagement.core.coreinputviewkind)，需进一步验证其在 Tauri 桌面窗口的调用条件、返回值和输入焦点。上述文档不代表双平台集成或实机验证通过。
 
-2026-11-10 实施：接入系统面板调用、编辑器心情及资料库迁移，相关保存、恢复与历史测试通过。macOS 面板实际交互、Windows 编译与面板实际交互未运行，不标记平台验收通过。
+2026-11-10 实施：接入系统面板调用、编辑器心情及资料库迁移，相关保存、恢复与历史测试通过。自动检查当时未包含 macOS 面板实际交互及 Windows 编译/实际交互。用户之后报告心情功能验证通过，但未说明具体平台和逐项范围。
