@@ -1,14 +1,21 @@
 // @vitest-environment jsdom
 import { recordsApi, type RecordFile, type SaveResult } from '@/services/records'
 import { tagsApi } from '@/services/tags'
+import { toast } from 'sonner'
 import { act, createRef } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RecordEditor, type EditorHandle } from './RecordEditor'
 vi.mock('@/services/records', async (original) => ({
   ...(await original<typeof import('@/services/records')>()),
-  recordsApi: { save: vi.fn(), end: vi.fn().mockResolvedValue(undefined), export: vi.fn() },
+  recordsApi: {
+    showEmojiPicker: vi.fn().mockResolvedValue(undefined),
+    save: vi.fn(),
+    end: vi.fn().mockResolvedValue(undefined),
+    export: vi.fn(),
+  },
 }))
+vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
 vi.mock('@/services/tags', async (original) => ({
   ...(await original<typeof import('@/services/tags')>()),
   tagsApi: { tag: vi.fn(), tagCatalog: vi.fn().mockResolvedValue([]) },
@@ -27,6 +34,7 @@ const record: RecordFile = {
 }
 let root: Root, host: HTMLDivElement
 const dirty = vi.fn()
+const failure = vi.fn()
 const ref = createRef<EditorHandle>()
 function title(value: string) {
   const input = host.querySelector<HTMLInputElement>('[aria-label="记录标题"]')!
@@ -61,7 +69,7 @@ beforeEach(async () => {
         onDirty={dirty}
         onBusy={() => {}}
         onSaved={() => {}}
-        onFailure={() => {}}
+        onFailure={failure}
       />,
     )
   })
@@ -72,6 +80,87 @@ afterEach(async () => {
   vi.useRealTimers()
 })
 describe('record saving user state', () => {
+  it('shows a friendly notification when the system picker fails', async () => {
+    vi.mocked(recordsApi.showEmojiPicker).mockRejectedValueOnce(
+      'show_system_emoji_picker not allowed. Command not found',
+    )
+    await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="添加心情"]')!.click())
+    expect(toast.error).toHaveBeenCalledWith('无法打开系统表情面板，请重试')
+    expect(failure).not.toHaveBeenCalled()
+    expect(dirty).not.toHaveBeenCalled()
+  })
+
+  it('opens the system picker and saves and clears a mood', async () => {
+    vi.mocked(recordsApi.save).mockResolvedValue(result())
+    await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="添加心情"]')!.click())
+    expect(recordsApi.showEmojiPicker).toHaveBeenCalledOnce()
+    const input = host.querySelector<HTMLInputElement>('[aria-label="选择心情表情"]')!
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '🌸')
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => {
+      await ref.current!.save()
+    })
+    expect(recordsApi.save).toHaveBeenLastCalledWith(expect.objectContaining({ mood: '🌸' }))
+    expect(host.textContent).toContain('🌸')
+    await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="清除心情"]')!.click())
+    expect(host.querySelector('[aria-label="添加心情"]')).not.toBeNull()
+  })
+  it('allows choosing heading levels and returning to paragraph', async () => {
+    const open = async () =>
+      act(async () => {
+        host
+          .querySelector<HTMLButtonElement>('[aria-label="标题级别"]')!
+          .dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      })
+    const choose = async (label: string) =>
+      act(async () => {
+        const option = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+          (item) => item.textContent?.includes(label),
+        )!
+        expect(option).toBeTruthy()
+        option.click()
+      })
+    await open()
+    await choose('H1')
+    expect(host.querySelector('.tiptap h1')).not.toBeNull()
+    await open()
+    expect(
+      [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')]
+        .find((item) => item.textContent === 'H1')
+        ?.getAttribute('aria-checked'),
+    ).toBe('true')
+    await choose('H6')
+    expect(host.querySelector('.tiptap h6')).not.toBeNull()
+    await open()
+    await choose('正文')
+    expect(host.querySelector('.tiptap > p')).not.toBeNull()
+  })
+  it('saves a task list created from the toolbar', async () => {
+    vi.mocked(recordsApi.save).mockResolvedValue(result())
+    await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="任务列表"]')!.click())
+    expect(host.querySelector('[data-type="taskList"] input[type="checkbox"]')).not.toBeNull()
+    await act(async () => {
+      await ref.current!.save()
+    })
+    expect(JSON.stringify(vi.mocked(recordsApi.save).mock.calls[0][0].document)).toContain(
+      'taskItem',
+    )
+  })
+  it('exposes the save indicator state when a record is edited', async () => {
+    expect(host.querySelector('[aria-label="已保存到本机"]')).not.toBeNull()
+    await act(async () => title('新的标题'))
+    expect(host.querySelector('[aria-label="未保存"]')).not.toBeNull()
+  })
+  it('reflects the active formatting when the user toggles bold', async () => {
+    const bold = host.querySelector<HTMLButtonElement>('[aria-label="粗体"]')!
+    expect(bold.getAttribute('aria-pressed')).toBe('false')
+    await act(async () => bold.click())
+    expect(bold.getAttribute('aria-pressed')).toBe('true')
+    await act(async () => bold.click())
+    expect(bold.getAttribute('aria-pressed')).toBe('false')
+  })
   it('retains edits on failure and retries the identical uncertain request', async () => {
     vi.mocked(recordsApi.save)
       .mockRejectedValueOnce({ code: 'write_failed', message: '合成写入失败' })

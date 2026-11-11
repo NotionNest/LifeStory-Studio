@@ -189,7 +189,7 @@ pub(crate) fn message_text(value: &Value) -> String {
     out.join("\n")
 }
 fn source_snapshot(db: &Connection, source: &str) -> StorageResult<(String, String)> {
-    let (kind,title,doc,text,date):(String,Option<String>,String,String,String)=db.query_row("SELECT r.kind,r.title,COALESCE(r.working_document,v.document_json),COALESCE(r.working_text,v.searchable_text),COALESCE(r.pending_date,r.record_date) FROM records r JOIN record_revisions v ON v.id=r.current_revision_id WHERE r.id=?1 AND r.deleted_at IS NULL AND NOT EXISTS(SELECT 1 FROM ai_source_blocks b WHERE b.source_id=r.id)",[source],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?))).optional()?.ok_or_else(||fail("not_found","所选来源已删除或不存在，请重新选择"))?;
+    let (kind,title,doc,text,date,mood):(String,Option<String>,String,String,String,Option<String>)=db.query_row("SELECT r.kind,r.title,COALESCE(r.working_document,v.document_json),COALESCE(r.working_text,v.searchable_text),COALESCE(r.pending_date,r.record_date),r.mood FROM records r JOIN record_revisions v ON v.id=r.current_revision_id WHERE r.id=?1 AND r.deleted_at IS NULL AND NOT EXISTS(SELECT 1 FROM ai_source_blocks b WHERE b.source_id=r.id)",[source],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?))).optional()?.ok_or_else(||fail("not_found","所选来源已删除或不存在，请重新选择"))?;
     let text = if kind == "conversation" {
         let mut stmt=db.prepare("SELECT role,content_json FROM conversation_messages WHERE record_id=?1 ORDER BY sequence,id")?;
         let rows = stmt
@@ -219,7 +219,8 @@ fn source_snapshot(db: &Connection, source: &str) -> StorageResult<(String, Stri
             Ok(json!({"id":r.get::<_,String>(0)?,"name":r.get::<_,String>(1)?}))
         })?
         .collect::<Result<Vec<_>, _>>()?;
-    let snapshot = json!({"document":document,"title":title,"recordDate":date,"tags":tags});
+    let snapshot =
+        json!({"document":document,"title":title,"mood":mood,"recordDate":date,"tags":tags});
     db.execute("INSERT INTO record_revisions(id,record_id,document_json,searchable_text,created_at,request_id,snapshot_json) VALUES(?1,?2,?3,?4,?5,?6,?7)",params![revision,source,document.to_string(),text,time,format!("ai-source:{revision}"),snapshot.to_string()])?;
     // Image ownership stays with its source version; images are never included in the prompt.
     db.execute("INSERT INTO revision_attachments(record_id,revision_id,attachment_id) SELECT record_id,?1,id FROM attachment_links WHERE record_id=?2 AND in_body=1",params![revision,source])?;

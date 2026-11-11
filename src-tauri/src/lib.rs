@@ -93,6 +93,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::runtime_info,
+            commands::show_system_emoji_picker,
             commands::copy_review_reserve,
             commands::copy_review_cancel,
             commands::copy_review_run,

@@ -97,6 +97,8 @@ pub struct SaveRecord {
     pub session_id: String,
     pub edit_sequence: u32,
     pub title: Option<String>,
+    #[serde(default)]
+    pub mood: Option<String>,
     pub record_date: String,
     pub tag_ids: Vec<String>,
     pub document: Value,
@@ -126,6 +128,8 @@ pub struct Tag {
 pub struct Record {
     pub id: String,
     pub title: Option<String>,
+    #[serde(default)]
+    pub mood: Option<String>,
     pub record_date: String,
     pub created_timezone: String,
     pub created_at: i64,
@@ -149,10 +153,10 @@ pub struct RecordSummary {
 }
 
 pub(crate) fn load(db: &Connection, record_id: &str) -> StorageResult<Record> {
-    let value = db.query_row("SELECT r.id,r.title,COALESCE(r.pending_date,r.record_date),r.created_timezone,r.created_at,r.updated_at,v.id,COALESCE(r.working_document,v.document_json),r.content_version
+    let value = db.query_row("SELECT r.id,r.title,COALESCE(r.pending_date,r.record_date),r.created_timezone,r.created_at,r.updated_at,v.id,COALESCE(r.working_document,v.document_json),r.content_version,r.mood
                  FROM records r
                  JOIN record_revisions v ON v.id=r.current_revision_id
-                 WHERE r.id=?1 AND r.kind='text' AND r.deleted_at IS NULL", [record_id], |r| Ok((r.get::<_,String>(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get::<_,String>(7)?,r.get::<_,i64>(8)?))).optional()?;
+                 WHERE r.id=?1 AND r.kind='text' AND r.deleted_at IS NULL", [record_id], |r| Ok((r.get::<_,String>(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get::<_,String>(7)?,r.get::<_,i64>(8)?,r.get::<_,Option<String>>(9)?))).optional()?;
     let Some((
         id,
         title,
@@ -163,6 +167,7 @@ pub(crate) fn load(db: &Connection, record_id: &str) -> StorageResult<Record> {
         revision_id,
         json,
         content_version,
+        mood,
     )) = value
     else {
         return Err(fail("not_found", "记录不存在或已删除"));
@@ -185,6 +190,7 @@ pub(crate) fn load(db: &Connection, record_id: &str) -> StorageResult<Record> {
     Ok(Record {
         id,
         title,
+        mood,
         record_date,
         created_timezone,
         created_at,
@@ -196,6 +202,18 @@ pub(crate) fn load(db: &Connection, record_id: &str) -> StorageResult<Record> {
             .map_err(|_| fail("corrupt_content", "记录正文无法读取，未改动资料"))?,
         tags,
     })
+}
+
+pub(crate) fn validate_mood(mood: &Option<String>) -> StorageResult<()> {
+    use unicode_segmentation::UnicodeSegmentation;
+    if mood.as_ref().is_some_and(|value| {
+        value.len() > 128
+            || value.chars().any(char::is_control)
+            || value.graphemes(true).count() != 1
+    }) {
+        return Err(fail("validation", "心情必须是单个表情"));
+    }
+    Ok(())
 }
 
 // Validate the installed StarterKit schema instead of persisting arbitrary editor nodes or URLs.
@@ -230,14 +248,16 @@ pub(crate) fn document_text(document: &Value) -> StorageResult<String> {
                 | "blockquote"
                 | "bulletList"
                 | "orderedList"
+                | "taskList"
                 | "codeBlock"
                 | "horizontalRule"
                 | "attachmentImage"
         );
         let allowed = match parent {
             "" => kind == "doc",
-            "doc" | "blockquote" | "listItem" => block,
+            "doc" | "blockquote" | "listItem" | "taskItem" => block,
             "bulletList" | "orderedList" => kind == "listItem",
+            "taskList" => kind == "taskItem",
             "paragraph" | "heading" => matches!(kind, "text" | "hardBreak"),
             "codeBlock" => kind == "text",
             _ => false,
@@ -245,12 +265,18 @@ pub(crate) fn document_text(document: &Value) -> StorageResult<String> {
         let children = obj.get("content").and_then(Value::as_array);
         if matches!(
             kind,
-            "doc" | "blockquote" | "bulletList" | "orderedList" | "listItem"
+            "doc"
+                | "blockquote"
+                | "bulletList"
+                | "orderedList"
+                | "listItem"
+                | "taskList"
+                | "taskItem"
         ) && children.is_none_or(Vec::is_empty)
         {
             return Err(fail("validation", "正文缺少必要的子节点"));
         }
-        if kind == "listItem"
+        if matches!(kind, "listItem" | "taskItem")
             && children
                 .and_then(|c| c.first())
                 .and_then(|n| n.get("type"))
@@ -281,6 +307,14 @@ pub(crate) fn document_text(document: &Value) -> StorageResult<String> {
                         v.as_str().is_some_and(|s| identifier(s).is_ok())
                     }
                     ("heading", "level") => v.as_i64().is_some_and(|n| (1..=6).contains(&n)),
+                    ("paragraph" | "heading", "indent") => v.as_u64().is_some_and(|n| n <= 8),
+                    ("paragraph" | "heading", "textAlign") => {
+                        v.is_null()
+                            || v.as_str().is_some_and(|s| {
+                                ["left", "center", "right", "justify"].contains(&s)
+                            })
+                    }
+                    ("taskItem", "checked") => v.is_boolean(),
                     ("orderedList", "type") => {
                         v.is_null()
                             || v.as_str()
@@ -308,8 +342,56 @@ pub(crate) fn document_text(document: &Value) -> StorageResult<String> {
                     .as_object()
                     .ok_or_else(|| fail("validation", "正文标记无效"))?;
                 let ty = m.get("type").and_then(Value::as_str).unwrap_or("");
-                let formatting = matches!(ty, "bold" | "italic" | "strike" | "code" | "underline")
-                    && m.keys().all(|k| k == "type");
+                let formatting =
+                    (matches!(ty, "bold" | "italic" | "strike" | "code" | "underline")
+                        && m.keys().all(|k| k == "type"))
+                        || (ty == "textStyle"
+                            && m.keys().all(|k| k == "type" || k == "attrs")
+                            && m.get("attrs")
+                                .and_then(Value::as_object)
+                                .is_some_and(|attrs| {
+                                    attrs.iter().all(|(key, value)| {
+                                        matches!(key.as_str(), "color" | "backgroundColor")
+                                            && (value.is_null()
+                                                || value.as_str().is_some_and(|s| {
+                                                    matches!(s.len(), 7 | 9)
+                                                        && s.starts_with('#')
+                                                        && s[1..]
+                                                            .bytes()
+                                                            .all(|c| c.is_ascii_hexdigit())
+                                                }))
+                                    })
+                                }))
+                        || (ty == "link"
+                            && m.keys().all(|k| k == "type" || k == "attrs")
+                            && m.get("attrs")
+                                .and_then(Value::as_object)
+                                .is_some_and(|attrs| {
+                                    attrs
+                                        .get("href")
+                                        .and_then(Value::as_str)
+                                        .is_some_and(|href| {
+                                            let lower = href.to_ascii_lowercase();
+                                            ((lower.starts_with("https://") && href.len() > 8)
+                                                || (lower.starts_with("http://") && href.len() > 7))
+                                                && href.len() <= 2048
+                                                && !href
+                                                    .chars()
+                                                    .any(|c| c.is_whitespace() || c.is_control())
+                                        })
+                                        && attrs.iter().all(|(key, value)| match key.as_str() {
+                                            "href" => true,
+                                            "title" => {
+                                                value.is_null()
+                                                    || value.as_str().is_some_and(|s| {
+                                                        s.len() <= 256
+                                                            && !s.chars().any(char::is_control)
+                                                    })
+                                            }
+                                            "target" | "rel" | "class" => value.is_null(),
+                                            _ => false,
+                                        })
+                                }));
                 if kind != "text" || !formatting {
                     return Err(fail("validation", "正文含不支持的文本标记"));
                 }
@@ -338,7 +420,7 @@ pub(crate) fn document_text(document: &Value) -> StorageResult<String> {
                 visit(child, kind, depth + 1, count, text)?;
             }
         }
-        if block || kind == "listItem" {
+        if block || matches!(kind, "listItem" | "taskItem") {
             text.push('\n');
         }
         Ok(())
@@ -419,6 +501,7 @@ impl DatabaseWorker {
         self.call(move|db,_| {
             identifier(&input.record_id)?; identifier(&input.request_id)?; identifier(&input.session_id)?; if !input.record_date.is_empty() { date(&input.record_date)?; }
             if input.title.as_ref().is_some_and(|s|s.chars().count()>240||s.contains(['\n','\r'])) || input.tag_ids.len()>50 {return Err(fail("validation","标题或标签数量超过限制"));}
+            validate_mood(&input.mood)?;
             let text=document_text(&input.document)?;
             let request_json=serde_json::to_string(&input)?;
             let tx=db.transaction()?;
@@ -441,7 +524,7 @@ impl DatabaseWorker {
             }
             let mut old_tags:Vec<_>=current.tags.iter().map(|t|t.id.clone()).collect(); old_tags.sort();
             let document_changed=current.document!=input.document;
-            let unchanged=!document_changed && current.title.as_deref()==title && current.record_date==input.record_date && old_tags==tags;
+            let unchanged=!document_changed && current.title.as_deref()==title && current.record_date==input.record_date && old_tags==tags && current.mood==input.mood;
             let timestamp=if unchanged {current.updated_at} else {now()?};
             if current.attachments.iter().any(|a|!input.attachment_ids.contains(&a.id)) {
                 crate::recovery::checkpoint_on_entry(&tx,&current)?;
@@ -450,7 +533,7 @@ impl DatabaseWorker {
             crate::attachments::restore_links(&tx,&input.record_id,&input.attachment_ids)?;
             let content_version=current.content_version+i64::from(!unchanged);
             if !unchanged {
-                tx.execute("UPDATE records SET title=?1,record_date=CASE WHEN ?2='' THEN record_date ELSE ?2 END,pending_date=CASE WHEN ?2='' THEN '' ELSE NULL END,updated_at=?3,content_version=?4 WHERE id=?5",params![title,input.record_date,timestamp,content_version,input.record_id])?;
+                tx.execute("UPDATE records SET title=?1,record_date=CASE WHEN ?2='' THEN record_date ELSE ?2 END,pending_date=CASE WHEN ?2='' THEN '' ELSE NULL END,updated_at=?3,content_version=?4,mood=?6 WHERE id=?5",params![title,input.record_date,timestamp,content_version,input.record_id,input.mood])?;
                 if document_changed {
                     tx.execute("UPDATE records SET working_document=?1,working_text=?2 WHERE id=?3",params![serde_json::to_string(&input.document)?,text,input.record_id])?;
                 }

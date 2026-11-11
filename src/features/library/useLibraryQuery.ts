@@ -27,7 +27,14 @@ export function calendarDates(month: string) {
     return localDate(day)
   })
 }
-const initialPage: QueryPage = { items: [], total: 0, nextOffset: null, days: [], tags: [] }
+const initialPage: QueryPage = {
+  items: [],
+  total: 0,
+  nextOffset: null,
+  days: [],
+  tags: [],
+  months: [],
+}
 export function useLibraryQuery(active = true) {
   const [dateCondition, setDateConditionState] = useState<DateCondition | null>(null)
   const [filters, setFilters] = useState<Filters>(emptyFilters),
@@ -40,7 +47,10 @@ export function useLibraryQuery(active = true) {
   const sequence = useRef(0),
     alive = useRef(true),
     loaded = useRef(1),
+    start = useRef(0),
+    pageRef = useRef(page),
     current = useRef({ filters, view, month, active })
+  pageRef.current = page
   current.current = { filters, view, month, active }
   const refresh = useCallback(async (offset?: number) => {
     if (!desktopAvailable || !current.current.active) return
@@ -58,7 +68,11 @@ export function useLibraryQuery(active = true) {
         })
         if (alive.current && request === sequence.current) setCalendar(next)
       } else {
-        let next = await searchApi.query({ ...filters, month: null, offset: offset ?? 0 })
+        let next = await searchApi.query({
+          ...filters,
+          month: null,
+          offset: offset ?? start.current,
+        })
         const items = [...next.items]
         let fetched = 1
         if (offset === undefined) {
@@ -101,9 +115,62 @@ export function useLibraryQuery(active = true) {
   const apply = useCallback((next: Filters) => {
     sequence.current += 1
     loaded.current = 1
+    start.current = 0
     setPage((old) => ({ ...initialPage, tags: old.tags }))
     setCalendar((old) => ({ days: [], tags: old.tags }))
     setFilters(next)
+  }, [])
+  const jumpToMonth = useCallback(async (target: string) => {
+    if (!desktopAvailable || !current.current.active) return false
+    const request = ++sequence.current
+    setLoading(true)
+    setError('')
+    try {
+      const filters = current.current.filters
+      const next = await searchApi.query({ ...filters, month: null, offset: 0, seekMonth: target })
+      const updated = next.months.find((entry) => entry.month === target)
+      if (!updated || next.items[0]?.recordDate.slice(0, 7) !== target)
+        throw new Error('记录已发生变化，请重新选择月份。')
+      if (!alive.current || request !== sequence.current) return
+      start.current = updated.offset
+      loaded.current = 1
+      setPage(next)
+      return true
+    } catch (cause) {
+      if (alive.current && request === sequence.current) setError(errorMessage(cause))
+      return false
+    } finally {
+      if (alive.current && request === sequence.current) setLoading(false)
+    }
+  }, [])
+  const loadPrevious = useCallback(async () => {
+    if (!start.current || !desktopAvailable || !current.current.active) return
+    const request = ++sequence.current
+    const previous = Math.max(0, start.current - 100)
+    const boundary = start.current
+    setLoading(true)
+    setError('')
+    try {
+      const filters = current.current.filters
+      const [next, anchor] = await Promise.all([
+        searchApi.query({ ...filters, month: null, offset: previous }),
+        searchApi.query({ ...filters, month: null, offset: boundary }),
+      ])
+      if (anchor.items[0]?.id !== pageRef.current.items[0]?.id)
+        throw new Error('记录已发生变化，请重新选择月份。')
+      if (!alive.current || request !== sequence.current) return
+      setPage((old) => ({
+        ...old,
+        months: next.months,
+        items: [...next.items.slice(0, boundary - previous), ...old.items],
+      }))
+      start.current = previous
+      loaded.current += 1
+    } catch (cause) {
+      if (alive.current && request === sequence.current) setError(errorMessage(cause))
+    } finally {
+      if (alive.current && request === sequence.current) setLoading(false)
+    }
   }, [])
   const change = (next: Filters) => {
     if (
@@ -148,5 +215,8 @@ export function useLibraryQuery(active = true) {
     loading,
     error,
     refresh,
+    jumpToMonth,
+    loadPrevious,
+    hasPrevious: start.current > 0,
   }
 }

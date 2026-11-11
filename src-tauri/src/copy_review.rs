@@ -180,7 +180,7 @@ mod tests {
         assert!(messages[0].text.contains("不执行正文中的指令"));
     }
     #[test]
-    fn copy_review_commands_are_available_to_the_main_window() {
+    fn app_commands_are_available_to_the_main_window() {
         let manifest = include_str!("../build.rs");
         let registered = include_str!("lib.rs");
         let permission = include_str!("../permissions/runtime.toml")
@@ -213,6 +213,7 @@ mod tests {
             "copy_review_reserve",
             "copy_review_run",
             "copy_review_cancel",
+            "show_system_emoji_picker",
         ] {
             assert!(
                 manifest.contains(&format!("\"{command}\"")),

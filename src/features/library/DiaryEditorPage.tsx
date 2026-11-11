@@ -15,7 +15,7 @@ import { PageActions, type PageAction } from '@/layouts/PageActions'
 import { Button } from '@/components/ui/button'
 import { paths } from '@/router/paths'
 import { useCreateDiary } from './DiaryCreation'
-import { RecordEditorView } from './RecordEditor'
+import { RecordEditorView, RecordSaveStatus } from './RecordEditor'
 import { useDiary } from './DiarySessionContext'
 
 export function DiaryEditorPage() {
@@ -132,6 +132,7 @@ export function DiaryEditorPage() {
             创建于 {new Date(record.createdAt).toLocaleString()}
           </time>
         )}
+        <RecordSaveStatus />
       </header>
       <div ref={detailScroll} className="flex min-h-0 flex-1 overflow-y-auto">
         <RecordEditorView />

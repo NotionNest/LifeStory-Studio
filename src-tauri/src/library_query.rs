@@ -26,6 +26,7 @@ pub struct LibraryQuery {
     pub tag_mode: String,
     pub has_images: Option<bool>,
     pub month: Option<String>,
+    pub seek_month: Option<String>,
     pub offset: u32,
 }
 #[derive(Serialize)]
@@ -33,7 +34,10 @@ pub struct LibraryQuery {
 pub struct SearchItem {
     pub id: String,
     pub title: Option<String>,
+    pub mood: Option<String>,
     pub record_date: String,
+    pub created_at: i64,
+    pub image_ids: Vec<String>,
     pub kind: String,
     pub excerpt: String,
     pub has_images: bool,
@@ -54,6 +58,13 @@ pub struct QueryPage {
     pub next_offset: Option<u32>,
     pub days: Vec<DayCount>,
     pub tags: Vec<Tag>,
+    pub months: Vec<MonthPosition>,
+}
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MonthPosition {
+    pub month: String,
+    pub offset: u32,
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -126,6 +137,12 @@ fn validate(q: &LibraryQuery) -> StorageResult<()> {
     if let Some(m) = &q.month {
         date(&format!("{m}-01"))?;
     }
+    if let Some(m) = &q.seek_month {
+        date(&format!("{m}-01"))?;
+        if q.offset != 0 || q.month.is_some() {
+            return Err(fail("validation", "月份定位参数无效"));
+        }
+    }
     Ok(())
 }
 pub(crate) fn excerpt(text: &str, needle: &str) -> String {
@@ -185,14 +202,59 @@ fn filters(query: &LibraryQuery) -> StorageResult<(Vec<SqlValue>, Vec<String>)> 
     }
     Ok((values, conditions))
 }
-type SearchRow = (String, Option<String>, String, String, String, String, bool);
+type SearchRow = (
+    String,
+    Option<String>,
+    String,
+    String,
+    String,
+    String,
+    bool,
+    i64,
+    Option<String>,
+);
 fn read_items(
     db: &rusqlite::Connection,
     rows: Vec<SearchRow>,
     keyword: &str,
 ) -> StorageResult<Vec<SearchItem>> {
     let mut items = vec![];
-    for (id, title, record_date, kind, body, messages, has_images) in rows {
+    for (id, title, record_date, kind, body, messages, has_images, created_at, mood) in rows {
+        let image_ids = if has_images {
+            let document: Option<String> = db.query_row(
+                "SELECT COALESCE(r.working_document,v.document_json) FROM records r LEFT JOIN record_revisions v ON v.id=r.current_revision_id WHERE r.id=?1",
+                [&id], |row| row.get(0),
+            )?;
+            fn images(node: &Value, result: &mut Vec<String>) {
+                if result.len() >= 4 {
+                    return;
+                }
+                if node.get("type").and_then(Value::as_str) == Some("attachmentImage")
+                    && let Some(id) = node.pointer("/attrs/attachmentId").and_then(Value::as_str)
+                {
+                    result.push(id.to_owned());
+                }
+                if let Some(children) = node.get("content").and_then(Value::as_array) {
+                    for child in children {
+                        images(child, result);
+                    }
+                }
+            }
+            let mut candidates = Vec::new();
+            if let Some(document) = document {
+                images(&serde_json::from_str::<Value>(&document)?, &mut candidates);
+            }
+            let mut valid = Vec::new();
+            for image in candidates {
+                let exists: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM attachment_links WHERE id=?1 AND record_id=?2 AND in_body=1)", [&image, &id], |row| row.get(0))?;
+                if exists {
+                    valid.push(image);
+                }
+            }
+            valid
+        } else {
+            Vec::new()
+        };
         let needle = keyword.to_ascii_lowercase();
         let match_field = if keyword.is_empty() {
             None
@@ -225,7 +287,10 @@ fn read_items(
         items.push(SearchItem {
             id,
             title,
+            mood,
             record_date,
+            created_at,
+            image_ids,
             kind,
             excerpt: excerpt(text, keyword),
             has_images,
@@ -273,7 +338,11 @@ impl DatabaseWorker {
         validate(&query.filters)?;
         date(&query.from)?;
         date(&query.to)?;
-        if query.from > query.to || query.filters.offset != 0 || query.filters.month.is_some() {
+        if query.from > query.to
+            || query.filters.offset != 0
+            || query.filters.month.is_some()
+            || query.filters.seek_month.is_some()
+        {
             return Err(fail("validation", "日历查询范围无效"));
         }
         self.call(move |db, _| {
@@ -290,13 +359,13 @@ impl DatabaseWorker {
                     conditions.push(format!("{field}{op}?{}", values.len()));
                 }
             }
-            let sql = format!("{BASE}, ranked AS (SELECT *, count(*) OVER (PARTITION BY record_date) AS day_count, row_number() OVER (PARTITION BY record_date ORDER BY created_at DESC,id) AS position FROM base WHERE {}) SELECT id,title,record_date,kind,body,messages,images,day_count FROM ranked WHERE position<=3 ORDER BY record_date,position", conditions.join(" AND "));
+            let sql = format!("{BASE}, ranked AS (SELECT *, count(*) OVER (PARTITION BY record_date) AS day_count, row_number() OVER (PARTITION BY record_date ORDER BY created_at DESC,id) AS position FROM base WHERE {}) SELECT id,title,record_date,kind,body,messages,images,day_count,created_at,mood FROM ranked WHERE position<=3 ORDER BY record_date,position", conditions.join(" AND "));
             let mut stmt = tx.prepare(&sql)?;
             let mut counts = std::collections::BTreeMap::new();
             let rows = stmt.query_map(params_from_iter(&values), |r| {
                 let day: String = r.get(2)?;
                 let count: u32 = r.get(7)?;
-                Ok(((r.get(0)?,r.get(1)?,day.clone(),r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?),day,count))
+                Ok(((r.get(0)?,r.get(1)?,day.clone(),r.get(3)?,r.get(4)?,r.get(5)?,r.get(6)?,r.get(8)?,r.get(9)?),day,count))
             })?.collect::<Result<Vec<(SearchRow,String,u32)>,_>>()?;
             let mut search_rows = Vec::new();
             for (row, day, count) in rows { counts.insert(day,count); search_rows.push(row); }
@@ -323,14 +392,19 @@ impl DatabaseWorker {
       if let Some(to)=&query.date_to {values.push(to.clone().into());conditions.push(format!("record_date<=?{}",values.len()));}
       let filter=conditions.join(" AND ");
       let total:u32=db.query_row(&format!("{BASE} SELECT count(*) FROM base WHERE {filter}"),params_from_iter(&values),|r|r.get(0))?;
-      values.push(i64::from(query.offset).into());
-      let sql=format!("{BASE} SELECT id,title,record_date,kind,body,messages,images FROM base WHERE {filter} ORDER BY record_date DESC,created_at DESC,id LIMIT 100 OFFSET ?{}",values.len());
+      let mut month_statement=db.prepare(&format!("{BASE} SELECT substr(record_date,1,7),count(*) FROM base WHERE {filter} GROUP BY substr(record_date,1,7) ORDER BY 1 DESC"))?;
+      let groups=month_statement.query_map(params_from_iter(&values),|r|Ok((r.get::<_,String>(0)?,r.get::<_,u32>(1)?)))?.collect::<Result<Vec<_>,_>>()?;
+      let mut position=0;
+      let months:Vec<MonthPosition>=groups.into_iter().map(|(month,count)| { let entry=MonthPosition { month, offset:position }; position+=count; entry }).collect();
+      let offset=if let Some(target)=&query.seek_month { months.iter().find(|entry| &entry.month==target).ok_or_else(||fail("not_found", "该月份的记录已发生变化，请重新选择。"))?.offset } else { query.offset };
+      values.push(i64::from(offset).into());
+      let sql=format!("{BASE} SELECT id,title,record_date,kind,body,messages,images,created_at,mood FROM base WHERE {filter} ORDER BY record_date DESC,created_at DESC,id LIMIT 100 OFFSET ?{}",values.len());
       let mut stmt=db.prepare(&sql)?;
-      let rows=stmt.query_map(params_from_iter(&values),|r|Ok((r.get::<_,String>(0)?,r.get::<_,Option<String>>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,String>(5)?,r.get::<_,bool>(6)?)))?.collect::<Result<Vec<_>,_>>()?;
+      let rows=stmt.query_map(params_from_iter(&values),|r|Ok((r.get::<_,String>(0)?,r.get::<_,Option<String>>(1)?,r.get::<_,String>(2)?,r.get::<_,String>(3)?,r.get::<_,String>(4)?,r.get::<_,String>(5)?,r.get::<_,bool>(6)?,r.get::<_,i64>(7)?,r.get::<_,Option<String>>(8)?)))?.collect::<Result<Vec<_>,_>>()?;
       let items=read_items(db, rows, keyword)?;
-      let next=query.offset.saturating_add(items.len() as u32);let next_offset=(next<total).then_some(next);
+      let next=offset.saturating_add(items.len() as u32);let next_offset=(next<total).then_some(next);
       let tags=query_tags(db)?;
-      Ok(QueryPage{items,total,next_offset,days,tags})
+      Ok(QueryPage{items,total,next_offset,days,tags,months})
     })
     }
     pub fn preview_library_content(&self, id: String) -> StorageResult<ContentPreview> {

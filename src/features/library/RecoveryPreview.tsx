@@ -56,7 +56,7 @@ export function RecoveryPreview({
         <section className="min-w-0 rounded border p-4">
           <h3 className="mb-2 text-sm font-semibold">当前已保存</h3>
           <p className="text-sm">
-            {record.title || '无标题记录'} · {record.recordDate}
+            {record.title || '无标题记录'} · {record.recordDate} {record.mood}
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
             {record.tags.map((t) => `#${t.name}`).join(' ')}
@@ -68,7 +68,8 @@ export function RecoveryPreview({
         <section className="min-w-0 rounded border p-4">
           <h3 className="mb-2 text-sm font-semibold">可恢复草稿</h3>
           <p className="text-sm">
-            {draft.input.title || '无标题记录'} · {draft.input.recordDate || '日期待补充'}
+            {draft.input.title || '无标题记录'} · {draft.input.recordDate || '日期待补充'}{' '}
+            {draft.input.mood}
           </p>
           <p className="mt-2 text-xs text-muted-foreground">
             {draft.tags.map((t) => `#${t.name}`).join(' ')}

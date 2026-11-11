@@ -38,6 +38,21 @@
     font-weight: 600;
     margin: 1em 0 0.5em;
   }
+  .record-editor .tiptap h4 {
+    font-size: 1.1em;
+    font-weight: 600;
+    margin: 1em 0 0.5em;
+  }
+  .record-editor .tiptap h5 {
+    font-size: 1em;
+    font-weight: 600;
+    margin: 1em 0 0.5em;
+  }
+  .record-editor .tiptap h6 {
+    font-size: 0.9em;
+    font-weight: 600;
+    margin: 1em 0 0.5em;
+  }
   .record-editor .tiptap ul {
     list-style: disc;
     padding-left: 1.5em;
@@ -104,10 +119,40 @@
 
 @layer components {
   .editor-document {
-    @apply mx-auto flex w-full max-w-[820px] flex-1 flex-col gap-4 px-7 pb-14 pt-10 lg:px-12;
+    @apply mx-auto flex w-full max-w-[820px] flex-1 flex-col gap-4 px-7 pb-14 pt-6 lg:px-12;
+  }
+  .record-mood-clear {
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    z-index: 1;
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-0.5rem, -50%);
+    transition:
+      opacity 180ms cubic-bezier(0.25, 1, 0.5, 1),
+      transform 180ms cubic-bezier(0.25, 1, 0.5, 1);
+  }
+  .record-mood:hover .record-mood-clear,
+  .record-mood:focus-within .record-mood-clear {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(0, -50%);
+  }
+  @media (hover: none) {
+    .record-mood-clear {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translate(0, -50%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .record-mood-clear {
+      transition: none;
+    }
   }
   .record-format {
-    @apply flex flex-nowrap items-center gap-1 overflow-x-auto border-y border-border/50 py-1;
+    @apply flex flex-wrap items-center gap-1 border-y border-border/50 py-1;
   }
   .record-editor .tiptap {
     font-size: 16px;
@@ -124,4 +169,180 @@
 .studio-shell:has(.studio-titlebar-macos) dialog[aria-labelledby='history-title'] {
   top: 2.5rem;
   height: calc(100dvh - 2.5rem);
+}
+
+@layer components {
+  .editor-save-status {
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+  }
+  .editor-save-indicator {
+    display: grid;
+    width: 1.75rem;
+    height: 1.75rem;
+    place-items: center;
+    border-radius: 0.4rem;
+  }
+  .editor-save-indicator:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .editor-save-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--review-wordy);
+  }
+  .editor-save-dot.is-saved {
+    background: var(--success);
+  }
+  .editor-save-dot.is-error {
+    background: var(--destructive);
+  }
+  .editor-title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 0.5rem 1rem;
+  }
+  .record-metadata {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .record-format {
+    border-top: 0;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 0.5rem;
+  }
+  .record-editor .tiptap > p:only-child:has(> br.ProseMirror-trailingBreak)::before {
+    content: '从这里开始记录…';
+    color: var(--muted-foreground);
+    opacity: 0.65;
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+  .diary-chat-empty {
+    display: none;
+  }
+  [data-docked='true'] .diary-chat-empty {
+    display: block;
+    position: absolute;
+    top: 42%;
+    left: 0;
+    right: 0;
+    text-align: center;
+    color: var(--muted-foreground);
+    font-size: 0.875rem;
+    pointer-events: none;
+  }
+}
+
+@layer components {
+  .color-palette-swatch:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .color-palette-group {
+    margin: 0.2rem 0;
+  }
+  .color-palette-label {
+    color: var(--muted-foreground);
+    font-size: 0.75rem;
+  }
+  .color-palette-swatches {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.25rem;
+    margin-top: 0.2rem;
+  }
+  .color-palette-swatch {
+    display: grid;
+    width: 100%;
+    height: 2rem;
+    place-items: center;
+    border: 1px solid var(--workspace-border);
+    border-radius: 0.45rem;
+  }
+  .color-palette-swatch svg {
+    width: 1rem;
+    height: 1rem;
+    color: white;
+    filter: drop-shadow(0 1px 2px black);
+  }
+  .color-palette-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    border-top: 1px solid var(--border);
+    padding-top: 0.35rem;
+    margin-top: 0.25rem;
+  }
+  .color-palette-custom-icon {
+    position: relative;
+    display: grid;
+    width: 1.75rem;
+    height: 1.75rem;
+    place-items: center;
+    border-radius: 0.5rem;
+  }
+  .color-palette-custom-icon:hover {
+    background: var(--muted);
+  }
+  .color-palette-custom-icon:focus-within {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .color-palette-custom-icon > svg {
+    width: 1rem;
+    height: 1rem;
+  }
+  .color-palette-custom-icon input {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: pointer;
+  }
+  .color-palette-custom-icon .color-palette-current {
+    position: absolute;
+    right: -0.2rem;
+    bottom: -0.2rem;
+    width: 0.7rem;
+    height: 0.7rem;
+  }
+  .color-palette-custom-icon .color-palette-current svg {
+    width: 0.6rem;
+    height: 0.6rem;
+  }
+  .color-palette-current {
+    display: grid;
+    width: 1.5rem;
+    height: 1.5rem;
+    place-items: center;
+    border: 1px solid var(--workspace-border);
+    border-radius: 0.35rem;
+  }
+  .color-palette-current svg {
+    width: 0.85rem;
+    height: 0.85rem;
+    color: white;
+    filter: drop-shadow(0 1px 2px black);
+  }
+  .record-editor .tiptap ul[data-type='taskList'] {
+    list-style: none;
+    padding-left: 0;
+  }
+  .record-editor .tiptap ul[data-type='taskList'] > li {
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+  }
+  .record-editor .tiptap ul[data-type='taskList'] > li > div {
+    flex: 1;
+    min-width: 0;
+  }
 }

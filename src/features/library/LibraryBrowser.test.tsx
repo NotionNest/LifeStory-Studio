@@ -21,12 +21,15 @@ const item = {
   kind: 'text' as const,
   tags: [],
   hasImages: false,
+  imageIds: [],
+  createdAt: 0,
   matchField: null,
 }
 const page: QueryPage = {
   items: [item],
   total: 1,
   nextOffset: null,
+  months: [{ month: '2026-10', offset: 0 }],
   days: [],
   tags: [
     { id: 't1', name: '生活' },
@@ -54,11 +57,18 @@ function setup() {
   const root = createRoot(host),
     open = vi.fn(),
     create = vi.fn()
-  function Harness({ active = true }: { active?: boolean }) {
+  function Harness({
+    active = true,
+    titlebarTarget,
+  }: {
+    active?: boolean
+    titlebarTarget?: HTMLElement
+  }) {
     const browser = useLibraryQuery(active)
     return (
       <LibraryBrowser
         browser={browser}
+        titlebarTarget={titlebarTarget}
         active={active}
         working={false}
         onCreate={create}
@@ -109,6 +119,59 @@ function setup() {
     },
   }
 }
+it('shows each mood in the timeline and calendar while keeping the date', async () => {
+  const first = { ...item, mood: '🌸', tags: [{ id: 't1', name: '生活' }] }
+  const second = { ...item, id: 'second-mood', title: '另一篇', mood: '🌧️' }
+  const third = { ...item, id: 'no-mood', title: '没有心情', recordDate: '2026-10-19' }
+  vi.mocked(searchApi.query).mockResolvedValue({ ...page, items: [first, second, third], total: 3 })
+  vi.mocked(searchApi.calendar).mockResolvedValue({
+    days: [{ date: item.recordDate, count: 2, items: [first, second] }],
+    tags: [],
+  })
+  const t = setup()
+  try {
+    await act(() => t.root.render(<t.Harness />))
+    const timeline = t.host.querySelector('.diary-timeline')!
+    expect(
+      [...timeline.querySelectorAll('.diary-timeline-day')].map((node) => node.textContent),
+    ).toEqual(['20', '19'])
+    expect([...timeline.querySelectorAll('[role="img"]')].map((node) => node.textContent)).toEqual([
+      '🌸',
+      '🌧️',
+    ])
+    expect(timeline.querySelector('.diary-timeline-tags')?.textContent).toBe('生活🌸')
+    expect(timeline.querySelectorAll('.diary-timeline-tags')[1]?.textContent).toBe('🌧️')
+    await t.click('日历')
+    await t.input('[aria-label="日历月份"]', '2026-10')
+    const entry = t.host.querySelector<HTMLElement>(
+      '.diary-calendar-entry[data-record-id="second-mood"]',
+    )!
+    expect(entry.textContent).toContain('🌧️')
+    await act(() => entry.click())
+    expect(t.open).toHaveBeenCalledWith(expect.objectContaining({ id: 'second-mood', mood: '🌧️' }))
+  } finally {
+    await t.close()
+  }
+})
+it('places homepage controls in the titlebar and removes them when leaving', async () => {
+  const t = setup()
+  const target = document.createElement('div')
+  document.body.append(target)
+  try {
+    await act(() => t.root.render(<t.Harness titlebarTarget={target} />))
+    expect(target.textContent).toContain('新建日记')
+    expect(target.textContent).toContain('日历')
+    await t.click('日历', target)
+    expect(t.host.querySelector('[aria-label="日历月份"]')).not.toBeNull()
+    await t.click('新建日记', target)
+    expect(t.create).toHaveBeenCalledOnce()
+    await act(() => t.root.render(null))
+    expect(target.textContent).toBe('')
+  } finally {
+    await t.close()
+    target.remove()
+  }
+})
 it('does not focus a diary on startup but restores focus after opening one', async () => {
   const t = setup()
   try {
@@ -151,6 +214,14 @@ it('shares filters across views and opens a day without replacing the global dat
     await t.click('生活')
     await t.escape()
     await t.click('日期筛选')
+    const shortcuts = document.querySelector<HTMLSelectElement>('[aria-label="快捷日期"]')!
+    expect([...shortcuts.options].map((option) => option.value)).toEqual([
+      'custom',
+      'today',
+      'yesterday',
+      'weekBefore',
+      'monthBefore',
+    ])
     await t.select('日期条件', 'onOrAfter')
     await t.input('[aria-label="筛选日期"]', '2026-10-01')
     await t.escape()
@@ -382,5 +453,34 @@ it('selects a complete date range directly on the calendar', async () => {
   } finally {
     await t.close()
     vi.useRealTimers()
+  }
+})
+it('jumps to an older month beyond the loaded page and can load newer records', async () => {
+  const t = setup()
+  const older = { ...item, id: 'older', title: '过去的记录', recordDate: '2025-12-01' }
+  const months = [
+    { month: '2026-10', offset: 0 },
+    { month: '2025-12', offset: 150 },
+  ]
+  vi.mocked(searchApi.query).mockImplementation(async (query) => ({
+    ...page,
+    months,
+    total: 151,
+    items: query.seekMonth === '2025-12' ? [older] : [item],
+    nextOffset: query.seekMonth === '2025-12' ? null : 100,
+  }))
+  try {
+    await act(() => t.root.render(<t.Harness />))
+    await t.click('较早的年份', t.host)
+    expect(t.host.textContent).toContain('过去的记录')
+    expect(
+      vi.mocked(searchApi.query).mock.calls.some(([query]) => query.seekMonth === '2025-12'),
+    ).toBe(true)
+    expect(t.host.textContent).toContain('加载较新记录')
+    await t.click('加载较新记录', t.host)
+    expect(t.host.textContent).toContain('记录已发生变化')
+    expect(t.host.textContent).toContain('过去的记录')
+  } finally {
+    await t.close()
   }
 })

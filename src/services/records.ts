@@ -7,6 +7,7 @@ import type { Tag } from './tags'
 export interface RecordFile {
   id: string
   title: string | null
+  mood?: string | null
   recordDate: string
   createdTimezone: string
   createdAt: number
@@ -32,6 +33,7 @@ export interface SaveInput {
   sessionId: string
   editSequence: number
   title: string | null
+  mood?: string | null
   recordDate: string
   tagIds: string[]
   document: JSONContent
@@ -71,6 +73,7 @@ export interface EditingSession {
 }
 
 export const recordsApi = {
+  showEmojiPicker: () => invoke<void>('show_system_emoji_picker'),
   recoveries: () => invoke<RecoverySummary[]>('recovery_list'),
   recovery: (recordId: string) => invoke<RecoveryDraft | null>('recovery_read', { recordId }),
   begin: (

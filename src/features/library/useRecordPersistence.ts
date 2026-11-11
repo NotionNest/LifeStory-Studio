@@ -14,7 +14,7 @@ interface Options {
   sessionId: string
   recovered?: SaveInput | null
   editor: Editor | null
-  content: () => Pick<SaveInput, 'title' | 'recordDate' | 'tagIds' | 'document'>
+  content: () => Pick<SaveInput, 'title' | 'mood' | 'recordDate' | 'tagIds' | 'document'>
   onDirty: (value: boolean) => void
   onSaved: () => void
   onFailure: (message: string) => void

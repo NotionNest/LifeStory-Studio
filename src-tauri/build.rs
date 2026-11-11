@@ -2,6 +2,7 @@ fn main() {
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(
         tauri_build::AppManifest::new().commands(&[
             "runtime_info",
+            "show_system_emoji_picker",
             "copy_review_reserve",
             "copy_review_run",
             "copy_review_cancel",

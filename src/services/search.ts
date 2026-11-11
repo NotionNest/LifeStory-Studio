@@ -12,10 +12,14 @@ export interface LibraryQuery {
   tagMode: 'all' | 'any'
   hasImages: boolean | null
   month: string | null
+  seekMonth?: string | null
   offset: number
 }
 export interface SearchItem extends RecordSummary {
+  mood?: string | null
   kind: RecordKind
+  createdAt: number
+  imageIds: string[]
   tags: Tag[]
   hasImages: boolean
   matchField: 'title' | 'body' | 'message' | null
@@ -26,6 +30,7 @@ export interface QueryPage {
   nextOffset: number | null
   days: { date: string; count: number }[]
   tags: Tag[]
+  months: { month: string; offset: number }[]
 }
 export interface CalendarDay {
   date: string

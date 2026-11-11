@@ -2037,6 +2037,8 @@ version = "0.1.0"
 dependencies = [
  "futures-util",
  "lifestory-image-validation",
+ "objc2",
+ "objc2-app-kit",
  "reqwest",
  "rusqlite",
  "serde",
@@ -2048,6 +2050,8 @@ dependencies = [
  "tauri-plugin-dialog",
  "tokio",
  "unicode-normalization",
+ "unicode-segmentation",
+ "windows",
  "windows-sys 0.61.2",
 ]
 

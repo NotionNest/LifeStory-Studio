@@ -160,11 +160,21 @@ beforeEach(() => {
   vi.mocked(recordsApi.recoveries).mockResolvedValue([])
   vi.mocked(recordsApi.recovery).mockResolvedValue(null)
   vi.mocked(searchApi.query).mockResolvedValue({
-    items: [{ ...original, excerpt: '合成正文', kind: 'text', hasImages: false, matchField: null }],
+    items: [
+      {
+        ...original,
+        excerpt: '合成正文',
+        kind: 'text',
+        hasImages: false,
+        imageIds: [],
+        matchField: null,
+      },
+    ],
     total: 1,
     nextOffset: null,
     days: [],
     tags: [],
+    months: [],
   })
   vi.mocked(recordsApi.begin).mockImplementation(async () => ({
     record: structuredClone(saved),

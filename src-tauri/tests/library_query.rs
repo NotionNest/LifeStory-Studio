@@ -53,6 +53,42 @@ fn q(keyword: &str) -> LibraryQuery {
     }
 }
 #[test]
+fn timeline_months_follow_filters_and_images_follow_current_document() {
+    let root = Workspace::new();
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    add(&db, &root, "a", "2026-11-01", "甲", "共同");
+    add(&db, &root, "b", "2025-12-01", "乙", "共同");
+    add(&db, &root, "c", "2025-11-01", "丙", "其他");
+    let sql = root.sql();
+    sql.execute_batch("INSERT INTO image_objects VALUES('obj','hash','objects/hash','image/png',10,1,1,'ready'); INSERT INTO attachment_links(id,record_id,object_id,original_name,in_body) VALUES('pic','a','obj','图.png',1);").unwrap();
+    let document = json!({"type":"doc","content":[{"type":"attachmentImage","attrs":{"attachmentId":"pic"}},{"type":"attachmentImage","attrs":{"attachmentId":"pic"}},{"type":"attachmentImage","attrs":{"attachmentId":"missing"}}]});
+    sql.execute(
+        "UPDATE records SET working_document=?1 WHERE id='a'",
+        [document.to_string()],
+    )
+    .unwrap();
+    let page = db.query_library(q("共同")).unwrap();
+    assert_eq!(
+        page.months
+            .iter()
+            .map(|m| (m.month.as_str(), m.offset))
+            .collect::<Vec<_>>(),
+        vec![("2026-11", 0), ("2025-12", 1)]
+    );
+    assert_eq!(page.items[0].image_ids, vec!["pic", "pic"]);
+    let mut seek = q("共同");
+    seek.seek_month = Some("2025-12".into());
+    let older = db.query_library(seek).unwrap();
+    assert_eq!(older.items[0].id, "b");
+    sql.execute("UPDATE attachment_links SET in_body=0 WHERE id='pic'", [])
+        .unwrap();
+    assert!(
+        db.query_library(q("共同")).unwrap().items[0]
+            .image_ids
+            .is_empty()
+    );
+}
+#[test]
 fn literal_search_tracks_only_current_content_and_deleted_records() {
     let root = Workspace::new();
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
@@ -130,6 +166,12 @@ fn diary_filters_calendar_and_chat_search_keep_separate_scopes() {
     query.date_to = query.date_from.clone();
     let page = db.query_library(query.clone()).unwrap();
     assert_eq!(page.total, 1);
+    let created_at: i64 = sql
+        .query_row("SELECT created_at FROM records WHERE id='a'", [], |row| {
+            row.get(0)
+        })
+        .unwrap();
+    assert_eq!(page.items[0].created_at, created_at);
     assert_eq!(page.days.iter().map(|d| d.count).sum::<u32>(), 2);
     query.date_from = None;
     query.date_to = None;
@@ -244,7 +286,7 @@ fn paging_validation_and_index_upgrade_do_not_lose_or_repeat_records() {
         assert!(db.query_library(query).is_err());
     }
     drop(db);
-    sql.execute_batch("DROP TRIGGER chat_user_text_insert; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; DROP TABLE ai_source_blocks; DROP TABLE ai_provider_checks; DROP TABLE ai_task_sources; DROP TABLE ai_tasks; DROP TABLE ai_profiles; DROP INDEX records_trash_due; ALTER TABLE record_relations DROP COLUMN unavailable_source_id; DROP TRIGGER library_search_insert;DROP TRIGGER library_search_update;DROP TRIGGER library_search_delete;DELETE FROM record_search;INSERT INTO record_search VALUES('r-000','过期残留');PRAGMA user_version=8;").unwrap();
+    sql.execute_batch("DROP TRIGGER chat_user_text_insert; DROP TABLE ai_request_receipts; DROP TABLE ai_adopted_ranges; DROP TABLE ai_previews; DROP TABLE ai_conversations; DROP TABLE ai_preferences; DROP TABLE ai_source_blocks; DROP TABLE ai_provider_checks; DROP TABLE ai_task_sources; DROP TABLE ai_tasks; DROP TABLE ai_profiles; DROP INDEX records_trash_due; ALTER TABLE record_relations DROP COLUMN unavailable_source_id; DROP TRIGGER library_search_insert;DROP TRIGGER library_search_update;DROP TRIGGER library_search_delete;DELETE FROM record_search;INSERT INTO record_search VALUES('r-000','过期残留');ALTER TABLE records DROP COLUMN mood; PRAGMA user_version=8;").unwrap();
     drop(sql);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
     assert_eq!(db.query_library(q("过期残留")).unwrap().total, 0);
@@ -503,4 +545,57 @@ fn tag_catalog_counts_only_active_diaries_and_keeps_unused_tags() {
     for id in ["missing", "deleted", "chat", "invalid/id"] {
         assert!(db.tag_catalog(id.into()).is_err());
     }
+}
+
+#[test]
+fn timeline_and_calendar_return_each_records_current_mood() {
+    use lifestory_studio_lib::library_query::CalendarQuery;
+    let root = Workspace::new();
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    add(&db, &root, "mood-a", "2026-10-20", "甲", "内容");
+    add(&db, &root, "mood-b", "2026-10-20", "乙", "内容");
+    add(&db, &root, "no-mood", "2026-10-20", "丙", "内容");
+    let sql = root.sql();
+    sql.execute("UPDATE records SET mood='🌸' WHERE id='mood-a'", [])
+        .unwrap();
+    sql.execute("UPDATE records SET mood='🌧️' WHERE id='mood-b'", [])
+        .unwrap();
+    let check = |items: &[lifestory_studio_lib::library_query::SearchItem]| {
+        for (id, expected) in [
+            ("mood-a", Some("🌸")),
+            ("mood-b", Some("🌧️")),
+            ("no-mood", None),
+        ] {
+            assert_eq!(
+                items
+                    .iter()
+                    .find(|item| item.id == id)
+                    .unwrap()
+                    .mood
+                    .as_deref(),
+                expected
+            );
+        }
+    };
+    check(&db.query_library(q("")).unwrap().items);
+    let calendar = db
+        .query_calendar(CalendarQuery {
+            filters: q(""),
+            from: "2026-10-20".into(),
+            to: "2026-10-20".into(),
+        })
+        .unwrap();
+    check(&calendar.days[0].items);
+    sql.execute("UPDATE records SET mood=NULL WHERE id='mood-a'", [])
+        .unwrap();
+    assert_eq!(
+        db.query_library(q(""))
+            .unwrap()
+            .items
+            .iter()
+            .find(|item| item.id == "mood-a")
+            .unwrap()
+            .mood,
+        None
+    );
 }

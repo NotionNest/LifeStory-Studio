@@ -86,6 +86,7 @@ fn trash_restores_without_replaying_old_sessions_and_rejects_stale_actions() {
         session_id: editing.session_id,
         edit_sequence: 1,
         title: Some("晚到内容".into()),
+        mood: None,
         record_date: "2026-10-21".into(),
         document: editing.record.document,
         tag_ids: vec![],

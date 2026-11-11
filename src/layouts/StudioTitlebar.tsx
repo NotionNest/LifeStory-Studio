@@ -53,14 +53,17 @@ export function StudioTitlebar({ macTitlebar }: { macTitlebar: boolean }) {
           {sidebarOpen ? <PanelLeftCloseIcon /> : <PanelLeftOpenIcon />}
         </Button>
       )}
-      <span className="text-xs font-medium" data-tauri-drag-region>
+      <span
+        className="hidden shrink-0 whitespace-nowrap text-xs font-medium sm:inline"
+        data-tauri-drag-region
+      >
         LifeStory Studio
       </span>
       <div
         ref={setTitlebarTarget}
         role="toolbar"
         aria-label="当前页面操作"
-        className="ml-auto flex shrink-0 items-center gap-1"
+        className="ml-auto flex min-w-0 items-center gap-1 overflow-x-auto py-1"
         style={{ WebkitAppRegion: 'no-drag' } as CSSProperties}
       />
     </header>

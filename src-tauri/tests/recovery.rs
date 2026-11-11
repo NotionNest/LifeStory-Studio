@@ -50,6 +50,7 @@ fn setup(db: &DatabaseWorker) -> SaveRecord {
         session_id: session.session_id,
         edit_sequence: 1,
         title: Some("未保存标题".into()),
+        mood: None,
         record_date: "2026-10-14".into(),
         tag_ids: vec![],
         document: json!({"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"合成恢复内容"}]}]}),
@@ -60,7 +61,8 @@ fn setup(db: &DatabaseWorker) -> SaveRecord {
 fn restart_preview_restore_keeps_durable_copy_until_formal_save() {
     let root = Workspace::new();
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
-    let input = setup(&db);
+    let mut input = setup(&db);
+    input.mood = Some("🌤️".into());
     assert!(db.recovery_write(input.clone()).unwrap());
     drop(db);
     let db = DatabaseWorker::start(root.0.clone()).unwrap();
@@ -68,6 +70,7 @@ fn restart_preview_restore_keeps_durable_copy_until_formal_save() {
     assert_eq!(formal.title, None);
     let draft = db.recovery_read("entry".into()).unwrap().unwrap();
     assert_eq!(draft.input.document, input.document);
+    assert_eq!(draft.input.mood.as_deref(), Some("🌤️"));
     assert!(
         db.begin_edit(BeginEdit {
             record_id: "entry".into(),
@@ -89,6 +92,7 @@ fn restart_preview_restore_keeps_durable_copy_until_formal_save() {
         .unwrap();
     let current = restored.recovered.unwrap();
     assert_ne!(current.session_id, input.session_id);
+    assert_eq!(current.mood.as_deref(), Some("🌤️"));
     let mut invalid = current.clone();
     invalid.record_date = "2025-02-29".into();
     assert!(db.save_record(invalid).is_err());
@@ -154,4 +158,25 @@ fn older_save_only_clears_covered_drafts_and_late_old_snapshot_is_ignored() {
     newer.base_content_version = Some(saved.content_version);
     db.save_record(newer).unwrap();
     assert!(db.recovery_read("entry".into()).unwrap().is_none());
+}
+
+#[test]
+fn mood_only_draft_is_not_discarded_as_unchanged() {
+    let root = Workspace::new();
+    let db = DatabaseWorker::start(root.0.clone()).unwrap();
+    let mut input = setup(&db);
+    input.title = None;
+    input.record_date = "2026-10-15".into();
+    input.document = json!({"type":"doc","content":[{"type":"paragraph"}]});
+    input.mood = Some("🌸".into());
+    db.recovery_write(input).unwrap();
+    assert_eq!(
+        db.recovery_read("entry".into())
+            .unwrap()
+            .unwrap()
+            .input
+            .mood
+            .as_deref(),
+        Some("🌸")
+    );
 }
